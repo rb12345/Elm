@@ -546,7 +546,7 @@ def _retrieveAllConfigDB():
         myTyp = conf.Type
         if myTyp is not None:
             if myTyp == 'password':
-                if hasattr(c, 'hsm') == True and isinstance(c.hsm, dict):
+                if False and hasattr(c, 'hsm') == True and isinstance(c.hsm, dict):
                     hsm = c.hsm.get('obj')
                     if hsm is not None and hsm.isReady() == True:
                         config['enc' + key] = decryptPassword(conf.Value)
