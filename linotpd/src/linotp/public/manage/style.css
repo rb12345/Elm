@@ -113,7 +113,7 @@
 			}
 .select_list { list-style-type: none; margin: 0; padding: 0; width: 95%; }
 .select_list li { margin: 3px; padding: 0.4em; }
-.select_list li:hover { background: #FEB77E; }
+.select_list li:hover { background: #3277AE; }
 
 
 #logDiv { width: 100%; height: 50px; padding: 0.5em; }
@@ -137,12 +137,8 @@ h1 {
 }
 
 body {
-	/*
-	font-family: helvetica, impact, sans-serif;
-	*/
-	font-family: Verdana,Arial,sans-serif; font-size: 1.0em;
-	/*background: #cacee4;
-	 */
+	font-family: Helvetica Neue, Helvetica, Verdana,Arial,sans-serif; 
+	font-size: 1.0em;
 	height: 100%;
 	}
 
@@ -161,26 +157,27 @@ html {
 }
 
 #wrap {
- width:98%;
- height: 100%;
- margin:0 auto;
- position: absolute;
- top: 0;
- right: 0;
- bottom: 0;
- left: 0;
- z-index: 1;
- min-width: 900px;
+	 width: 95%;
+	 height: 100%;
+	 margin: 8px auto;
+	 position: absolute;
+	 top: 0;
+	 right: 0;
+	 bottom: 0;
+	 left: 0;
+	 z-index: 1;
+	 min-width: 900px;
 }
 
 #main {
- float:right;
- width: 86%;
- background: #080808;
- /*padding: 3px;*/
- position: relative;
- z-index: 1;
- margin-bottom: 20px;
+	 float:right;
+	 width: 86%;
+	 padding: 3px;
+	 position: relative;
+	 z-index: 1;
+	 margin-bottom: 20px;
+	 background: #eeeeee;
+	 border: 1px solid #aeaeae
 }
 
 #main #tabs #ui-tabs-1 button.ui-button {
@@ -188,12 +185,13 @@ html {
 }
 
 #sidebar {
-float:left;
-width:13%;
-background:#fefefe;
-padding: 3px;
-position: relative;
-z-index: 1;
+	float:left;
+	width:12%;
+	padding: 3px;
+	position: relative;
+	z-index: 1;
+	background:#eeeeee;
+	border: 1px solid #aeaeae;
 }
 
 #sidebar #realms {
@@ -239,27 +237,25 @@ z-index: 1;
 
  li#logo {
     float: right;
-    margin-right: 10px;
     background: none;
  }
 
  li#logo div {
-    background-image:  url("/images/linotp_logo_118x40.png");
-    margin-left: 38px;
-    background-repeat:no-repeat;
-    height: 40px;
-    width: 118px;
+    background-image:  url("/images/crest.png");
+    background-size: cover;
+	float: right;
+    height: 68px;
+    width: 220px;
  }
 
  #menu {
- 	width:100%;
-	margin-top: 5px;
-	padding: 5px 0;
+	background:#002147;
+	font-size:large;
+	width: 100%;
+	border: 1px solid #dedede;
+	border-radius: 0;
  }
 
- #menu.sf-menu ul {
-	width: 12em;
- }
 
  #menu.sf-menu li:first-child a {
 	border-left:none;
@@ -267,7 +263,6 @@ z-index: 1;
 
  #menu.sf-menu a {
 	border-top: none;
-	padding: 12px 25px;
  }
 
  #nav {
@@ -277,11 +272,6 @@ z-index: 1;
  #logout {
  float:right;
  }
-
- #main {
- background:#fefefe;
- }
-
 
 #footer {
  clear:both;

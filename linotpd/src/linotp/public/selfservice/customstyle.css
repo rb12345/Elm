@@ -1,0 +1,17 @@
+a {
+ 	color: #3277AE;
+}
+
+.ui-tabs.ui-widget {
+	border: none;
+	border-radius: 0;
+}
+
+.ui-state-default.ui-corner-top {
+	border-radius: 0;
+}
+
+.ui-tabs-nav.ui-widget-header {
+	background: #002147;
+	border-radius: 0;
+}
