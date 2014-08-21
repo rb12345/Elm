@@ -1229,8 +1229,28 @@ ${c.version} --- ${c.licenseinfo}
 <!-- ################## dialog Oak resolver ######################### -->
 
 <div id="dialog_oak_resolver">
-<form class="cmxform" id="form_oakconfig"><fieldset name='${_("Oak configuration")}'></fieldset></form>
+	<form class="cmxform" id="form_oakconfig">
+		<fieldset name='${_("Oak configuration")}'>
+			<table>
+				<tr>
+					<td><label for=oak_resolvername>${_("Resolver name")}:</label></td>
+					<td><input type="text" name="oak_resolvername" class="required"  id="oak_resolvername" size="35" maxlength="20"></td>
+				</tr>
+				<tr>
+					<td><label for=oak_realm>${_("Realm code (eg 'ball' or 'admn')")}:</label></td>
+					<td><input type="text" name="oak_realm" class="required"  id="oak_realm" size="10" maxlength="6"></td>
+				</tr>
+				<tr>
+					<td><label for=ldap_sizelimit>${_("Response size limit")}:</label></td>
+					<td><input type="text" name="oak_sizelimit" class="required"  id="oak_sizelimit" size="10" maxlength="10"></td>
+				</tr>
+			</table>
+		</fieldset>
+	</form>
+	<div id="progress_test_oak"><img src="/images/ajax-loader.gif" border="0" alt=""> ${_("Testing connections...")} </div>
+		<button class="action-button" id="button_test_oak">${_("Test Oak connection")}</button>\
 </div>
+
 <script>
 	function translate_dialog_oak_resolver() {
 		$("#dialog_oak_resolver" ).dialog( "option", "title", '${_("Oak Resolver")}' );
@@ -1351,8 +1371,10 @@ ${c.version} --- ${c.licenseinfo}
 <div id="text_regexp_error">${_("Error in regular expression for")}: <span class="text_param1"> </span></div>
 <div id="text_ldap_config_success">${_("LDAP config seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
 <div id="text_ldap_load_error">${_("Error loading LDAP resolver")}: <span class="text_param1"> </span></div>
+
 <div id="text_oak_config_success">${_("Oak config seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
 <div id="text_oak_load_error">${_("Error loading Oak resolver")}: <span class="text_param1"> </span></div>
+
 <div id="text_sql_load_error">${_("Error loading SQL resolver")}: <span class="text_param1"> </span></div>
 <div id="text_sql_config_success">${_("SQL config seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
 <div id="text_sql_config_fail">${_("SQL config contains errors")}: <span class="text_param1"> </span></div>

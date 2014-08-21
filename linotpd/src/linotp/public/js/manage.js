@@ -99,6 +99,8 @@ function error_handling(message, file, line){
 var $dialog_ldap_resolver;
 var $dialog_file_resolver;
 var $dialog_sql_resolver;
+var $dialog_oak_resolver;
+
 var $dialog_edit_realms;
 var $dialog_ask_new_resolvertype;
 var $dialog_resolvers;
@@ -252,7 +254,7 @@ function alert_box(title, s, param1) {
 
 // ####################################################
 //
-//  functions for seletected tokens and selected users
+//  functions for selected tokens and selected users
 //
 
 function get_selected_tokens(){
@@ -1923,6 +1925,36 @@ function save_ldap_config(){
     return false;
 }
 
+function save_oak_config(){
+    // Save all Oak config
+    var resolvername = $('#oak_resolvername').val();
+    var resolvertype = "oakresolver";
+    var oak_map = {
+        '#oak_realm': 'OAKREALM',
+        '#oak_sizelimit': 'SIZELIMIT',
+    };
+    var url = '/system/setResolver?name='+resolvername+'&type='+resolvertype+'&';
+    for (var key in oak_map) {
+        var data = $(key).serialize();
+        var new_data = data.replace(/^.*=/, oak_map[key] + '=');
+        url += new_data + "&";
+    }
+
+    url += "session="+getsession();
+    show_waiting();
+    $.get(url,
+     function(data, textStatus, XMLHttpRequest){
+        hide_waiting();
+        if (data.result.status == false) {
+            alert_info_text("text_error_oak", data.result.error.message, ERROR);
+        } else {
+            resolvers_load();
+            $dialog_oak_resolver.dialog('close');
+        }
+    });
+    return false;
+}
+
 function save_realm_config(){
     var realm = $('#realm_name').val();
     show_waiting();
@@ -2170,7 +2202,10 @@ function resolver_edit_type(){
     var reso = g.resolver_to_edit.replace(/(\S+)\s+\S+/, "$1");
     var type = g.resolver_to_edit.replace(/\S+\s+\[(\S+)\]/, "$1");
     switch (type) {
-        case "ldapresolver":
+		case "oakresolver":
+			resolver_oak(reso)
+			break;
+		case "ldapresolver":
             resolver_ldap(reso);
             break;
         case "sqlresolver":
@@ -2650,6 +2685,21 @@ $(document).ready(function(){
     // hide the javascrip message
     $('#javascript_error').hide();
 
+	/*
+    var ua = window.navigator.userAgent;
+    var msie = ua.indexOf("MSIE ");
+
+	// IE breaks when encountering links in the form username:pass@url
+	// so we display an IE-parseable reduced-functionality link by default
+	// and then hide it for all modern browsers
+	
+    if (!(msie > 0 || !!navigator.userAgent.match(/Trident.*rv\:11\./))) {
+		var old_link = document.getElementById("logout_url_ie");
+		old_link.hide();
+		var link = document.getElementById("logout_url");
+		link.show();		
+	}
+	*/
     $('#do_waiting').overlay({
         top: 10,
         mask: {
@@ -2912,6 +2962,15 @@ $(document).ready(function(){
                     text: "LDAP"
 
             },
+			'Oak': { click: function(){
+                        // calling with no parameter, creates a new resolver
+                        resolver_oak("");
+                        $(this).dialog('close');
+                    },
+                    id: "button_new_resolver_type_oak",
+                    text: "Oak"
+
+            },
             'SQL': { click: function(){
                     // calling with no parameter, creates a new resolver
                     resolver_sql("");
@@ -2991,7 +3050,68 @@ $(document).ready(function(){
             ldap_resolver_ldaps();
         }
     });
+	
+    $dialog_oak_resolver = $('#dialog_oak_resolver').dialog({
+        autoOpen: false,
+        title: 'Oak Resolver',
+        width: 600,
+        modal: true,
+        maxHeight: 500,
+        buttons: {
+            'Cancel': { click: function(){
+                $(this).dialog('close');
+                },
+                id: "button_oak_resolver_cancel",
+                text: "Cancel"
+                },
+            'Save': { click: function(){
+                    // Save the LDAP configuration
+                    if ($("#form_oakconfig").valid()) {
+                        save_oak_config();
+                        //$(this).dialog('close');
+                    }
+                },
+                id: "button_oak_resolver_save",
+                text: "Save"
+            }
+        },
+        open: function() {
+            do_dialog_icons();
+        }
+    });
+	    
+	$('#button_test_oak').click(function(event){
+        $('#progress_test_oak').show();
 
+        var url = '/admin/testresolver';
+        var params = {};
+        params['type']              = 'oak';
+        params['oak_realm']          = $('#oak_realm').val();
+        params['oak_sizelimit']    = $('#oak_sizelimit').val();
+
+        clientUrlFetch(url, params, function(xhdr, textStatus) {
+                    var resp = xhdr.responseText;
+                    var obj = jQuery.parseJSON(resp);
+                    $('#progress_test_oak').hide();
+                    if (obj.result.status == true) {
+                        result = obj.result.value.result;
+                        if (result == "success") {
+                            // show number of found users
+                            var num = obj.result.value.desc;
+                            alert_box("Oak Test", "text_oak_config_success", num);
+                        }
+                        else {
+                            alert_box("Oak Test", obj.result.value.desc);
+                        }
+                    }
+                    else {
+                        alert_box("Oak Test", obj.result.error.message);
+                    }
+                    return false;
+                 });
+        return false;
+    });
+	
     $('#button_test_ldap').click(function(event){
         $('#progress_test_ldap').show();
 
@@ -4065,6 +4185,9 @@ function realm_edit(name){
                         alert_info_text("text_regexp_error", reso, ERROR);
                     }
                     switch (t) {
+						case 'oakresolver':
+							g.resolvers_in_realm_to_edit += 'useridresolver.OakIdResolver.IdResolver.' + r;
+							break;
                         case 'ldapresolver':
                             g.resolvers_in_realm_to_edit += 'useridresolver.LDAPIdResolver.IdResolver.' + r;
                             break;
@@ -4126,7 +4249,7 @@ function resolver_ldap(name){
                     'LDAPURI': 'ldap://linotpserver1, ldap://linotpserver2',
                     'LDAPBASE': 'dc=yourdomain,dc=tld',
                     'TIMEOUT': '5',
-                    'SIZELIMIT' : '500',
+                    'SIZELIMIT' : '1000',
                     'LOGINNAMEATTRIBUTE': 'sAMAccountName',
                     'LDAPSEARCHFILTER': '(sAMAccountName=*)(objectClass=user)',
                     'LDAPFILTER': '(&(sAMAccountName=%s)(objectClass=user))',
@@ -4231,6 +4354,72 @@ function resolver_ldap(name){
 
 }
 
+function resolver_set_oak(obj) {
+    $('#oak_realm').val(obj.result.value.data.OAKREALM);
+    $('#oak_sizelimit').val(obj.result.value.data.SIZELIMIT);
+
+}
+
+function resolver_oak(name){
+
+    var obj = {
+        'result': {
+            'value': {
+                'data': {
+                    'OAKREALM': '',
+                    'SIZELIMIT' : '1000',
+                }
+            }
+        }
+    };
+
+
+    if (name) {
+        // load the config of the resolver "name".
+        clientUrlFetch('/system/getResolver', {'resolver' : name}, function(xhdr, textStatus) {
+            var resp = xhdr.responseText;
+            var obj = jQuery.parseJSON(resp);
+            $('#oak_resolvername').val(name);
+            if (obj.result.status) {
+                resolver_set_oak(obj);
+            } else {
+                // error reading resolver
+                alert_box("", "text_oak_load_error", obj.result.error.message);
+            }
+
+          });
+    } // end if
+    else {
+        $('#oak_resolvername').val("");
+        resolver_set_oak(obj);
+    }
+
+    $('#progress_test_oak').hide();
+    $dialog_oak_resolver.dialog('open');
+
+    jQuery.validator.addMethod("resolvername", function(value, element, param){
+        return value.match(/^[a-z0-9_\-]+$/i);
+    }, "Please enter a valid resolver name. It may contain characters, numbers and '_-'.");
+
+	jQuery.validator.addMethod("oak_realm", function(value, element, param){
+        return value.match(/^[a-z0-9]+$/i);
+    }, "Please enter a valid Oak realm identifier. It may contain characters or numbers.");
+
+	$("#form_oakconfig").validate({
+        rules: {
+            oak_resolvername: {
+                required: true,
+                minlength: 4,
+                resolvername: true
+            },
+            oak_resolvername: {
+                required: true,
+                minlength: 4,
+                oak_realm: true
+            },
+        }
+    });
+}
 
 function resolver_set_sql(obj) {
 
@@ -4498,20 +4687,23 @@ function view_token() {
             url : '/manage/tokenview_flexi?session='+getsession(),
             method: 'GET',
             dataType : 'json',
-            colModel : [ {display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
-                            {display: 'active', name : 'Isactive', width : 30, sortable : true, align: 'center'},
+            colModel : [ 
+							{display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
+                            {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
+							{display: 'description', name : 'TokenDesc', width : 200, sortable : true, align: 'center'},
+                            {display: 'active', name : 'Isactive', width : 35, sortable : true, align: 'center'},
+							
                             {display: 'username', name : 'Username', width : 100, sortable : false, align: 'center'},
                             {display: 'realm', name : 'realm', width : 100, sortable : false, align: 'center'},
-                            {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
-                            {display: 'counter login', name : 'FailCount', width : 30, sortable : true, align: 'center'},
-                            {display: 'description', name : 'TokenDesc', width : 100, sortable : true, align: 'center'},
-                            {display: 'maxfailcount', name : 'maxfailcount', width : 50, sortable : false, align: 'center'},
+                            {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'},		
+							{display: 'userid', name : 'Userid', width : 100, sortable : true, align: 'center'},
+			
+                            {display: 'fail count', name : 'FailCount', width : 60, sortable : true, align: 'center'},
+                            {display: 'max fails', name : 'maxfailcount', width : 60, sortable : false, align: 'center'},
                             {display: 'otplen', name : 'otplen', width : 50, sortable : false, align: 'center'},
                             {display: 'countwindow', name : 'countwindow', width : 50, sortable : false, align: 'center'},
-                            {display: 'syncwindow', name : 'syncwindow', width : 50, sortable : false, align: 'center'},
-                            {display: 'userid', name : 'Userid', width : 100, sortable : true, align: 'center'},
-                            {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'}
-                                ],
+                            {display: 'syncwindow', name : 'syncwindow', width : 50, sortable : false, align: 'center'}
+            ],
             height: 400,
             searchitems : [
                 {display: 'in loginname', name: 'loginname', isdefault: true },
@@ -4542,26 +4734,22 @@ function view_user() {
             url : '/manage/userview_flexi?session='+getsession(),
             method: 'GET',
             dataType : 'json',
-            colModel : [ {display: 'username', name : 'username', width : 90, sortable : true, align:"left"},
-                        {display: 'useridresolver', name : 'useridresolver', width : 200, sortable : true, align:"left"},
-            {display: 'surname', name : 'surname', width : 100, sortable : true, align:"left"},
-            {display: 'givenname', name : 'givenname', width : 100, sortable : true, align:"left"},
-            {display: 'email', name : 'email', width : 100, sortable : false, align:"left"},
-                        {display: 'mobile', name : 'mobile', width : 50, sortable : true, align:"left"},
-            {display: 'phone', name : 'phone', width : 50, sortable : false, align:"left"},
-                        {display: 'userid', name : 'userid', width : 200, sortable : true, align:"left"}
+            colModel : [ 
+				{display: 'username', name : 'username', width : 100, sortable : true, align:"left"},
+				{display: 'givenname', name : 'givenname', width : 150, sortable : true, align:"left"},
+				{display: 'surname', name : 'surname', width : 150, sortable : true, align:"left"},
+				{display: 'email', name : 'email', width : 300, sortable : false, align:"left"},
+                {display: 'userid', name : 'userid', width : 100, sortable : true, align:"left"},
+				{display: 'useridresolver', name : 'useridresolver', width : 200, sortable : true, align:"left"}
             ],
             height: 400,
             searchitems : [
                 {display: 'in username          ', name : 'username', isdefault: true},
-                {display: 'surname          ', name : 'surname'},
                 {display: 'given name           ', name : 'givenname'},
-                {display: 'description          ', name : 'description'},
+				{display: 'surname          ', name : 'surname'},
+			    {display: 'email            ', name : 'email'},
                 {display: 'userid           ', name : 'userid'},
-                {display: 'email            ', name : 'email'},
-                {display: 'mobile           ', name : 'mobile'},
-                {display: 'phone            ', name : 'phone'}
-                ],
+            ],
             rpOptions: [15,20,50,100],
             sortname: "username",
             sortorder: "asc",

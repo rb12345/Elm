@@ -86,7 +86,19 @@
 	<div id='tokenDiv'>
 
     </div>
-
+    <div>
+		${_("Realm")}:
+	    <select name="realm">
+	       % for realm in c.realmArray:
+	       %if c.realm == realm:
+	       <option value="${realm}" selected>${realm}</option>
+	       %else:
+	       <option value="${realm}">${realm}</option>
+	       %endif
+	       %endfor
+		</select>
+	</div>
+	
     <div id='imprint'>
     ${c.imprint|n}
     </div>

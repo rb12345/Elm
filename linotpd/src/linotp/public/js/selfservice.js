@@ -66,11 +66,7 @@ function alert_box(p_title, s, param1) {
                 }
             }
      });
-
-
 }
-
-
 
 function sprintf() {
     if (sprintf.arguments.length < 2) {
@@ -115,6 +111,7 @@ function error_handling(message, file, line) {
 
 function get_selfservice_session() {
     var session = "";
+	
     if (document.cookie) {
         session = getcookie("linotp_selfservice");
         if (session == "") {
@@ -643,11 +640,6 @@ function finishOcra() {
 
 }
 
-
-
-
-
-
 function provisionGoogle() {
     show_waiting();
     var type = "googleauthenticator";
@@ -936,3 +928,23 @@ function view_audit_selfservice() {
             addTitleToCell: true
     });
 }
+
+$('#realm').change(function(){
+    var new_realm = $('#realm').val();
+    params['session'] = get_selfservice_session();
+	params['realm'] = new_realm;
+
+	show_waiting();
+    $.post('/selfservice/change_realm', params, function(data, textStatus, XMLHttpRequest) {
+            hide_waiting();
+            if (data.result.status == false) {
+                alert("Error changing realm: " + data.result.error.message);
+            };
+            if (data.result.status == true) {
+                showTokenlist();
+				$('.selectedToken').val("");
+            };
+        });
+        // end of get
+    }
+);

@@ -143,6 +143,9 @@ class ManageController(BaseController):
             c.title = "LinOTP Management"
             admin_user = getUserFromRequest(request)
             if admin_user.has_key('login'):
+                (login, realm) = admin_user['login'].split("@")
+                c.login = login;
+                c.realm = realm;
                 c.admin = admin_user['login']
 
             log.debug("[index] importers: %s" % IMPORT_TEXT)
@@ -201,7 +204,8 @@ class ManageController(BaseController):
             http_host = request.environ.get("HTTP_HOST")
             url_scheme = request.environ.get("wsgi.url_scheme")
             c.logout_url = "%s://log-me-out:fake@%s/manage/logout" % (url_scheme, http_host)
-
+            # c.logout_url_ie = "%s://%s/manage/logout_ie" % (url_scheme, http_host)
+            
             Session.commit()
             ren = render('/manage/start.mako')
             return ren
@@ -340,7 +344,7 @@ class ManageController(BaseController):
             if not pol['active']:
                 filterRealm = ["*"]
 
-            # check if we only want to see ONE realm or see all realms we are allowerd to see.
+            # check if we only want to see ONE realm or see all realms we are allowed to see.
             if filter_realm:
                 if filter_realm in filterRealm or '*' in filterRealm:
                     filterRealm = [filter_realm]
@@ -364,18 +368,22 @@ class ManageController(BaseController):
                     { 'id' : tok['LinOtp.TokenSerialnumber'],
                         'cell': [
                             tok['LinOtp.TokenSerialnumber'],
+                            tok['LinOtp.TokenType'],
+                            tok['LinOtp.TokenDesc'],
                             tok['LinOtp.Isactive'],
+                            
                             tok['User.username'],
                             tok['LinOtp.RealmNames'],
-                            tok['LinOtp.TokenType'],
+                            tok['LinOtp.IdResolver'],
+                            tok['LinOtp.Userid'],
+                            
                             tok['LinOtp.FailCount'],
-                            tok['LinOtp.TokenDesc'],
                             tok['LinOtp.MaxFail'],
                             tok['LinOtp.OtpLen'],
                             tok['LinOtp.CountWindow'],
                             tok['LinOtp.SyncWindow'],
-                            tok['LinOtp.Userid'],
-                            tok['LinOtp.IdResolver'], ]
+                            
+                        ]
                     }
                     )
 
@@ -458,13 +466,11 @@ class ManageController(BaseController):
                     { 'id' : u['username'],
                         'cell': [
                             (u['username']) if u.has_key('username') else (""),
-                            (resolver_display),
-                            (u['surname']) if u.has_key('surname') else (""),
                             (u['givenname']) if u.has_key('givenname') else (""),
+                            (u['surname']) if u.has_key('surname') else (""),
                             (u['email']) if u.has_key('email') else (""),
-                            (u['mobile']) if u.has_key('mobile') else (""),
-                            (u['phone']) if u.has_key('phone') else (""),
                             (u['userid']) if u.has_key('userid') else (""),
+                            (resolver_display),
                              ]
                     }
                     )
@@ -585,7 +591,14 @@ class ManageController(BaseController):
         http_host = request.environ.get("HTTP_HOST")
         url_scheme = request.environ.get("wsgi.url_scheme", "https")
         redirect("%s://%s/manage/" % (url_scheme, http_host))
-
+    
+    def logout_ie(self):
+        '''
+        redirect logout
+        '''
+        from pylons.controllers.util import abort
+        abort(401, "Logged out. Please close this tab.")
+     
 
     def help(self):
         '''
