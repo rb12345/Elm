@@ -451,8 +451,9 @@ class TimeHmacTokenClass(HmacTokenClass):
             if initTime == -1:
                 log.warning("[checkOTP] a previous OTP value was used again!\n former tokencounter: %i, presented counter %i" %
                         (oCount, res))
-                res = -1
-                return res
+                # Allow reuse of passcodes to fix Apache issues.
+                #res = -1
+                #return res
 
         if -1 == res :
             ## autosync: test if two consecutive otps have been provided
