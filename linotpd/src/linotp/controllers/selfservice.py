@@ -40,7 +40,7 @@ except ImportError:
     import simplejson as json
 
 import webob
-
+import time
 
 from pylons import request, response, config, tmpl_context as c
 from pylons.controllers.util import abort
@@ -98,7 +98,7 @@ from linotp.lib.reply import sendQRImageResult
 from linotp.lib.reply import create_img
 
 from linotp.lib.selfservice import get_imprint
-from linotp.lib.user import getUserInfo, User
+from linotp.lib.user import getUserInfo, User, getAllUserRealms
 
 from linotp.lib.error import SelfserviceException
 
@@ -159,50 +159,33 @@ class SelfserviceController(BaseController):
             c.audit['success'] = False
             c.audit['client'] = get_client()
 
-
             c.version = get_version()
             c.licenseinfo = get_copyright_info()
-            if isSelfTest():
-                log.debug("[__before__] Doing selftest!")
-                uuser = getParam(param, "selftest_user", True)
+			
+            if request.environ.has_key('REMOTE_USER'):
+                uuser = request.environ.get('REMOTE_USER')
                 if uuser is not None:
-                    (c.user, _foo, c.realm) = uuser.rpartition('@')
+                    realms = getAllUserRealms(User(uuser, "", ""))
+                    if (realms):
+                        c.user = uuser
+                        c.realm = realms[0]
+                        c.realmArray = realms
+                    self.authUser = User(c.user, c.realm, '')
                 else:
-                    c.realm = ""
-                    c.user = "--u--"
-                    env = request.environ
-                    uuser = env.get('REMOTE_USER')
-                    if uuser is not None:
-                        (c.user, _foo, c.realm) = uuser.rpartition('@')
-
-                self.authUser = User(c.user, c.realm, '')
-                log.debug("[__before__] authenticating as %s in realm %s!" % (c.user, c.realm))
+                    abort(401, "You are not authenticated..")
             else:
-                identity = request.environ.get('repoze.who.identity')
-                if identity is None:
-                    abort(401, "You are not authenticated")
+                abort(401, "You are not authenticated...")
+				
+            # checking the session
+            if (False == check_selfservice_session()):
+                c.audit['action'] = request.path[1:]
+                c.audit['info'] = "session expired"
+                audit.log(c.audit)
+                abort(401, "No valid session")
 
-                log.debug("[__before__] doing getAuthFromIdentity in action %s" % action)
-
-                user_id = request.environ.get('repoze.who.identity').get('repoze.who.userid')
-                if type(user_id) == unicode:
-                    user_id = user_id.encode(ENCODING)
-                identity = user_id.decode(ENCODING)
-                log.debug("[__before__] getting identity from repoze.who: %r" % identity)
-
-                (c.user, _foo, c.realm) = identity.rpartition('@')
-                self.authUser = User(c.user, c.realm, '')
-
-                log.debug("[__before__] set the self.authUser to: %s, %s " % (self.authUser.login, self.authUser.realm))
-                log.debug('[__before__] param for action %s: %s' % (action, param))
-
-                # checking the session
-                if (False == check_selfservice_session()):
-                    c.audit['action'] = request.path[1:]
-                    c.audit['info'] = "session expired"
-                    audit.log(c.audit)
-                    abort(401, "No valid session")
-
+            age = int(request.environ.get('WEBAUTH_TOKEN_EXPIRATION')) - time.time()
+            response.set_cookie('linotp_selfservice', 'REMOTE_USER', max_age = int(age))
+                
             c.imprint = get_imprint(c.realm)
 
             c.tokenArray = []
@@ -289,18 +272,12 @@ class SelfserviceController(BaseController):
                         c.user = "--ua--"
                         env = request.environ
                         uuser = env.get('REMOTE_USER')
-                        if uuser is not None:
-                            (c.user, _foo, c.realm) = uuser.rpartition('@')
+                        realms = getAllUserRealms(User(uuser, "", ""))
+                        if (realms):
+                            c.user = uuser
+                            c.realm = realms[0]
+                            c.realmArray = realms
 
-    ### This makes no sense...
-    #                c.audit['user'] = c.user
-    #                c.audit['realm'] =  c.realm
-    #            else:
-    #                user = getUserFromRequest(request).get("login")
-    #                c.audit['user'] ,c.audit['realm'] = user.split('@')
-    #                uc = user.split('@')
-    #                c.audit['realm'] = uc[-1]
-    #                c.audit['user'] = '@'.join(uc[:-1])
 
                 log.debug("[__after__] authenticating as %s in realm %s!" % (c.user, c.realm))
 
@@ -339,7 +316,6 @@ class SelfserviceController(BaseController):
         This is the redirect to the first template
         '''
         c.title = "LinOTP Self Service"
-
         ren = render('/selfservice/base.mako')
         return ren
 
@@ -1195,7 +1171,64 @@ class SelfserviceController(BaseController):
             Session.close()
             log.debug('[token_call] done')
 
+    def change_realm(self):
+        '''
+            the generic method call for an dynamic token
+        '''
+        param = {}
 
+        res = {}
+
+        try:
+            param.update(request.params)
+               
+            realm = getParam(param, "realm", required)
+
+            # Are they allowed to create a token in that realm?
+            pols = getPolicy({ "realm" : realm,
+                                "scope" : "selfservice" })
+            found = False
+            for policy in pols.values():
+                action = u'' + policy.get('action')
+                actions_in = action.split(',')
+
+                actions = []
+                for act in actions_in:
+                    actions.append(act.strip())
+
+                if 'webprovisionGOOGLEtime' in actions:
+                    found = True
+                    break
+
+            if found == False:
+                log.error('user %r not authorized to call %s'
+                          % (self.authUser, method))
+                raise PolicyException('user %r not authorized to call %s'
+                                      % (self.authUser, method))
+
+            c.realm = realm;
+            
+            Session.commit()
+            return sendResult(response, 'okay', 1)
+
+        except PolicyException as pe:
+            log.error("[token_call] policy failed: %r" % pe)
+            log.error("[token_call] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, unicode(pe), 1)
+
+        except Exception as e:
+            log.error("[token_call] calling method %s.%s of user %s failed! %r"
+                      % (typ, method, c.user, e))
+            log.error("[token_call] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, e, 1)
+
+        finally:
+            Session.close()
+            log.debug('[token_call] done')
+
+            
     def usergetmultiotp(self):
         '''
         Using this function the user may receive OTP values for his own tokens.
@@ -1821,11 +1854,11 @@ def add_dynamic_selfservice_enrollment(actions):
 
         :return: hash of {tokentype : html for tab}
     '''
-
-    dynanmic_actions = {}
+   
+    dynamic_actions = {}
     g = config['pylons.app_globals']
     tokenclasses = g.tokenclasses
-
+        
     for tok in tokenclasses.keys():
         tclass = tokenclasses.get(tok)
         tclass_object = newToken(tclass)
@@ -1843,7 +1876,7 @@ def add_dynamic_selfservice_enrollment(actions):
                     ''' remove empty lines '''
                     t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
                     e_name = "%s.%s.%s" % (tok, 'selfservice', 'enroll')
-                    dynanmic_actions[e_name] = t_html
+                    dynamic_actions[e_name] = t_html
 
                 ## check if there are other selfserive policy actions
                 policy = tclass_object.getClassInfo('policy', ret=None)
@@ -1861,14 +1894,14 @@ def add_dynamic_selfservice_enrollment(actions):
                             ''' remove empty lines '''
                             t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
                             e_name = "%s.%s.%s" % (tok, 'selfservice', action)
-                            dynanmic_actions[e_name] = t_html
+                            dynamic_actions[e_name] = t_html
 
 
             except Exception as e:
-                log.info('[_add_dynamic_actions] no policy for tokentype '
+                log.debug('[_add_dynamic_actions] no policy for tokentype '
                          '%s found (%r)' % (unicode(tok), e))
 
-    return dynanmic_actions
+    return dynamic_actions
 
 
 def add_dynamic_selfservice_policies(actions):

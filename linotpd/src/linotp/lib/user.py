@@ -421,6 +421,18 @@ def getResolvers(user):
 
     return Resolver
 
+def getAllUserRealms(user):
+    results = [];
+    realms = getRealms();
+    
+    # get a list of realms the user is present in
+    for key, v in realms.items():
+        resolvers = getResolversOfUser(User(user.login, v['realmname'], ""))
+        if (resolvers):
+            results.append(v['realmname'])
+            
+    return results;
+    
 def getResolversOfUser(user):
     '''
     This returns the list of the Resolvers of a user in a given realm.

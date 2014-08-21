@@ -347,6 +347,7 @@ def get_resolver_list():
     module_list.add("useridresolver.PasswdIdResolver")
     module_list.add("useridresolver.LDAPIdResolver")
     module_list.add("useridresolver.SQLIdResolver")
+    module_list.add("useridresolver.OakIdResolver")
 
     config_modules = config.get("linotpResolverModules", '')
     log.debug("[get_resolver_module_list] %s " % config_modules)

@@ -34,6 +34,7 @@ from pylons.controllers.util import abort
 
 import binascii
 import os
+import time
 
 import string
 from linotp.lib.crypt import urandom
@@ -184,17 +185,16 @@ def check_selfservice_session():
     if request.path.lower()[:17] != "/selfservice/user":
         log.info('[check_selfservice_session] nothing to check')
     else:
-        try:
-            cookie = request.cookies.get('linotp_selfservice')[0:40]
-            session = request.params.get('session')[0:40]
-        except Exception as e:
-            log.warning("[check_selfservice_session] failed to check selfservice session: %r" % e)
+        expiry = request.environ.get('WEBAUTH_TOKEN_EXPIRATION')
+        if expiry is not None:
+            log.info("[check_selfservice_session] Got header!")
+            if (expiry < time.time()):
+                log.warning("[check_selfservice_session] Webauth token has expired.")
+                res = False
+        else:
+            log.warning("[check_selfservice_session] No expiry found.")
             res = False
-        log.info("[check_selfservice_session]: session: %s" % session)
-        log.info("[check_selfservice_session]: cookie:  %s" % cookie)
-        if session is None or session != cookie:
-            log.error("[check_selfservice_session] The request %s did not pass a valid session!" % request.url)
-            res = False
+            
     return res
 
 def remove_session_from_param(param):

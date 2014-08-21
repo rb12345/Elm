@@ -24,11 +24,10 @@
 #    Support: www.lsexperts.de
 #
 
-""" Setup the LinOTP application -
+''' Setup the LinOTP application -
                 the websetup.py is called for the creating the initial
                 data and configuration
-"""
-
+'''
 
 
 from linotp.config.environment import load_environment

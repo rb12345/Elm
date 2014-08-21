@@ -104,57 +104,23 @@ class AccountController(BaseController):
 
     def login(self):
         log.debug("[login] selfservice login screen")
-        identity = request.environ.get('repoze.who.identity')
+        identity = request.environ.get('REMOTE_USER')
         if identity is not None:
             # After login We always redirect to the start page
-            redirect("/")
+            redirect("/selfservice")
 
-        res = {}
-        try:
-            c.defaultRealm = getDefaultRealm()
-            res = getRealms()
+        Session.close()
+        
 
-            c.realmArray = []
-            #log.debug("[login] %s" % str(res) )
-            for (k, v) in res.items():
-                c.realmArray.append(k)
-
-            c.realmbox = getRealmBox()
-            log.debug("[login] displaying realmbox: %i" % int(c.realmbox))
-
-            Session.commit()
-            response.status = '%i Logout from LinOTP selfservice' % LOGIN_CODE
-            return render('/selfservice/login.mako')
-
-        except Exception as e:
-            log.error('[login] failed %r' % e)
-            log.error('[login] %s' % traceback.format_exc())
-            Session.rollback()
-            return sendError(response, e)
-
-        finally:
-            Session.close()
-
-
-    def test(self):
-        identity = request.environ.get('repoze.who.identity')
+    def logout(self):
+        identity = request.environ.get('REMOTE_USER')
         if identity is None:
-            # Force skip the StatusCodeRedirect middleware; it was stripping
-            #   the WWW-Authenticate header from the 401 response
-            request.environ['pylons.status_code_redirect'] = True
-            # Return a 401 (Unauthorized) response and signal the repoze.who
-            #   basicauth plugin to set the WWW-Authenticate header.
-            abort(401, 'You are not authenticated')
-
-        log.debug(u"[test] identity: %r" % identity)
-        return """
-<body>
-Hello, you are logged in as %s.
-<a href="/account/logout">logout</a>
-</body>
-</html>
-""" % identity['repoze.who.userid']
-
-
+            # After logout We always redirect to the start page
+            redirect("/")
+            
+        redirect('https://webauth.ox.ac.uk/logout')
+        Session.close()
+        
+        
 #eof##########################################################################
 
