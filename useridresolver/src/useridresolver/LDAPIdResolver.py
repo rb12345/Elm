@@ -162,7 +162,6 @@ class IdResolver (UserIdResolver):
 
         cls.ca_dir = cache_dir
 
-        log.info("Setting up the LDAPResolver")
         if config is not None:
             for entry in config:
                 if entry.startswith('linotp.ldapresolver.CACERTIFICATE'):
