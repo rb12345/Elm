@@ -122,9 +122,6 @@ class IdResolver (UserIdResolver):
 
             searchfilter = "(&(oakOxfordSSOUsername=*)%s)" % realmfilter
             
-            log.error("[welp] Got: %s" % str(params['OAKREALM']))
-            log.error("[welp2] %s, %s" % (str(realmfilter), str(searchfilter)))
-            
             # get a userlist:
             results = 0;
             sizelimit = int(DEFAULT_SIZELIMIT)
