@@ -2,9 +2,66 @@
  	color: #3277AE;
  }
  
+  body {
+	font-family: Helvetica Neue, Helvetica, Verdana,Arial,sans-serif; 
+	font-size: 1.0em;
+ }
+ 
+ li#logo {
+	margin-right: inherit;
+ }
+ 
+ li#logo div {
+    background-image:  url("/images/crest.png");
+    background-size: cover;
+	float: right;
+    height: 68px;
+    width: 220px;
+	margin-left: inherit;
+ }
+ 
+ #wrap {
+	 width: 95%;
+	 margin: 8px auto;
+ }
+ 
+ #main {
+	 padding: 3px;
+	 background: #eeeeee;
+	 border: 1px solid #aeaeae
+ }
+
+ #sidebar {
+	width:12%;
+	background:#eeeeee;
+	border: 1px solid #aeaeae;
+ }
+
+ #menu {
+	background:#002147;
+	font-size:large;
+	border: 1px solid #dedede;
+	border-radius: 0;
+	margin-top: inherit;
+	padding: inherit;
+ }
+ 
  #menu.sf-menu ul {
 	margin-top: 25px;
  }
+ 
+ #menu.sf-menu > li > a {
+	border-top: none;
+	padding: 0;
+	padding-right: 2.25em;
+	padding-left: 1em;
+ }
+ 
+ #menu.sf-menu > li > ul > li > a {
+	padding: .75em 1em;
+ }
+ 
+ .select_list li:hover { background: #3277AE; }
  
  .sf-menu > li {
 	height: 70px;
@@ -20,7 +77,6 @@
 	vertical-align: middle;
 	height: 70px;
 	padding: 0;
-	padding-left: 1em;
  }
  
  .sf-menu li li {
