@@ -52,8 +52,8 @@
 }
 
 a.activeToken {
-	color: #3277AE;
-	text-decoration: underline;
+	color: black;
+	background-color:white;
 }
 a.disabledToken {
 	color: black;
@@ -61,11 +61,11 @@ a.disabledToken {
 }
 
 h1 {
-	color: #3277AE;
+	color: #fe8625;
 }
 
 body {
-	font-family: Helvetica Neue, helvetica, impact, sans-serif;
+	font-family: helvetica, impact, sans-serif;
 	}
 
 #wrap {
@@ -73,49 +73,56 @@ body {
  margin:0 auto;
 }
 
+
 #main {
-	float:right;
-	width:68%;
-	background: #eeeeee;
-	border: 1px solid #aeaeae;
-	padding: 3px;
-	margin-bottom: 1em;
+float:right;
+width:68%;
+background: #080808;
+border: 1px solid #fe8625;
+padding: 3px;
 }
 
 #sidebar {
-	float:left;
-	width:30%;
-	background:#eeeeee;
-	border: 1px solid #aeaeae;
-	padding: 3px;
+float:left;
+width:30%;
+background:#eeeeee;
+border-right: 1px solid #fe8625;
+padding: 3px;
+/*position:  relative;*/
 }
 
-#header {
-	background:#002147;
-	font-size:large;
-	margin-bottom: 1em;
-	padding: 1em;
-	border: 1px solid #dedede;
-	height: 70px;
+#imprint {
+	 /*position: absolute;
+	 bottom:  0;
+	 */
 }
 
-#logo{
-	background-image:  url(/images/crest.png);
-	background-repeat: no-repeat;
-	background-size: cover;
-	float: right;
-	height: 68px;
-	width: 220px;
-	margin: 1px 0 0 1px;
-}
+
+ #header {
+ background:#feb77e;
+ font-size:large;
+ background-image:url(/images/ui-bg_highlight-soft_75_cccccc_1x100.png);
+ margin: 1px;
+ padding: 3px;
+ border: 1px solid #aaaaaa;
+ height: 70px;
+ }
+
+ #logo{
+ background-image:  url(/images/linotp_logo_200x68_72dpi.png);
+ background-repeat: no-repeat;
+ float: left;
+ height: 68px;
+ width: 200px;
+ margin: 1px 0 0 1px;
+ }
 
  .float_left {
  	float:left;
  }
  .float_right{
-	color: #fff;
- 	float: left;
-	text-align: left;
+ 	float:right;
+	text-align:right;
  }
 
  .portalname{
@@ -134,12 +141,14 @@ body {
  //float:left;
  }
  #logout {
-	float:right;
-	color: #3277AE;
+ float:right;
  }
 
- 
- 
+ #main {
+ background:#fefefe;
+ }
+
+
 #footer {
  clear:both;
  color: white;

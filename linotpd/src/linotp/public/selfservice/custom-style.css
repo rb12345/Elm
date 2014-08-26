@@ -2,6 +2,55 @@ a {
  	color: #3277AE;
 }
 
+h1 {
+	color: #3277AE;
+}
+
+body {
+	font-family: Helvetica Neue, helvetica, impact, sans-serif;
+}
+	
+a.activeToken {
+	color: #3277AE;
+	text-decoration: underline;
+}
+
+#main {
+	background: #eeeeee;
+	border: 1px solid #aeaeae;
+	margin-bottom: 1em;
+}
+
+#sidebar {
+	border: 1px solid #aeaeae;
+}
+
+#header {
+	background:#002147;
+	background-image: inherit;
+	margin-bottom: 1em;
+	padding: 1em;
+	border: 1px solid #dedede;
+}
+
+#logo{
+	background-image:  url(/images/crest.png);
+	background-size: cover;
+	float: right;
+	width: 220px;
+}
+
+ #logout {
+	color: #3277AE;
+ }
+ 
+/* float the logo left and the title right to match the admin page */
+ .float_right{
+	color: #fff;
+ 	float: left;
+	text-align: left;
+ }
+
 .ui-tabs.ui-widget {
 	border: none;
 	border-radius: 0;
