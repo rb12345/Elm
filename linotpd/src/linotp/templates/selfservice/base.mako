@@ -66,7 +66,7 @@
 	</div>
 
 	<div class="float_right">
-	Open Source Edition<br>
+	Elm Authentication System<br>
 	<span class=portalname>${_("Selfservice Portal")}</span>
 	</div>
 </div>

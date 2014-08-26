@@ -54,6 +54,7 @@
 	margin-top: 25px;
  }
  
+ 
  .sf-menu > li {
 	height: 70px;
 	padding: 0 !important;
@@ -72,6 +73,25 @@
  
  .select_list li:hover { background: #3277AE; }
   
+ .float_left{
+ 	float: left;
+	text-align: left;
+	color: #fff;
+	font-weight: normal;
+	margin-right: 1.5em !important;
+ }
+ 
+ .float_left:hover {
+	background: #002147;
+ }
+
+ .portalname{
+	font-size:200%;
+	text-shadow:black 3px 2px 4px;
+	line-height: normal;
+
+ }
+ 
  .sf-menu a.sf-with-ul {
 	color: #fff;
 	border-left: none;
@@ -110,18 +130,22 @@
 	border-radius: 0;
 }
 
-#menu > li:nth-child(1) > ul {
+#menu > li:nth-child(1):hover {
+	background: #002147;
+}
+
+#menu > li:nth-child(2) > ul {
 	width: 11em;
  }
  
- #menu > li:nth-child(2) > ul {
+ #menu > li:nth-child(3) > ul {
 	width: 17em;
  }
  
- #menu > li:nth-child(3) > ul {
+ #menu > li:nth-child(4) > ul {
 	width: 15em;
  }
  
- #menu > li:nth-child(4) > ul {
+ #menu > li:nth-child(5) > ul {
 	width: 11em;
  }

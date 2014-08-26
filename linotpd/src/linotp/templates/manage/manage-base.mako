@@ -51,7 +51,14 @@
 <div id="wrap">
 
 <ul id='menu' class='sf-menu sf-vertical ui-widget-header ui-widget ui-widget-content ui-corner-all'>
-    <li><a href='#'>${_("LinOTP Config")}</a>
+    <li>
+		<div class="float_left">
+		Elm Authentication System<br>
+		<span class=portalname>${_("Management Portal")}</span>
+		</div>
+	</li>
+	
+	<li><a href='#'>${_("LinOTP Config")}</a>
         <ul>
             <li><a href='#' id='menu_edit_resolvers'>${_("useridresolvers")}</a></li>
             <li><a href='#' id='menu_edit_realms'>${_("realms")}</a></li>
