@@ -187,7 +187,7 @@ def check_selfservice_session():
     else:
         expiry = request.environ.get('WEBAUTH_TOKEN_EXPIRATION')
         if expiry is not None:
-            log.info("[check_selfservice_session] Got header!")
+            log.debug("[check_selfservice_session] Got header!")
             if (expiry < time.time()):
                 log.warning("[check_selfservice_session] Webauth token has expired.")
                 res = False
