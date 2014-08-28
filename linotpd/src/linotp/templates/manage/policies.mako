@@ -25,9 +25,9 @@
  *    Support: www.lsexperts.de
  *
 -->
-<a id=policy_export>${_("Export policies")}</a>
+<button class='ui-button' id=policy_export>${_("Export policies")}</button>
 
-<button id=policy_import>${_("Import policies")}</button>
+<button class='ui-button' id=policy_import>${_("Import policies")}</button>
 
 <table id="policy_table" class="flexme2" style="display:none"></table>
    
@@ -87,6 +87,7 @@
 </table> 
 <script type="text/javascript"> 
 	view_policy();
+	policybuttons();
 </script>
 
 
