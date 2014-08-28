@@ -12,23 +12,37 @@
 <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8">
 <meta http-equiv="content-style-type" content="text/css">
 
+%if c.debug:
+    <link type="text/css" rel="stylesheet" href="/css/jquery-ui/jquery-ui.structure.css" />
+    <link type="text/css" rel="stylesheet" href="/css/jquery-ui/jquery-ui.theme.css" />
+%else:
+    <link type="text/css" rel="stylesheet" href="/css/jquery-ui/jquery-ui.structure.min.css" />
+    <link type="text/css" rel="stylesheet" href="/css/jquery-ui/jquery-ui.theme.min.css" />
+%endif
+<link type="text/css" rel="stylesheet" href="/css/flexigrid/flexigrid.css">
+<link type='text/css' rel='stylesheet' media='screen' href='/css/superfish.css' />
+<link type="text/css" rel="stylesheet" href="/css/linotp.css"/>
 <link type="text/css" rel="stylesheet" href="/manage/style.css"/>
 <link type="text/css" rel="stylesheet" href="/manage/custom-style.css"/>
 
-<link type="text/css" rel="stylesheet" href="/css/smoothness/jquery-ui-1.8.21.custom.css" />
-
-<link type="text/css" rel="stylesheet" href="/css/flexigrid/flexigrid.css">
-<link type='text/css' rel='stylesheet' media='screen' href='/css/superfish.css' />
-
-<script type="text/javascript" src="/js/jquery-1.7.2.min.js"></script>
-<script type="text/javascript" src="/js/jquery.cookie.js"></script>
-<script type="text/javascript" src="/js/jquery.tools.min.js"></script>
-<script type="text/javascript" src="/js/jquery-ui-1.8.21.custom.min.js"></script>
-<script type="text/javascript" src="/js/jquery.validate.js"></script>
-<script type="text/javascript" src="/js/jquery.form.js"></script>
+%if c.debug:
+    <script type="text/javascript" src="/js/jquery-1.11.1.js"></script>
+    <script type="text/javascript" src="/js/jquery-ui.js"></script>
+    <script type="text/javascript" src="/js/jquery.validate.js"></script>
+    <script type="text/javascript" src="/js/jquery.form.js"></script>
+    <script type="text/javascript" src="/js/jquery.cookie.js"></script>
+    <script type='text/javascript' src='/js/hoverIntent.js'></script>
+    <script type='text/javascript' src='/js/superfish.js'></script>
+%else:
+    <script type="text/javascript" src="/js/jquery-1.11.1.min.js"></script>
+    <script type="text/javascript" src="/js/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="/js/jquery.validate.min.js"></script>
+    <script type="text/javascript" src="/js/jquery.form.min.js"></script>
+    <script type="text/javascript" src="/js/jquery.cookie.min.js"></script>
+    <script type='text/javascript' src='/js/hoverIntent.min.js'></script>
+    <script type='text/javascript' src='/js/superfish.min.js'></script>
+%endif
 <script type="text/javascript" src="/js/flexigrid.js"></script>
-<script type='text/javascript' src='/js/superfish.js'></script>
-
 
 <script type="text/javascript" src="/js/qrcode.js"></script>
 <script type="text/javascript" src="/js/qrcode-helper.js"></script>
@@ -49,74 +63,103 @@
 <body>
 
 <div id="wrap">
+<div id="header" class="ui-widget-header ui-corner-all">
+    <ul id='menu' class='sf-menu sf-vertical'>
+		<li>
+				<div class="float_left">
+				Elm Authentication System<br>
+				<span class=portalname>${_("Management Portal")}</span>
+				</div>
+		</li>        
+		<li><a href='#'>${_("LinOTP Config")}</a>
+            <ul>
+                <li><a href='#' id='menu_edit_resolvers'>${_("useridresolvers")}</a></li>
+                <li><a href='#' id='menu_edit_realms'>${_("realms")}</a></li>
+                <li><a href='#' id='menu_system_config'>${_("System Config")}</a></li>
+                <li><a href='#' id='menu_token_config'>${_("Token Config")}</a></li>
+                <li><a href='#' id='menu_policies'>${_("Policies")}</a></li>
+            </ul>
+        </li>
+        <li><a href='#'>${_("Tools")}</a>
+            <ul>
+                <li><a href='#' id='menu_tools_getserial'>${_("Get Serial by OTP")}</a></li>
+                <li><a href='#' id='menu_tools_copytokenpin'>${_("Copy Token PIN")}</a></li>
+                <li><a href='#' id='menu_tools_checkpolicy'>${_("Check Policy")}</a></li>
+                <li><a href='#' id='menu_tools_exporttoken'>${_("Export Token information")}</a></li>
+                <li><a href='#' id='menu_tools_exportaudit'>${_("Export Audit information")}</a></li>
+            </ul>
+        </li>
+        <li><a href='#'>${_("Import Token File")}</a>
+            <ul>
+                <li><a href='#' id='menu_load_aladdin_xml_tokenfile'>${_("SafeNet/ Aladdin XML")}</a></li>
+                <li><a href='#' id='menu_load_oath_csv_tokenfile'>${_("OATH csv")}</a></li>
+                <li><a href='#' id='menu_load_yubikey_csv_tokenfile'>${_("Yubikey csv")}</a></li>
 
-<ul id='menu' class='sf-menu sf-vertical ui-widget-header ui-widget ui-widget-content ui-corner-all'>
-    <li>
-		<div class="float_left">
-		Elm Authentication System<br>
-		<span class=portalname>${_("Management Portal")}</span>
-		</div>
-	</li>
-	
-	<li><a href='#'>${_("LinOTP Config")}</a>
-        <ul>
-            <li><a href='#' id='menu_edit_resolvers'>${_("useridresolvers")}</a></li>
-            <li><a href='#' id='menu_edit_realms'>${_("realms")}</a></li>
-            <li><a href='#' id='menu_system_config'>${_("System Config")}</a></li>
-            <li><a href='#' id='menu_token_config'>${_("Token Config")}</a></li>
-            <li><a href='#' id='menu_policies'>${_("Policies")}</a></li>
-        </ul>
-    </li>
-    <li><a href='#'>${_("Tools")}</a>
-		  <ul>
-            <li><a href='#' id='menu_tools_getserial'>${_("Get Serial by OTP")}</a></li>
-            <li><a href='#' id='menu_tools_copytokenpin'>${_("Copy Token PIN")}</a></li>
-            <li><a href='#' id='menu_tools_checkpolicy'>${_("Check Policy")}</a></li>
-            <li><a href='#' id='menu_tools_exporttoken'>${_("Export Token information")}</a></li>
-            <li><a href='#' id='menu_tools_exportaudit'>${_("Export Audit information")}</a></li>
-        </ul>
-    </li>
-    <li><a href='#'>${_("Import Token File")}</a>
-		  <ul>
-            <li><a href='#' id='menu_load_aladdin_xml_tokenfile'>${_("SafeNet/ Aladdin XML")}</a></li>
-            <li><a href='#' id='menu_load_oath_csv_tokenfile'>${_("OATH csv")}</a></li>
-            <li><a href='#' id='menu_load_yubikey_csv_tokenfile'>${_("Yubikey csv")}</a></li>
-
-		% for id in c.importers:
-		<li><a href='#' id='menu_load_${id}'>${c.importers[id]}</a></li>
-		% endfor
-		</ul>
-    </li>
-    <li>
-    	<li><a href='#'>${_("Help")}</a>
-		  <ul>
-    		<li><a href='${c.help_url}' target="_blank" id="menu_help">${_("Documentation")}</a></li>
-            <li><a href='#' id='menu_view_support'>${_("Support")}</a></li>
-            <li><a href='#' id='menu_about'>${_("About LinOTP")}</a></li>
-        </ul>
-    </li>
-    <li id="logo">
-        <div></div>
-    </li>
-</ul>
-
+            % for id in c.importers:
+            <li><a href='#' id='menu_load_${id}'>${c.importers[id]}</a></li>
+            % endfor
+            </ul>
+        </li>
+        <li>
+            <li><a href='#'>${_("Help")}</a>
+            <ul>
+                <li><a href='${c.help_url}' target="_blank" id="menu_help">${_("Documentation")}</a></li>
+                <li><a href='#' id='menu_view_support'>${_("Support")}</a></li>
+                <li><a href='#' id='menu_about'>${_("About LinOTP")}</a></li>
+            </ul>
+        </li>
+		<li id="logo"><div></div></li>
+    </ul>
+</div> <!-- header -->
 <div class="javascript_error" id="javascript_error">
 	${_("You need to enable Javascript to use the LinOTP Management Web UI.")}
 </div>
 
-
-<div class="simple_overlay" id="do_waiting">
-	<img src="/images/ajax-loader.gif" border="0" alt=""> ${_("Communicating with LinOTP server...")}
+<div id="do_waiting">
+    <img src="/images/ajax-loader.gif" border="0" alt="" /><span>${_("Communicating with LinOTP server...")}</span>
 </div>
 
 <div id="left_and_right">
 <div id="sidebar">
-
-${self.sidebar()}
-
+    <span id="selected_tokens_header">${_("selected tokens")}</span>
+    <div id="selected_tokens"></div>
+    <span id="selected_users_header">${_("selected users")}</span>
+    <div id="selected_users"></div>
+    <p>${_("Logged in as")}: ${c.admin}
+        <a href="${c.logout_url}">${_("Logout")}</a>
+    </p>
+    <div id="realms">
+    ${_("Realms")}: <select id=realm></select>
+    </div>
+    <button class='action-button' id='button_enroll'>${_("enroll")}</button>
+    <button class='action-button' id='button_assign'>${_("assign")}</button>
+    <button class='action-button' id='button_unassign'>${_("unassign")}</button>
+    <button class='action-button' id='button_enable'>${_("enable")}</button>
+    <button class='action-button' id='button_disable'>${_("disable")}</button>
+    <button class='action-button' id='button_setpin'>${_("set PIN")}</button>
+    <button class='action-button' id='button_resetcounter'>${_("Reset failcounter")}</button>
+    <button class='action-button' id='button_delete'>${_("delete")}</button>
 </div> <!-- sidebar -->
 
-${self.body()}
+<div id="main">
+    <div id="info_box">
+        <div id='info_bar'>
+          <span id="info_text"></span>
+          <button class="button_info_text">OK</button>
+       </div>
+    </div>
+    <a href="#" class="close_all">${_("Close all")}</a>
+    <div id="tabs">
+        <ul>
+            <li><a href="/manage/tokenview"><span>${_("Token View")}</span></a></li>
+            <li><a href="/manage/userview"><span>${_("User View")}</span></a></li>
+            <li><a href="/manage/policies"><span>${_("Policies")}</span></a></li>
+            <li><a href="/manage/audittrail"><span>${_("Audit Trail")}</span></a></li>
+        </ul>
+    </div>
+    <div id='errorDiv'></div>
+    <div id='successDiv'></div>
+</div>  <!-- end of main-->
 
 </div>
 <div id="footer">
@@ -289,7 +332,7 @@ ${c.version} --- ${c.licenseinfo}
 			<tr id="lic_contact-phone_tr"><td>${_("Contact phone")}</td><td><label id="lic_contact-phone"> </label></td></tr>
 			<tr id="lic_date_tr"><td>${_("Date")}</td><td><label id="lic_date"> </label></td></tr>
 			<tr id="lic_expire_tr"><td>${_("Expire")}</td><td><label id="lic_expire"> </label></td></tr>
-			<tr id="lic_subscription_tr"><td>${_("Subscription runtime")}</td><td><label id="lic_subscription"> </label></td></tr>
+			<tr id="lic_subscription_tr"><td>${_("Subscription")}</td><td><label id="lic_subscription"> </label></td></tr>
 			</table>
 
 		</div>
@@ -1393,6 +1436,8 @@ ${c.version} --- ${c.licenseinfo}
 <div id="text_form_validation_error1">${_("Incorrect or missing input at")}:<ul><span class="text_param1"> </span></ul>
 	<div>${_("Please have a look at each of the forms for more details.")}</div></div>
 <div id="text_form_validation_error_title">${_("Form Validation Error")}</div>
+<div id="text_support_lic_error">${_("License reminder:")}</div>
+<div id="text_support_lic_installed">${_("Support license installed successfully.")}</div>
 </div> <!--end of hidden-->
 
 <div id="alert_box">

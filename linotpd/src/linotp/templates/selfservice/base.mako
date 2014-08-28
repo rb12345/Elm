@@ -37,17 +37,17 @@
 <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8">
 <meta http-equiv="content-style-type" content="text/css">
 
+<link type="text/css" rel="stylesheet" href="/css/linotp.css"/>
 <link type="text/css" rel="stylesheet" href="/selfservice/style.css" />
 <link type="text/css" rel="stylesheet" href="/selfservice/custom-style.css" />
 <link type="text/css" rel="stylesheet" href="/css/flexigrid/flexigrid.css">
 
-<link type="text/css" href="/css/smoothness/jquery-ui-1.8.21.custom.css" rel="stylesheet" />
+<link type="text/css" href="/css/jquery-ui/jquery-ui.min.css" rel="stylesheet" />
 
 
-<script type="text/javascript" src="/js/jquery-1.7.2.min.js"></script>
-<script type="text/javascript" src="/js/jquery-ui-1.8.21.custom.min.js"></script>
-<script type="text/javascript" src="/js/jquery.tools.min.js"></script>
-<script type="text/javascript" src="/js/jquery.validate.js"></script>
+<script type="text/javascript" src="/js/jquery-1.11.1.min.js"></script>
+<script type="text/javascript" src="/js/jquery-ui.min.js"></script>
+<script type="text/javascript" src="/js/jquery.validate.min.js"></script>
 
 <script type="text/javascript" src="/js/qrcode.js"></script>
 <script type="text/javascript" src="/js/qrcode-helper.js"></script>
@@ -71,8 +71,8 @@
 	</div>
 </div>
 
-<div class="simple_overlay" id="do_waiting">
-	<img src="/images/ajax-loader.gif" border="0" alt=""> ${_("Communicating with LinOTP server...")}
+<div id="do_waiting">
+    <img src="/images/ajax-loader.gif" border="0" alt="" /><span>${_("Communicating with LinOTP server...")}</span>
 </div>
 
 <div id="sidebar">
@@ -177,8 +177,8 @@ ${c.version} --- ${c.licenseinfo}
 <input type='hidden' id='token_enroll_fail' value='${_("Error enrolling token:\n %s")}'/>
 <input type='hidden' id='token_enroll_ok'   value='${_("Token enrolled successfully:\n %s")}'/>
 
-<div id="allert_box">
-	<span id="allert_box_text"> </span>
+<div id="alert_box">
+	<span id="alert_box_text"> </span>
 </div>
 
 </body>

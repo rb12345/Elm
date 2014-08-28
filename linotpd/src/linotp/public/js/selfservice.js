@@ -54,9 +54,9 @@ function alert_box(p_title, s, param1) {
         s=str;
     }
 
-    $('#allert_box_text').html(s);
+    $('#alert_box_text').html(s);
 
-    $( "#allert_box" ).dialog({
+    $( "#alert_box" ).dialog({
         title : p_title,
         width: 450,
         modal: true,
@@ -66,7 +66,11 @@ function alert_box(p_title, s, param1) {
                 }
             }
      });
+
+
 }
+
+
 
 function sprintf() {
     if (sprintf.arguments.length < 2) {
@@ -111,7 +115,6 @@ function error_handling(message, file, line) {
 
 function get_selfservice_session() {
     var session = "";
-	
     if (document.cookie) {
         session = getcookie("linotp_selfservice");
         if (session == "") {
@@ -640,6 +643,11 @@ function finishOcra() {
 
 }
 
+
+
+
+
+
 function provisionGoogle() {
     show_waiting();
     var type = "googleauthenticator";
@@ -785,18 +793,6 @@ $(document).ready(function() {
     }
     );
 
-    $('#do_waiting').overlay({
-        top : 10,
-        mask : {
-            color : '#fff',
-            loadSpeed : 100,
-            opacity : 0.5
-        },
-        closeOnClick : false,
-        load : true
-    });
-    $('#do_waiting').hide();
-
     $("#tabs").tabs({
         ajaxOptions : {
             error : function(xhr, status, index, anchor) {
@@ -824,31 +820,6 @@ $(document).ready(function() {
     $("#tokenDiv").on("click", "ul li", function(event) {
         event.preventDefault();
         selectToken($.trim($(this).text()));
-    });
-});
-
-function deselect() {
-    $(".pop").slideFadeToggle(function() {
-        $("#contact").removeClass("selected");
-    });
-}
-
-$(function() {
-    $("#contact").live('click', function() {
-        if ($(this).hasClass("selected")) {
-            deselect();
-        } else {
-            $(this).addClass("selected");
-            $(".pop").slideFadeToggle(function() {
-                $("#email").focus();
-            });
-        }
-        return false;
-    });
-
-    $(".close").live('click', function() {
-        deselect();
-        return false;
     });
 });
 

@@ -159,22 +159,36 @@ class SelfserviceController(BaseController):
             c.audit['success'] = False
             c.audit['client'] = get_client()
 
+
             c.version = get_version()
             c.licenseinfo = get_copyright_info()
-			
-            if request.environ.has_key('REMOTE_USER'):
-                uuser = request.environ.get('REMOTE_USER')
+            if isSelfTest():
+                log.debug("[__before__] Doing selftest!")
+                uuser = getParam(param, "selftest_user", True)
                 if uuser is not None:
-                    realms = getAllUserRealms(User(uuser, "", ""))
-                    if (realms):
-                        c.user = uuser
-                        c.realm = realms[0]
-                        c.realmArray = realms
-                    self.authUser = User(c.user, c.realm, '')
+                    (c.user, _foo, c.realm) = uuser.rpartition('@')
                 else:
-                    abort(401, "You are not authenticated..")
+                    c.realm = ""
+                    c.user = "--u--"
+                    env = request.environ
+                    uuser = env.get('REMOTE_USER')
+                    if uuser is not None:
+                        (c.user, _foo, c.realm) = uuser.rpartition('@')
+
+                self.authUser = User(c.user, c.realm, '')
+                log.debug("[__before__] authenticating as %s in realm %s!" % (c.user, c.realm))
             else:
-                abort(401, "You are not authenticated...")
+                identity = request.environ.get('REMOTE_USER')
+                if identity is None:
+					abort(401, "You are not authenticated")
+                    
+				realms = getAllUserRealms(User(identity, "", ""))
+                if (realms):
+                    c.user = identity
+                    c.realm = realms[0]
+                    c.realmArray = realms
+                self.authUser = User(c.user, c.realm, '')
+                    
 				
             # checking the session
             if (False == check_selfservice_session()):
@@ -316,6 +330,7 @@ class SelfserviceController(BaseController):
         This is the redirect to the first template
         '''
         c.title = "LinOTP Self Service"
+
         ren = render('/selfservice/base.mako')
         return ren
 
@@ -1228,7 +1243,6 @@ class SelfserviceController(BaseController):
             Session.close()
             log.debug('[token_call] done')
 
-            
     def usergetmultiotp(self):
         '''
         Using this function the user may receive OTP values for his own tokens.

@@ -189,15 +189,14 @@ function load_flexi(){
 }
 
 
-function alert_info_text(s, param1, display_type) {
+function alert_info_text(s, text_container, display_type) {
     /*
      * If the parameter is the ID of an element, we pass the text from this very element
      */
     str = s;
     try {
-        if (param1) {
-
-            $('#'+s+' .text_param1').html(param1);
+        if (text_container) {
+            $('#'+s+' .text_param1').html(text_container);
         }
         if ( $('#'+s).length > 0 ) { // Element exists!
             s=$('#'+s).html();
@@ -209,15 +208,50 @@ function alert_info_text(s, param1, display_type) {
     catch (e) {
         s=str;
     }
+
+    new_info_bar = $('#info_bar').clone(true,true)
+    new_info_bar.removeAttr('id');
+    new_info_bar.children('span').removeAttr('id');
+
+    pp = $('#info_bar').parent();
+    new_info_bar.appendTo(pp);
+
     if (display_type == ERROR) {
-        $('#info_box').addClass("error_box");
-        $('#info_box').removeClass("info_box");
+        new_info_bar.addClass("error_box");
+        new_info_bar.removeClass("info_box");
     } else {
-        $('#info_box').addClass("info_box");
-        $('#info_box').removeClass("error_box");
+        new_info_bar.addClass("info_box");
+        new_info_bar.removeClass("error_box");
     }
-    $('#info_text').html(s);
+
+    new_info_bar.children('span').html(s);
+    new_info_bar.show()
+
+    toggle_close_all_link();
+
     $('#info_box').show();
+}
+
+function toggle_close_all_link() {
+    /*
+     * This function counts the number of visible info boxes and error boxes and
+     * if more than 3 are displayed it shows the "Close all" link. Otherwise it
+     * hides the link.
+     */
+    visible_boxes = $("#info_box > div").filter(":visible");
+    close_all = $("a.close_all");
+    if (visible_boxes.length > 3) {
+        close_all.click(function( event ) {
+            event.preventDefault();
+            visible_boxes.hide('blind', {}, 500);
+            $(this).hide('blind', {}, 500);
+        });
+        close_all.show('blind', {}, 500);
+        close_all.css("display", "block");
+    }
+    else {
+       close_all.hide('blind', {}, 500);
+    }
 }
 
 function alert_box(title, s, param1) {
@@ -406,7 +440,7 @@ function get_selected(){
     $("#button_enroll").button("enable");
 
     // The policies (we can select only one)
-    if ($('#tabs').tabs('option', 'selected') == 2) {
+    if ($('#tabs').tabs('option', 'active') == 2) {
         policy = get_selected_policy().join(',');
         if (policy) {
             $.get('/system/getPolicy', {'name' : policy,
@@ -420,7 +454,7 @@ function get_selected(){
                     if (pol_active == undefined) {
                         pol_active = "True";
                     }
-                    $('#policy_active').attr("checked", pol_active=="True" );
+                    $('#policy_active').prop('checked', pol_active=="True");
                     $('#policy_name').val(pol);
                     $('#policy_action').val(data.result.value[pol].action);
                     $('#policy_scope').val(data.result.value[pol].scope);
@@ -712,6 +746,17 @@ function get_tokennum(){
     return obj.result.value.resultset.tokens;
 }
 
+function check_license(){
+    /* call the server license check*/
+    var resp = clientUrlFetchSync('/system/isSupportValid',{});
+    var obj = jQuery.parseJSON(resp);
+    if (obj.result.value === false) {
+       message = obj.detail.reason
+       intro = $('#text_support_lic_error').html()
+       alert_info_text(intro + " " + message, '' ,ERROR);
+       return;
+    }
+}
 
 function check_serial(serial){
     var resp = clientUrlFetchSync('/admin/check_serial',{'serial':serial});
@@ -827,6 +872,7 @@ function token_disable(){
 
 function token_enable(){
     var tokens = get_selected_tokens();
+    check_license();
     token_operation(tokens, "/admin/enable", {});
 }
 
@@ -960,6 +1006,7 @@ function view_setpin_after_enrolling(tokens) {
      * or not display it. In case of no OTP PIN or AD PIN, we don't want to see this dialog!
      */
     view_setpin_dialog(tokens);
+    check_license();
 }
 
 function view_setpin_after_assigning(tokens) {
@@ -1124,7 +1171,6 @@ function enroll_callback(xhdr, textStatus, p_serial) {
 }
 
 
-
 function token_enroll(){
 
     var users = get_selected_users();
@@ -1150,7 +1196,7 @@ function token_enroll(){
         case 'ocra':
             params['sharedsecret'] = 1;
             // If we got to generate the hmac key, we do it here:
-            if  ( $('#ocra_key_cb').attr('checked') ) {
+            if  ( $('#ocra_key_cb').is(':checked') ) {
                 params['genkey']    = 1;
             } else {
                 // OTP Key
@@ -1527,21 +1573,23 @@ function parsePolicyImport(xml, textStatus) {
     hide_waiting();
 };
 
-function parseXMLlicense(xml, textStatus){
-    var version = $(xml).find('version').text();
-    var status = $(xml).find('status').text();
-    var value = $(xml).find('value').text();
+function parseLicense(xhdr, textStatus){
+    // calback to handle response when license has been submitted
+    var resp = xhdr.responseText;
+    var obj = jQuery.parseJSON(resp);
+    var status = obj.result.status;
 
-    if ("error" == textStatus) {
-        alert_info_text("text_linotp_comm_fail");
-    }
-    else {
-        if ("False" == status) {
-            alert_info_text("text_subscription_import_failed", value);
-        }
-        else {
-            alert_info_text("text_subscription_import_result", value);
-
+    // error occured    
+    if ( status === false) {
+        message = obj.result.error.message;
+        alert_info_text(message, '' ,ERROR);
+    } else {
+        value = obj.result.value;
+        if (value === false){
+            message = obj.detail.reason;
+            alert_info_text(message, '', ERROR);
+        } else {
+            alert_box('', "text_support_lic_installed");
         }
     }
     hide_waiting();
@@ -1570,78 +1618,72 @@ function load_tokenfile(type){
             dataType: 'xml'
         });
     }
-    else
-        if ("feitian" == type) {
-            $('#load_tokenfile_form_feitian').ajaxSubmit({
-                data: { session:getsession() },
-                type: "POST",
-                error: parseXML,
-                success: parseXML,
-                dataType: 'xml'
-            });
-        }
-        else
-            if ("pskc" == type) {
-                $('#load_tokenfile_form_pskc').ajaxSubmit({
-                    data: { session:getsession() },
-                    type: "POST",
-                    error: parseXML,
-                    success: parseXML,
-                    dataType: 'xml'
-                });
-            }
-            else
-                if ("dpw" == type) {
-                    $('#load_tokenfile_form_dpw').ajaxSubmit({
-                        data: { session:getsession() },
-                        type: "POST",
-                        error: parseXML,
-                        success: parseXML,
-                        dataType: "xml"
-                    });
-                } else
-                if ("dat" == type) {
-                    $('#load_tokenfile_form_dat').ajaxSubmit({
-                        data: { session:getsession() },
-                        type: "POST",
-                        error: parseXML,
-                        success: parseXML,
-                        dataType: "dat"
-                    });
-                }
-                else
-                if ("vasco" == type) {
-                    $('#load_tokenfile_form_vasco').ajaxSubmit({
-                        data: { session:getsession() },
-                        type: "POST",
-                        error: parseXML,
-                        success: parseXML,
-                        dataType: "xml"
-                    });
-                } else
-                if ("oathcsv" == type) {
-                    $('#load_tokenfile_form_oathcsv').ajaxSubmit({
-                        data: { session:getsession() },
-                        type: "POST",
-                        error: parseXML,
-                        success: parseXML,
-                        dataType: "xml"
-                    });
-                }
-
-                if ("yubikeycsv" == type) {
-                    $('#load_tokenfile_form_yubikeycsv').ajaxSubmit({
-                        data: { session:getsession() },
-                        type: "POST",
-                        error: parseXML,
-                        success: parseXML,
-                        dataType: "xml"
-                    });
-                }
-
-                else {
-                    alert_info_text( "text_import_unknown_type", "", ERROR);
-                };
+    else if ("feitian" == type) {
+        $('#load_tokenfile_form_feitian').ajaxSubmit({
+            data: { session:getsession() },
+            type: "POST",
+            error: parseXML,
+            success: parseXML,
+            dataType: 'xml'
+        });
+    }
+    else if ("pskc" == type) {
+        $('#load_tokenfile_form_pskc').ajaxSubmit({
+            data: { session:getsession() },
+            type: "POST",
+            error: parseXML,
+            success: parseXML,
+            dataType: 'xml'
+        });
+    }
+    else if ("dpw" == type) {
+        $('#load_tokenfile_form_dpw').ajaxSubmit({
+            data: { session:getsession() },
+            type: "POST",
+            error: parseXML,
+            success: parseXML,
+            dataType: "xml"
+        });
+    }
+    else if ("dat" == type) {
+        $('#load_tokenfile_form_dat').ajaxSubmit({
+            data: { session:getsession() },
+            type: "POST",
+            error: parseXML,
+            success: parseXML,
+            dataType: "dat"
+        });
+    }
+    else if ("vasco" == type) {
+        $('#load_tokenfile_form_vasco').ajaxSubmit({
+            data: { session:getsession() },
+            type: "POST",
+            error: parseXML,
+            success: parseXML,
+            dataType: "xml"
+        });
+    }
+    else if ("oathcsv" == type) {
+        $('#load_tokenfile_form_oathcsv').ajaxSubmit({
+            data: { session:getsession() },
+            type: "POST",
+            error: parseXML,
+            success: parseXML,
+            dataType: "xml"
+        });
+    }
+    else if ("yubikeycsv" == type) {
+        $('#load_tokenfile_form_yubikeycsv').ajaxSubmit({
+            data: { session:getsession() },
+            type: "POST",
+            error: parseXML,
+            success: parseXML,
+            dataType: "xml"
+        });
+    }
+    else {
+        alert_info_text( "text_import_unknown_type", "", ERROR);
+    };
     return false;
 }
 
@@ -1654,8 +1696,8 @@ function support_set(){
     $('#set_support_form').ajaxSubmit({
         data: { session:getsession() },
         type: "POST",
-        error: parseXMLlicense,
-        success: parseXMLlicense,
+        error: parseLicense,
+        success: parseLicense,
         dataType: 'xml'
     });
     } else {
@@ -1710,7 +1752,7 @@ function support_view(){
         else { $('#lic_licensee_tr').hide(); }
 
         if (support_dict['expire'].length > 0 ) {
-            $('#lic_expire').html(data.result.value.description['expire']);
+            $('#lic_expire').html(support_dict['expire']);
             $('#lic_expire_tr').show();
             }
         else { $('#lic_expire_tr').hide(); }
@@ -1905,7 +1947,7 @@ function save_ldap_config(){
     }
     // checkboxes
     var noreferrals="False";
-    if ($("#ldap_noreferrals").attr('checked')) {
+    if ($("#ldap_noreferrals").is(':checked')) {
         noreferrals = "True";
     }
     url += "NOREFERRALS="+noreferrals+"&";
@@ -2685,33 +2727,6 @@ $(document).ready(function(){
     // hide the javascrip message
     $('#javascript_error').hide();
 
-	/*
-    var ua = window.navigator.userAgent;
-    var msie = ua.indexOf("MSIE ");
-
-	// IE breaks when encountering links in the form username:pass@url
-	// so we display an IE-parseable reduced-functionality link by default
-	// and then hide it for all modern browsers
-	
-    if (!(msie > 0 || !!navigator.userAgent.match(/Trident.*rv\:11\./))) {
-		var old_link = document.getElementById("logout_url_ie");
-		old_link.hide();
-		var link = document.getElementById("logout_url");
-		link.show();		
-	}
-	*/
-    $('#do_waiting').overlay({
-        top: 10,
-        mask: {
-            color: '#fff',
-            loadSpeed: 100,
-            opacity: 0.5
-        },
-        closeOnClick: true,
-        load: true
-    });
-    hide_waiting();
-
     $("button").button();
 
     /*
@@ -2802,6 +2817,12 @@ $(document).ready(function(){
         icons: {
             primary: 'ui-icon-trash'
         }
+    });
+
+    // Info box
+    $(".button_info_text").button();
+    $('.button_info_text').click(function(){
+        $(this).parent().hide('blind', {}, 500, toggle_close_all_link);
     });
 
     disable_all_buttons();
@@ -3132,7 +3153,7 @@ $(document).ready(function(){
         params['ldap_certificate']  = $('#ldap_certificate').val();
 
 
-        if ($('#ldap_noreferrals').attr('checked')) {
+        if ($('#ldap_noreferrals').is(':checked')) {
             params["NOREFERRALS"] = "True";
         }
 
@@ -3640,7 +3661,7 @@ $(document).ready(function(){
 
 
     $('#menu_policies').click(function(){
-        $('#tabs').tabs('select', 2);
+        $('#tabs').tabs('option', 'active', 2);
     });
 
     /*********************************************************************
@@ -4055,9 +4076,6 @@ $(document).ready(function(){
      minHeight: 60
      });
      */
-
-    $('#do_waiting').click(reset_waiting());
-
 });
 //--------------------------------------------------------------------------------------
 // End of document ready
@@ -4281,7 +4299,7 @@ function resolver_ldap(name){
         $('#ldap_resolvername').val("");
         resolver_set_ldap(obj);
     }
-    $('#ldap_noreferrals').attr('checked', ("True" == obj.result.value.data.NOREFERRALS));
+    $('#ldap_noreferrals').prop('checked', ("True" == obj.result.value.data.NOREFERRALS));
 
     $('#progress_test_ldap').hide();
     $dialog_ldap_resolver.dialog('open');
@@ -4629,8 +4647,7 @@ function view_policy() {
             return;
         }
 
-        var pol_active = $('#policy_active').attr("checked");
-        if (pol_active == "checked") {
+        if ($('#policy_active').is(':checked')) {
             pol_active = "True";
         } else {
             pol_active = "False";

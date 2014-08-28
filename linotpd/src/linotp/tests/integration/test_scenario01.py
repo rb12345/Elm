@@ -283,7 +283,7 @@ gYzNiYwtvAu74Q+eTC6R5Uf0hOlFig==
         driver.find_element_by_id("motp_self_desc").send_keys("Selenium self enrolled")
         driver.find_element_by_id("button_register_motp").click()
         time.sleep(1)
-        alert_box_text = driver.find_element_by_id("allert_box_text").text
+        alert_box_text = driver.find_element_by_id("alert_box_text").text
         alert_box_text_list = alert_box_text.split("\n")
         self.assertEqual(
             alert_box_text_list[0],
@@ -291,7 +291,7 @@ gYzNiYwtvAu74Q+eTC6R5Uf0hOlFig==
             )
         serial_text = alert_box_text_list[1] # serial: LSMO12345678
         serial_token_mozart = serial_text[8:].strip()
-        self.driver.find_element_by_xpath("//button[@type='button' and ancestor::div[@aria-labelledby='ui-dialog-title-allert_box']]").click()
+        self.driver.find_element_by_xpath("//button[@type='button' and ancestor::div[@aria-describedby='alert_box']]").click()
         driver.find_element_by_link_text("Logout").click()
 
         ### 9. Alle 4 Benutzer melden sich im selfservice Portal an und setzen die PIN

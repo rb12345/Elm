@@ -40,6 +40,7 @@ from linotp.lib.base import BaseController
 from pylons.templating import render_mako as render
 from mako.exceptions import CompileException
 
+from paste.deploy.converters import asbool
 
 # Our Token stuff
 from linotp.lib.token   import TokenIterator
@@ -47,7 +48,7 @@ from linotp.lib.token   import getTokenType
 from linotp.lib.token   import newToken
 
 
-from linotp.lib.user    import getUserFromParam, getUserFromRequest
+from linotp.lib.user    import getUserFromParam, getUserFromRequest, getAdminRealms
 from linotp.lib.user    import getUserList, User
 
 from linotp.lib.util    import getParam
@@ -140,13 +141,18 @@ class ManageController(BaseController):
         '''
 
         try:
+            c.debug = asbool(config.get('debug', False))
             c.title = "LinOTP Management"
             admin_user = getUserFromRequest(request)
             if admin_user.has_key('login'):
-                (login, realm) = admin_user['login'].split("@")
-                c.login = login;
-                c.realm = realm;
-                c.admin = admin_user['login']
+                c.login = admin_user['login']
+                realms = getAdminRealms(c.login)
+                if (realms):
+                    c.realm = realms[0]
+                else:
+                    realm = getDefaultRealm()
+                        
+                c.admin = "%s@%s" % (c.login, c.realm)
 
             log.debug("[index] importers: %s" % IMPORT_TEXT)
             c.importers = IMPORT_TEXT
@@ -204,10 +210,9 @@ class ManageController(BaseController):
             http_host = request.environ.get("HTTP_HOST")
             url_scheme = request.environ.get("wsgi.url_scheme")
             c.logout_url = "%s://log-me-out:fake@%s/manage/logout" % (url_scheme, http_host)
-            # c.logout_url_ie = "%s://%s/manage/logout_ie" % (url_scheme, http_host)
-            
+
             Session.commit()
-            ren = render('/manage/start.mako')
+            ren = render('/manage/manage-base.mako')
             return ren
 
         except PolicyException as pe:
@@ -344,7 +349,7 @@ class ManageController(BaseController):
             if not pol['active']:
                 filterRealm = ["*"]
 
-            # check if we only want to see ONE realm or see all realms we are allowed to see.
+            # check if we only want to see ONE realm or see all realms we are allowerd to see.
             if filter_realm:
                 if filter_realm in filterRealm or '*' in filterRealm:
                     filterRealm = [filter_realm]
@@ -591,14 +596,7 @@ class ManageController(BaseController):
         http_host = request.environ.get("HTTP_HOST")
         url_scheme = request.environ.get("wsgi.url_scheme", "https")
         redirect("%s://%s/manage/" % (url_scheme, http_host))
-    
-    def logout_ie(self):
-        '''
-        redirect logout
-        '''
-        from pylons.controllers.util import abort
-        abort(401, "Logged out. Please close this tab.")
-     
+
 
     def help(self):
         '''

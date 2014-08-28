@@ -763,6 +763,23 @@ def check_user_password(username, realm, password):
                   "the username: %r" % e.description)
 
     return success
+ 
+def getAdminRealms(username): 
+    results = [] 
+    if username is None: 
+		return results 
+
+    from linotp.lib.policy import checkPolicyPre 
+    
+    log.error("checking for %s" % username)
+ 
+    try: 
+        res = checkPolicyPre('admin', 'show', {}, user = User(username, '', ""))
+        results = res['realms']
+    finally: 
+        pass
+    
+    return results 
 
 #eof###########################################################################
 

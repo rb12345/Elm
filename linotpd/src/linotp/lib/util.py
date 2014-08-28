@@ -194,7 +194,6 @@ def check_selfservice_session():
         else:
             log.warning("[check_selfservice_session] No expiry found.")
             res = False
-            
     return res
 
 def remove_session_from_param(param):
