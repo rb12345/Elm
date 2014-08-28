@@ -182,7 +182,7 @@ class SelfserviceController(BaseController):
                 if identity is None:
 					abort(401, "You are not authenticated")
                     
-				realms = getAllUserRealms(User(identity, "", ""))
+                realms = getAllUserRealms(User(identity, "", ""))
                 if (realms):
                     c.user = identity
                     c.realm = realms[0]

@@ -125,9 +125,12 @@
     <div id="selected_tokens"></div>
     <span id="selected_users_header">${_("selected users")}</span>
     <div id="selected_users"></div>
-    <p>${_("Logged in as")}: ${c.admin}
-        <a href="${c.logout_url}">${_("Logout")}</a>
-    </p>
+    <p>
+		User: ${c.login}<br/> 
+		Realm: ${c.realm}</br> 
+		<a id="logout_url" href="${c.logout_url}">${_("Logout")}</a> 
+    </p> 
+
     <div id="realms">
     ${_("Realms")}: <select id=realm></select>
     </div>

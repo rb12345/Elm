@@ -6,25 +6,45 @@
 	font-family: Helvetica Neue, Helvetica, Verdana,Arial,sans-serif; 
 	font-size: 1.0em;
  }
- 
- li#logo {
+  
+ #header #logo {
 	margin: 0;
- }
+	
+}
  
- li#logo div {
-    background-image:  url("/images/crest.png");
-    background-size: cover;
+ #logo div{
+	background-image:  url(/images/crest.png);
+	background-size: cover;
 	float: right;
-    height: 68px;
-    width: 220px;
-	margin: 0;
- }
+	width: 220px;
+	height: 68px;
+	margin: 0px;
+}
  
  #wrap {
 	 width: 95%;
 	 position: relative;
  }
  
+ #header {
+	background:#002147;
+	background-image: inherit;
+	margin: 0;
+	margin-bottom: 1em;
+	padding: 1em;
+	border: 1px solid #dedede;
+	border-radius: 0;
+	height:70px;
+	width: auto;
+	width: initial;
+	font-size: large;
+	float: none;
+}
+
+#header .sf-menu {
+	width: 100%;
+}
+
  #main {
 	 padding: 3px;
 	 background: #eeeeee;
@@ -36,24 +56,6 @@
 	background:#eeeeee;
 	border: 1px solid #aeaeae;
  }
-
- #menu {
-	background:#002147;
-	font-size:large;
-	border: 1px solid #dedede;
-	border-radius: 0;
-	margin: 0;
-	margin-bottom: 1em;
-	padding: 1em;
-	height: 70px;
-	float: none;
-	width: initial;
- }
- 
- #menu.sf-menu ul {
-	margin-top: 25px;
- }
- 
  
  .sf-menu > li {
 	height: 70px;
@@ -65,13 +67,15 @@
 	padding: 0;
 	padding-right: 2.25em;
 	padding-left: 1em;
+	color: #fff;
  }
+  
+ #menu.sf-menu > li:hover > a { color: #3277AE; }
  
  #menu.sf-menu > li > ul > li > a {
 	padding: .75em 1em;
  }
- 
- .select_list li:hover { background: #3277AE; }
+
   
  .float_left{
  	float: left;
@@ -109,7 +113,11 @@
  
 .ui-button {
 	border-radius: 0 !important;
-	font-family: Helvetica Neue, Helvetica, verdana, sans-serif !important
+	font-family: Helvetica Neue, Helvetica, verdana, sans-serif !important;
+}
+
+#main > div > div > .ui-button {
+	margin-bottom: 1em;
 }
 
 .ui-widget {
@@ -119,6 +127,10 @@
  .ui-tabs.ui-widget {
 	border: none;
 	border-radius: 0;
+}
+
+.ui-corner-all {
+	border-radius: 0 !important;
 }
 
 .ui-state-default.ui-corner-top {
@@ -133,19 +145,3 @@
 #menu > li:nth-child(1):hover {
 	background: #002147;
 }
-
-#menu > li:nth-child(2) > ul {
-	width: 11em;
- }
- 
- #menu > li:nth-child(3) > ul {
-	width: 17em;
- }
- 
- #menu > li:nth-child(4) > ul {
-	width: 15em;
- }
- 
- #menu > li:nth-child(5) > ul {
-	width: 11em;
- }
