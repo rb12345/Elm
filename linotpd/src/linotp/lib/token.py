@@ -1254,6 +1254,8 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
                       (typ, tokenclasses))
             continue
 
+        # Allow tokens in any realm.
+        '''
         ## now check if the token is in the same realm as the user
         if user is not None:
             t_realms = token.token.getRealmNames()
@@ -1261,7 +1263,8 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
             if (len(t_realms) > 0 and len(u_realm) > 0 and
                 u_realm.lower() not in t_realms) :
                 continue
-
+        '''
+        
         tok_va = linotp.lib.validate.ValidateToken(token, context=c)
         ## in case of a failure during checking token, we log the error and
         ## continue with the next one

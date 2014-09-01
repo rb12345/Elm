@@ -523,8 +523,16 @@ def getUserId(user):
     uid = ''
     loginUser = u''
     loginUser = user.login;
-
-    resolvers = getResolversOfUser(user)
+ 
+    resolvers = '';
+    realms = getRealms();
+        
+    # Get the first resolver they're present in, because UID is independent of realm.
+    for key, v in realms.items():
+        resolvers = getResolversOfUser(User(user.login, v['realmname'], ""))
+        if (resolvers):
+            break;
+                
     for reso in resolvers:
         resId = ""
         resIdC = ""
