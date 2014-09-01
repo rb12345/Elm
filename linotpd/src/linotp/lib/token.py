@@ -1325,7 +1325,7 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
                     audit['action_detail'] = "Failcounter exceeded"
             else:
                 audit['action_detail'] = "Token inactive"
-
+            
         # add the audit information to the auditList
         auditList.append(audit)
 
@@ -1344,7 +1344,6 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
             # multiple tokens that might contain "wrong otp value" or "wrong otp pin"
             c.audit['serial'] = ''
             c.audit['token_type'] = ''
-        log.warn("[checkTokenList] %s" % c.audit['action_detail'])
 
     ## handle the processing of challenge tokens
     if len(challenge_tokens) == 1:

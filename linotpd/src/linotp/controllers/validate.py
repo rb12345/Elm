@@ -239,6 +239,9 @@ class ValidateController(BaseController):
             # by sending a request w.o. pass parameter
             try:
                 (ok, opt) = self._check(param)
+                if (not ok and opt is not None and 'error' in opt):
+                    log.error("[check] authorization failed for validate/check: %s" % opt['error'])
+                        
             except (AuthorizeException, ParameterError) as exx:
                 log.warning("[check] authorization failed for validate/check: %r"
                             % exx)
