@@ -771,5 +771,38 @@ class ValidateController(BaseController):
             Session.close()
             log.debug("[smspin] done")
 
+    def hastoken(self):
+        param = {}
+        ret = False
+        
+        try:
+            param.update(request.params)
+            user = getUserFromParam(param, optionalOrRequired)
+            if (user is not None and user.isEmpty() == False):  
+                (userid, idResolver, idResolverClass) = getUserId(user)
+                    
+                sqlQuery = Session.query(model.Token).with_lockmode("update").filter(
+                   model.Token.LinOtpUserid == uid).filter(
+                    model.Token.LinOtpIdResClass == resolverClass)
+
+                tokenList = []
+                for token in sqlQuery:
+                    tokenList.append(token.LinOtpTokenSerialNumber)
+                        
+                if (tokenList is not None)
+                    ret = tokenList
+                    
+            Session.commit()
+
+            return sendResult(response, ret, 0)
+
+        except Exception as exx:
+            log.error("[hastoken] validate/hastoken failed: %r" % exx)
+            log.error("[hastoken] %s" % traceback.format_exc())
+ 
+            Session.rollback()
+            return sendError(response, u"validate/hastoken failed: %s"
+                             % unicode(exx), 0)
+
 #eof###########################################################################
 

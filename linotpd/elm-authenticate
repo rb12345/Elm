@@ -1,0 +1,150 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+#	 Elm Authentication System
+#	 Copyright (C) 2014 - IT Services, University of Oxford
+#	 Author: Richard May (richard.may@balliol.ox.ac.uk)
+#
+
+"""
+	This script is used by WebAuth to validate one-time passcodes.
+    It uses a JSON-based interface.
+"""
+
+import sys
+import os
+from os import path, access, R_OK
+
+import traceback
+import getpass
+import urllib, httplib2, json
+import crypt
+
+from getopt import getopt, GetoptError
+
+import logging
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s %(levelname)-5.5s "
+                "[%(name)s][%(funcName)s #%(lineno)d] %(message)s"
+    )
+
+LINOTP_URL = "https://mfa-test.bsp.ox.ac.uk:5001"
+DISABLE_SSL_VALIDATION = True
+
+log = logging.getLogger(__name__)
+
+def usage():
+    """
+    print the usage info
+
+    """
+
+    print "Script to contact the LinOTP server and transmit the result back to WebAuth."
+    print '''
+Syntax: elm-authenticate [mode] [json argument]"
+
+    mode: 'webkdc-userinfo' or 'webkdc-validate'"
+
+    webkdc-userinfo JSON argument: 
+        {
+            "userid" : "<username>",
+            "ip" : "<ip of user>",
+            "timestamp" : "<unix timestamp>",
+            "random" : true|false,
+            "return_url" : "<url>",
+            "factors" : [ "<factor>", "<factor>", ... ]
+        }
+
+    webkdc-validate JSON argument:
+        {
+            "userid": "<sunetid>",
+            "ip" : "<ip of user>",
+            "login_state" : "<string-serialized object>",
+            "factor" : {
+                "capability" : "<webauth-factor-code>",
+                "device" : "<phone or token id, or auto>",
+                "passcode" : "<text>"
+            }
+        }  
+
+    '''
+
+    return
+
+# path: /validate/check, /validate/hastoken, etc.
+# params: {"user" : "root", ...}
+def call_linotp(path, params)
+    data = urllib.urlencode(params)
+    
+    url = LINOTP_URL + path
+    headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
+    
+    try:
+        http = httplib2.Http(disable_ssl_certificate_validation = DISABLE_SSL_VALIDATION)
+    except TypeError as exx:
+        log.warning("httplib2 'disable_ssl_certificate_validation' attribute error: %r" % exx)
+        http = httplib2.Http()
+    
+    (_resp, content) = http.request(url, method="POST", body=data, headers=headers)
+    
+    rv = json.loads(content)
+    if rv.get("result"):
+        if (rv['result'].get('success', False)):
+            res = rv['result'].get('value', False)
+            return res
+]
+    # If we didn't get a valid response, exit and signal to remctl that something went wrong.
+    sys.exit(2)
+
+def webkdc-userinfo(data)
+    if (user = rv.get("userid"))
+        result = {
+            "username" : user, 
+            "factors" : ["p"]
+        }
+        if (tokens = call_linotp("/validate/hastoken", {"user" : user}))
+            result["factors"] = ["p", "m", "o", "o3"]
+            tokenList = []
+            for (token in tokens)
+                tokenList.append({
+                    "device" : token,
+                    "name" : token,
+                    "prompt": False,
+                    "default": False,
+                })
+            tokenList[0]["default"] = True
+            
+            result["capabilities"] = {
+                "o3" : tokenList
+            }
+            
+        return json.dumps(result)
+
+def main():
+    """
+    main worker:
+    * gather the input
+    """
+    param = {}
+
+    prog = sys.argv[0]
+
+    command = sys.argv[1]
+    
+    data = json.loads(sys.argv[2])
+
+    if (command == "webkdc-userinfo"):
+        return webkdc-userinfo(data)
+    elseif (command == "webkdc-validate"):
+        return webkdc-validate(data)
+    else
+        usage()
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    ## jump to the main worker
+    main()
+
