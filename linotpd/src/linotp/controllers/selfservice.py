@@ -1489,7 +1489,7 @@ class SelfserviceController(BaseController):
                     t_type = "totp"
 
                 if prefix is None:
-                    prefix = "LSGO"
+                    prefix = "GOOG"
                 if serial is None:
                     serial = genSerial(t_type, prefix)
 
