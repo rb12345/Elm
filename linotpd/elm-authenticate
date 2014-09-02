@@ -76,35 +76,69 @@ Syntax: elm-authenticate [mode] [json argument]"
 # path: /validate/check, /validate/hastoken, etc.
 # params: {"user" : "root", ...}
 def call_linotp(path, params)
-    data = urllib.urlencode(params)
+    # Turn the params dict into a "?user=a&pass=b&..." format
+	data = urllib.urlencode(params)
     
+	# Get the URL and headers ready.
     url = LINOTP_URL + path
     headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
     
+	# Connect with httplib2 (note that not all versions are compiled with disable_ssl_validation)
     try:
         http = httplib2.Http(disable_ssl_certificate_validation = DISABLE_SSL_VALIDATION)
     except TypeError as exx:
         log.warning("httplib2 'disable_ssl_certificate_validation' attribute error: %r" % exx)
         http = httplib2.Http()
     
+	# POST and get our response
     (_resp, content) = http.request(url, method="POST", body=data, headers=headers)
     
+	# Turn the JSON response into a python dict
     rv = json.loads(content)
-    if rv.get("result"):
-        if (rv['result'].get('success', False)):
-            res = rv['result'].get('value', False)
+    if result = rv.get('result'):
+        if (result.get('success')):
+			# No execution errors, so return 'value' (which contains the actual response)
+            res = result.get('value')
             return res
-]
+		else if (error = result.get("error"))
+			# There was an error, so if we've got any details print it to stderr for remctl to pick up
+			print >> sys.stderr, error
+
     # If we didn't get a valid response, exit and signal to remctl that something went wrong.
     sys.exit(2)
 
 def webkdc-userinfo(data)
-    if (user = rv.get("userid"))
+    if (user = data.get("userid"))
+        reply = {
+            "username" : user, 
+            "factors" : ["p"]
+        }
+		# Call the hastoken function.
+        if (tokens = call_linotp("/validate/hastoken", {"user" : user}))
+            reply["factors"] = ["p", "m", "o", "o3"]
+            tokenList = []
+            for (token in tokens)
+                tokenList.append({
+                    "device" : token,
+                    "name" : token,
+                    "prompt": False,
+                    "default": False,
+                })
+            tokenList[0]["default"] = True
+            
+            reply["capabilities"] = {
+                "o3" : tokenList
+            }
+            
+        return json.dumps(reply)
+
+def webkdc-validate(data)
+    if (user = data.get("userid") and factor = data.get("factor"))
         result = {
             "username" : user, 
             "factors" : ["p"]
         }
-        if (tokens = call_linotp("/validate/hastoken", {"user" : user}))
+        if (tokens = call_linotp("/validate/check", {"user" : user, "pass" : pass}))
             result["factors"] = ["p", "m", "o", "o3"]
             tokenList = []
             for (token in tokens)
@@ -121,7 +155,7 @@ def webkdc-userinfo(data)
             }
             
         return json.dumps(result)
-
+		
 def main():
     """
     main worker:
@@ -136,9 +170,9 @@ def main():
     data = json.loads(sys.argv[2])
 
     if (command == "webkdc-userinfo"):
-        return webkdc-userinfo(data)
+        print webkdc-userinfo(data)
     elseif (command == "webkdc-validate"):
-        return webkdc-validate(data)
+        print webkdc-validate(data)
     else
         usage()
         sys.exit(1)

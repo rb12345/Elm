@@ -1338,6 +1338,7 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
         sortedAuditList = sorted(auditList, key=lambda audit_entry: audit_entry.get("weight", 0))
         highest_audit = sortedAuditList[-1]
         c.audit['action_detail'] = highest_audit.get('action_detail', '')
+        c.audit['info'] = c.audit['action_detail']
         # check how many highest_audit values entries exist!
         highest_list = filter(lambda audit_entry: audit_entry.get("weight", 0) == highest_audit.get("weight", 0), sortedAuditList)
         if len(highest_list) == 1:

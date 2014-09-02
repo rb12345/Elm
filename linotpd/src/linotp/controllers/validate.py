@@ -70,6 +70,9 @@ from linotp.lib.token import getTokens4UserOrSerial
 
 from linotp.lib.error import ParameterError
 
+from linotp import model
+from linotp.model import Token
+
 import traceback
 
 audit = config.get('audit')
@@ -239,7 +242,11 @@ class ValidateController(BaseController):
             # by sending a request w.o. pass parameter
             try:
                 (ok, opt) = self._check(param)
-                if (not ok and opt is not None and 'error' in opt):
+                if (not ok):
+                    if opt == None:
+                        opt = {}
+
+                    opt['error'] = c.audit.get('info')
                     log.error("[check] authorization failed for validate/check: %s" % opt['error'])
                         
             except (AuthorizeException, ParameterError) as exx:
@@ -252,6 +259,8 @@ class ValidateController(BaseController):
                     if opt == None:
                         opt = {}
                     opt['error'] = c.audit.get('info')
+                    log.error("[check] authorization failed for validate/check: %s" % opt['error'])
+
 
             Session.commit()
 
@@ -777,19 +786,19 @@ class ValidateController(BaseController):
         
         try:
             param.update(request.params)
-            user = getUserFromParam(param, optionalOrRequired)
+            user = getUserFromParam(param, optionalOrRequired = True)
             if (user is not None and user.isEmpty() == False):  
                 (userid, idResolver, idResolverClass) = getUserId(user)
                     
                 sqlQuery = Session.query(model.Token).with_lockmode("update").filter(
-                   model.Token.LinOtpUserid == uid).filter(
-                    model.Token.LinOtpIdResClass == resolverClass)
+                   model.Token.LinOtpUserid == userid).filter(
+                    model.Token.LinOtpIdResClass == idResolverClass)
 
                 tokenList = []
                 for token in sqlQuery:
-                    tokenList.append(token.LinOtpTokenSerialNumber)
+                    tokenList.append(token.LinOtpTokenSerialnumber)
                         
-                if (tokenList is not None)
+                if (tokenList is not None):
                     ret = tokenList
                     
             Session.commit()
