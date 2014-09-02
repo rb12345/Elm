@@ -300,7 +300,7 @@ class IdResolver (UserIdResolver):
             resultList = None
 
         if resultList == None:
-            log.info("[getUserId] : empty result ")
+            log.debug("[getUserId] : empty result ")
             return userid
         log.debug("[getUserId] : resultList :%r: " % (resultList))
 
@@ -310,7 +310,7 @@ class IdResolver (UserIdResolver):
 
         ## Ticket #754
         if len(resultList) == 0:
-            log.info("[getUserId] resultList is empty")
+            log.debug("[getUserId] resultList is empty")
         else:
             res = resultList[0][1]
             if res != None:
@@ -319,7 +319,7 @@ class IdResolver (UserIdResolver):
                         userid = res.get(key)[0]
 
         if res == None or userid == '':
-            log.info("[getUserId] : empty result for  %r"
+            log.debug("[getUserId] : empty result for  %r"
                       % (loginname))
         else:
             log.debug("[getUserId] userid: %r:%r" % (type(userid), userid))
