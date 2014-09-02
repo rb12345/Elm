@@ -207,7 +207,7 @@ def sendResult(response, obj, id=1, opt=None):
            "id": id }
 
     if opt is not None and len(opt) > 0:
-        res["value"]["detail"] = opt
+        res["result"].update(opt)
 
     return json.dumps(res, indent=3)
 
