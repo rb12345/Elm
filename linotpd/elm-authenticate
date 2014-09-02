@@ -13,6 +13,7 @@
 
 import sys
 import os
+
 from os import path, access, R_OK
 
 import traceback
@@ -30,7 +31,7 @@ logging.basicConfig(
                 "[%(name)s][%(funcName)s #%(lineno)d] %(message)s"
     )
 
-LINOTP_URL = "https://mfa-test.bsp.ox.ac.uk:5001"
+LINOTP_URL = "https://mfa-test.bsp.ox.ac.uk"
 DISABLE_SSL_VALIDATION = True
 
 log = logging.getLogger(__name__)
@@ -75,11 +76,11 @@ Syntax: elm-authenticate [mode] [json argument]"
 
 # path: /validate/check, /validate/hastoken, etc.
 # params: {"user" : "root", ...}
-def call_linotp(path, params)
+def call_linotp(path, params):
     # Turn the params dict into a "?user=a&pass=b&..." format
-	data = urllib.urlencode(params)
+    data = urllib.urlencode(params)
     
-	# Get the URL and headers ready.
+    # Get the URL and headers ready.
     url = LINOTP_URL + path
     headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
     
@@ -95,67 +96,95 @@ def call_linotp(path, params)
     
 	# Turn the JSON response into a python dict
     rv = json.loads(content)
-    if result = rv.get('result'):
-        if (result.get('success')):
-			# No execution errors, so return 'value' (which contains the actual response)
-            res = result.get('value')
-            return res
-		else if (error = result.get("error"))
-			# There was an error, so if we've got any details print it to stderr for remctl to pick up
-			print >> sys.stderr, error
+    return rv.get('result')
 
-    # If we didn't get a valid response, exit and signal to remctl that something went wrong.
-    sys.exit(2)
-
-def webkdc-userinfo(data)
-    if (user = data.get("userid"))
+def webkdc_userinfo(data):
+    # Have we got enough input?
+    user = data.get("userid")
+    if user:
         reply = {
             "username" : user, 
             "factors" : ["p"]
         }
-		# Call the hastoken function.
-        if (tokens = call_linotp("/validate/hastoken", {"user" : user}))
-            reply["factors"] = ["p", "m", "o", "o3"]
-            tokenList = []
-            for (token in tokens)
-                tokenList.append({
-                    "device" : token,
-                    "name" : token,
-                    "prompt": False,
-                    "default": False,
-                })
-            tokenList[0]["default"] = True
+        response = call_linotp("/validate/webkdc_userinfo", {"user" : user})
+		# Did the call succeed?
+        if (response.get("status")):
+            # Call succeeded. Get the results and send them back in the required form.
+            tokens = response.get("value") 
+            if tokens is not None:
+                reply["factors"].extend(["m", "o", "o3"])
+                tokenList = []
+                for serial in tokens:
+                    tokenList.append({
+                        "device" : serial,
+                        "name" : serial,
+                        "prompt" : True,
+                        "default" : False,
+                    })                   
+                
+                if (tokenList is not None):
+                    tokenList[0]["default"] = True
+                    ret = tokenList
+                    
+                reply["capabilities"] = {
+                    "o3" : tokens,
+                }
             
-            reply["capabilities"] = {
-                "o3" : tokenList
-            }
-            
-        return json.dumps(reply)
+            return json.dumps({
+                "success" : True,
+                "response" : reply
+            })
+        else:
+            # An error occured, so respond with the error info.
+            return json.dumps({
+                "success" : False,
+                "code" : response.get("code"),
+                "message" : response.get("error"),
+                "message-detail" : response.get("error"),
+            })
+    else:
+        print "Missing user."
+        usage()
+        sys.exit(2)
+        
+def webkdc_validate(data):
+    # Have we got enough input?
+    user = data.get("userid")
+    factor = data.get("factor")
 
-def webkdc-validate(data)
-    if (user = data.get("userid") and factor = data.get("factor"))
-        result = {
-            "username" : user, 
-            "factors" : ["p"]
-        }
-        if (tokens = call_linotp("/validate/check", {"user" : user, "pass" : pass}))
-            result["factors"] = ["p", "m", "o", "o3"]
-            tokenList = []
-            for (token in tokens)
-                tokenList.append({
-                    "device" : token,
-                    "name" : token,
-                    "prompt": False,
-                    "default": False,
+    if (user is not None and factor is not None):
+        token = factor.get("device")
+        code = factor.get("passcode")
+        if (token is not None and code is not None):
+            response = call_linotp("/validate/webkdc_validate", {"user" : user, "token" : token, "code" : code})
+            # Did the call succeed?
+            value = response.get("value")
+            if (value and response.get("status") and value.get("success")):
+                # The call succeeded and they authenticated successfully
+                return json.dumps({
+                    "success" : True,
+                    "factors" : [{
+                        "factor" : "o3",
+                        "expiration" : value.get("expiration")
+                    }]
                 })
-            tokenList[0]["default"] = True
-            
-            result["capabilities"] = {
-                "o3" : tokenList
-            }
-            
-        return json.dumps(result)
-		
+            else:
+                # An error occured, so respond with the error info.
+                return json.dumps({
+                    "success" : False,
+                    "code" : value.get("code"),
+                    "message" : value.get("error"),
+                    "message-detail" : value.get("error"),
+                })               
+        else:
+            print "Missing token and / or code."
+            usage()
+            sys.exit(2)
+    else:
+        print "Missing user and / or factor."
+        usage()
+        sys.exit(2)
+        
 def main():
     """
     main worker:
@@ -165,18 +194,30 @@ def main():
 
     prog = sys.argv[0]
 
+    if (len(sys.argv) < 3):
+        print "Not enough arguments."
+        usage()
+        sys.exit(1)
+        
     command = sys.argv[1]
     
-    data = json.loads(sys.argv[2])
+    try:
+        data = json.loads(sys.argv[2])
+    except:
+        print "Malformed JSON."
+        usage()
+        sys.exit(2)
 
     if (command == "webkdc-userinfo"):
-        print webkdc-userinfo(data)
-    elseif (command == "webkdc-validate"):
-        print webkdc-validate(data)
-    else
+        print webkdc_userinfo(data)
+    elif (command == "webkdc-validate"):
+        print webkdc_validate(data)
+    else:
+        print "Unrecognized command."
         usage()
         sys.exit(1)
 
+    sys.exit(0)
 
 if __name__ == '__main__':
     ## jump to the main worker

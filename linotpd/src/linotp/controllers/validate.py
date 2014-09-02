@@ -74,6 +74,7 @@ from linotp import model
 from linotp.model import Token
 
 import traceback
+import time
 
 audit = config.get('audit')
 
@@ -748,7 +749,7 @@ class ValidateController(BaseController):
                 state = opt.get('state', '') or ''
                 message = opt.get('message', '') or 'No sms message defined!'
 
-            # sucessfull submit
+            # sucessful submit
             if (message in ['sms with otp already submitted',
                             'sms submitted']
                 and len(state) > 0):
@@ -780,9 +781,8 @@ class ValidateController(BaseController):
             Session.close()
             log.debug("[smspin] done")
 
-    def hastoken(self):
+    def webkdc_userinfo(self):
         param = {}
-        ret = False
         
         try:
             param.update(request.params)
@@ -797,21 +797,60 @@ class ValidateController(BaseController):
                 tokenList = []
                 for token in sqlQuery:
                     tokenList.append(token.LinOtpTokenSerialnumber)
-                        
-                if (tokenList is not None):
-                    ret = tokenList
                     
             Session.commit()
 
-            return sendResult(response, ret, 0)
+            return sendResult(response, tokenList, 0)
 
         except Exception as exx:
-            log.error("[hastoken] validate/hastoken failed: %r" % exx)
-            log.error("[hastoken] %s" % traceback.format_exc())
+            log.error("[webkdc_userinfo] validate/webkdc_userinfo failed: %r" % exx)
+            log.error("[webkdc_userinfo] %s" % traceback.format_exc())
  
             Session.rollback()
-            return sendError(response, u"validate/hastoken failed: %s"
+            return sendError(response, u"validate/webkdc_userinfo failed: %s"
                              % unicode(exx), 0)
+        finally:
+            Session.close()
+            
+    def webkdc_validate(self):
+        param = {}
+        
+        try:
+            param.update(request.params)
+            username = param["user"]
+            serial = param["token"]
+            code = param["code"]
+            
+            user = User(username, "", "")
+            (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
 
+            ret = {
+                "success" : ok,
+            }
+
+            if (ok):
+                ret['expiration']  = round(time.time()) + 60 * 60, # one hour from now      
+            else:
+                if opt == None:
+                    opt = {}
+                ret['error'] = c.audit.get('info')
+                log.error("[webkdc_validate] authorization failed: %s" % ret['error'])
+                ret['code'] = -310
+            
+            Session.commit()
+            
+            return sendResult(response, ret, 0, opt=opt)
+                        
+        except Exception as exx:
+            log.error("[webkdc_validate] validate/webkdc_validate failed: %r" % exx)
+            log.error("[webkdc_validate] %s" % traceback.format_exc())
+ 
+            Session.rollback()
+            return sendError(response, u"validate/webkdc_validate failed: %s"
+                             % unicode(exx), 0)   
+        finally:
+            Session.close()
+            
 #eof###########################################################################
+
 
