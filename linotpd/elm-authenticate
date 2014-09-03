@@ -47,7 +47,8 @@ def usage():
 Syntax: elm-authenticate [mode] [json argument]"
 
     mode: 'webkdc-userinfo' or 'webkdc-validate'"
-
+    json argument must be enclosed in single quotes
+    
     webkdc-userinfo JSON argument: 
         {
             "userid" : "<username>",
@@ -195,7 +196,7 @@ def main():
     prog = sys.argv[0]
 
     if (len(sys.argv) < 3):
-        print "Not enough arguments."
+        print "Please specify a command."
         usage()
         sys.exit(1)
         
@@ -222,4 +223,3 @@ def main():
 if __name__ == '__main__':
     ## jump to the main worker
     main()
-
