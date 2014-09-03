@@ -1,0 +1,157 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+#	 Elm Authentication System
+#	 Copyright (C) 2014 - IT Services, University of Oxford
+#	 Author: Richard May (richard.may@balliol.ox.ac.uk)
+#
+
+"""
+	This script is used by WebAuth to validate one-time passcodes.
+    It gets multiple command-line string arguments and responds with a block of XML.
+	As of the upcoming WebAuth 4.7.0, this is superseded by the elm-authenticate script.
+"""
+
+import sys
+import os
+
+from os import path, access, R_OK
+
+import traceback
+import getpass
+import urllib, httplib2, json
+import crypt
+
+from getopt import getopt, GetoptError
+
+import logging
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s %(levelname)-5.5s "
+                "[%(name)s][%(funcName)s #%(lineno)d] %(message)s"
+    )
+
+LINOTP_URL = "https://mfa-test.bsp.ox.ac.uk"
+DISABLE_SSL_VALIDATION = True
+
+log = logging.getLogger(__name__)
+
+def usage():
+    """
+    print the usage info
+
+    """
+
+    print "Script to contact the LinOTP server and transmit the result back to WebAuth."
+    print '''
+Syntax: elm-authenticate [mode] [arguments]"
+
+    mode: 'webkdc-userinfo' or 'webkdc-validate'"
+
+    webkdc-userinfo arguments: 
+        [username] [ip] [timestamp] [random-multifactor] [url] [factors]
+        
+    webkdc-validate arguments:
+         [username] [ip] [code] [type] [login-state]
+    '''
+
+    return
+
+# path: /validate/check, /validate/hastoken, etc.
+# params: {"user" : "root", ...}
+def call_linotp(path, params):
+    # Turn the params dict into a "?user=a&pass=b&..." format
+    data = urllib.urlencode(params)
+    
+    # Get the URL and headers ready.
+    url = LINOTP_URL + path
+    headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
+    
+	# Connect with httplib2 (note that not all versions are compiled with disable_ssl_validation)
+    try:
+        http = httplib2.Http(disable_ssl_certificate_validation = DISABLE_SSL_VALIDATION)
+    except TypeError as exx:
+        log.warning("httplib2 'disable_ssl_certificate_validation' attribute error: %r" % exx)
+        http = httplib2.Http()
+    
+	# POST and get our response
+    (_resp, content) = http.request(url, method="POST", body=data, headers=headers)
+    
+	# Turn the JSON response into a python dict
+    rv = json.loads(content)
+    return rv.get('result')
+
+def webkdc_userinfo(user):
+    reply = '<authdata user="%s"><factors>%s</factors></authdata>'
+    factors = "<factor>p</factor>"
+    response = call_linotp("/validate/webkdc_userinfo", {"user" : user})
+	# Did the call succeed?
+    if (response.get("status")):
+        # Call succeeded. Get the results and send them back in the required form.
+        tokens = response.get("value") 
+        if tokens is not None:
+            factors += "<factor>m</factor><factor>o</factor><factor>o3</factor>"
+            
+        return reply % (user, factors)
+    else:
+        print >> sys.stderror, response.get("error")
+        sys.exit(1)
+        
+def webkdc_validate(user, code):
+    response = call_linotp("/validate/webkdc_validate", {"user" : user, "code" : code})
+    reply = '<authdata user="%s"><success>%s</success>%s</authdata>'
+    # Did the call succeed?
+    value = response.get("value")
+    if (value and response.get("status") and value.get("success")):
+        # The call succeeded and they authenticated successfully
+        factor = "<factors><factor>o</factor><factor>o3</factor><expiration>%s</expiration></factors>" % value.get("expiration")
+        return reply % (user, "yes", factor)
+    else:
+        # An error occured, so respond with the error info.
+        error = "<user-message>%s</user-message>" % value.get("error")
+        return reply % (user, "no", error)
+        
+def main():
+    """
+    main worker:
+    * gather the input
+    """
+    param = {}
+
+    prog = sys.argv[0]
+
+    # No command provided
+    if (len(sys.argv) < 2):
+        print "Please specify a command."
+        usage()
+        sys.exit(1)
+        
+    command = sys.argv[1]
+    
+    if (command == "webkdc-userinfo"):
+        # Did we get enough arguments for this command?
+        if (len(sys.argv) < 8):
+            print "Not enough arguments."
+            usage()
+            sys.exit(1)
+        
+        print webkdc_userinfo(sys.argv[2]) # 2 = username
+    elif (command == "webkdc-validate"):
+        # Did we get enough arguments for this command?
+        if (len(sys.argv) < 7):
+            print "Not enough arguments."
+            usage()
+            sys.exit(1)
+        
+        print webkdc_validate(sys.argv[2], sys.argv[4]) # 2 = username, 4 = code
+    else:
+        print "Unrecognized command."
+        usage()
+        sys.exit(1)
+
+    sys.exit(0)
+
+if __name__ == '__main__':
+    ## jump to the main worker
+    main()

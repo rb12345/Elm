@@ -818,11 +818,15 @@ class ValidateController(BaseController):
         try:
             param.update(request.params)
             username = param["user"]
-            serial = param["token"]
             code = param["code"]
             
             user = User(username, "", "")
-            (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
+            
+            if ('token' in param):
+                serial = param["token"]
+                (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
+            else:
+                (ok, opt) = checkUserPass(user, code)          
 
             ret = {
                 "success" : ok,
