@@ -1,0 +1,87 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <http-equiv="pragma" content="no-cache">
+    <title>WebAuth Multifactor</title>
+	<link rel="icon" href="/elm/images/favicon.ico" type="image/x-icon" />
+
+	<link rel="shortcut icon" href="/elm/images/favicon.ico" type="image/x-icon" />
+	<link rel="stylesheet" type="text/css" href="/elm/css/webauth.css" media="all"/>
+	<link rel="stylesheet" type="text/css" href="/elm/css/webauth-handheld.css" media="screen and (max-width: 639px)"/>
+	<link rel="stylesheet" type="text/css" href="/elm/css/webauth-large.css" media="screen and (min-width: 640px)" />
+  </head>
+
+  [% IF notdefined %]
+<!--
+This is the template for the WebAuth multifactor page.  This page is called
+from login.fcgi script on the weblogin server after a successful
+authentication that has come back signaling that multifactor authentication
+is also required.  Variables used:
+
+factor_type             : type of multifactor being used (o1, o2, etc)
+username                : the authenticated identity of the user
+login_cancel            : a cancel URL was specified
+cancel_url              : the specified cancel URL
+multifactor_sentauth    : the form was submitted to run the sendauth function
+error                   : some error occurred
+err_multifactor_missing : the form was submitted previously without an OTP
+err_multifactor_invalid : could not validate a submitted OTP
+-->
+  [% END %]
+
+  <body onload="document.multifactor_login.otp.focus();">
+	<div class="content" id="loginpage">
+		<h1 align="center">WebAuth Multifactor</h1>
+		[% IF error %]
+		  <div class="error" align="center">
+			<p><strong>
+			  [% IF err_multifactor_missing %]
+				<!-- Error: no OTP submitted. -->
+				Error: Enter a one-time password.
+			  [% END %]
+
+			  [% IF err_multifactor_invalid %]
+				<!-- Error: login failed. -->
+				Error: You entered an incorrect one-time password.
+			  [% END %]
+
+			</strong></p>
+			<p>Click <a href="/help.html">help</a> for assistance.</p>
+		  </div>
+		[% END %]
+
+		<div id="loginForm" style="width: 70%;">
+			<p>Please enter your PIN, followed by your one-time password. For example, if your PIN is 1234 and your access code is 000000, enter 123456000000.</p>
+		  
+			<form name="multifactor_login"	action="[% script_name FILTER html %]" method="post" autocomplete="OFF" enctype="application/x-www-form-urlencoded">
+				<input type="hidden" name="rm" value="multifactor">
+				<input type="hidden" name="RT" value="[% RT FILTER html %]">
+				<input type="hidden" name="ST" value="[% ST FILTER html %]">
+				<input type="hidden" name="username" value="[% username FILTER html %]">
+				<input type="hidden" name="factor_type" value="[% factor_type FILTER html %]">
+				<div class="formfield">
+					<label title="A one-time code generate by your phone, plus your PIN" for="otp">Access Code</label>
+					<input id="otp" type="password" name="otp" value=""	size="10" maxlength="10" tabindex="1"/>
+				</div>
+				
+				<input type="submit" name="Submit" class="go-go-go" value="Login" tabindex="2" />
+			</form>
+		</div>
+
+		<span class="help"><a title="Help on how to use the Oxford Single Sign-On System." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Help</a></span>
+		<p class="postscript">
+			<a href="http://www.ict.ox.ac.uk/oxford/rules/">University of Oxford  Computer Usage Rules and Etiquette</a>
+		</p>
+		
+	</div>
+	<div id="footer">
+		<div id="site-info">
+			<h2 class="nonvis-exposition">Site Information</h2>
+			<dl>
+				<dt class="nonvis-exposition">Institution</dt><dd id="institution">University of Oxford</dd>
+				<dt class="nonvis-exposition">Service</dt><dd id="serviceName" >WebAuth</dd>
+			</dl>
+		</div>
+	</div> 
+  </body>
+</html>

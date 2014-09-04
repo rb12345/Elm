@@ -1,0 +1,587 @@
+/*
+
+Some basic styling stuff
+
+*/
+
+#loginForm {
+	margin-left: auto;
+	margin-right: auto;
+	text-align: center;
+}
+
+.postscript {
+	margin-left: auto;
+	margin-right: auto;
+	text-align: center;
+}
+
+body{
+
+font-family: Helvetica, Verdana, Arial, sans-serif;
+font-size: 0.84em;
+background-color: #fff;
+color: #000;
+padding: 60px 10px 0px 10px;
+
+margin: 0px;
+}
+
+h1, h2, h3, h4, h5, h6
+{
+font-family: georgia, times, serif;
+font-weight: bold;
+font-style: normal;
+color: #333;
+clear: both;
+}
+h1, span.help a, a.go_button
+{
+text-align: center;
+font-size: 1.5em;
+}
+
+div.content h1
+{
+padding: 10px 50px;
+
+}
+h2
+{
+font-size: 1.4em;
+}
+
+h3
+{
+font-size: 1.3em;
+}
+
+h4
+{
+font-size: 1.2em;
+}
+
+h5
+{
+font-size: 1.1em;
+}
+
+h6
+{
+margin: 0px;
+margin-bottom: 0.2em;
+padding: 0px;
+font-size: 1em;
+font-weight: normal;
+font-style: italic;
+}
+/* link styling */
+
+a,
+a:link,
+a:visited,
+a:focus,
+a:hover,
+a:active{
+
+font-weight: bold;
+
+}
+a,
+a:link,
+a:visited {
+  color: #002147;  
+  
+}
+.postscript a:hover, .postscript a:focus,
+a:hover, a:focus,
+a.form-help:hover, a.form-help:focus{
+color: #0496fc;
+}
+/* remove underline from link on the login anfd confirm pages only */
+#confirmPage a,
+#loginPage a {
+  
+  text-decoration: none;
+  
+}
+em {
+  
+  font-style: normal;
+  font-weight: bold;
+  color: #666;
+}
+p
+{
+/*
+padding-bottom: 0.3em;
+*/
+line-height: 1.3em;
+}
+
+/* avoid annoying borders on linked images*/
+a img
+{
+border: none;
+
+}
+/* a class style for highlighting  names in your text*/ 
+span.name
+{
+
+font-weight: bold;
+
+}
+
+div.content {
+   
+   position: relative; 
+}
+
+.content ul {
+padding-left: 40px;    
+}
+li
+{
+padding: 0.5em;
+line-height: 1em;
+}
+dl {
+  
+  padding: 1em;
+  
+}
+#index   {
+  
+  font-size: 1.2em;
+}
+
+#index ol {
+  
+    list-style-type: lower-alpha;
+margin: 0.2em 0px 1em 0px;
+  
+}
+
+#index.content ol {
+    list-style-position: inside;
+}
+
+#non-ssl ul {
+  font-size: 1.3em;
+}
+#non-ssl a.https-link,
+#non-ssl a.https-link strong {
+  
+    color: #002147;
+
+}
+#non-ssl a.https-link {
+  
+  display: block;
+  font-size: 1.3em;
+  text-align: center;
+  line-height: 2em;
+  font-weight: normal;
+  
+}
+
+#non-ssl a.https-link strong{
+  
+
+  font-size: 1.2em;
+
+}
+
+/* branding and layout stuff */
+#site-info
+{
+position: absolute;
+width: 100%;
+top: 0px;
+left: 0px;
+height: 60px;
+
+}
+
+
+div#site-info dl, div#site-info dl dd, div#site-info dt
+
+{
+margin: 0px;
+padding: 0px;
+}
+
+
+div#site-info dl dd#serviceName
+{
+background: url('../images/servicename-handheld.png') no-repeat top center;
+
+/* position the element
+*/
+position: absolute;
+top: 0px;
+height: 56px;
+left: 0px;
+/* hide the text */
+display: block;
+text-indent: -7000px;
+
+}
+
+div#site-info dl dd#institution
+{
+
+background: url('../images/2247_ox_brand6_pos_rect.gif') no-repeat top center;
+border: none;
+height: 56px;
+
+/* hide the text */
+display: block;
+text-indent: -7000px;
+}
+input {
+    border: 1px solid #ccc;
+}
+
+ input[type="text"],
+  input[type="password"] {
+     
+     font-size: 1.2em;
+     margin-bottom: 0.3em;
+     margin-right: 5px;
+     }
+     
+
+ 
+ 
+div#confirmBox 
+{
+
+text-align: center;
+}
+
+div#confirmBox p
+{
+text-align: left;
+}
+
+div#confirmBox table
+{
+font-size: 1.2em;
+margin: 0px auto 1em auto;
+width: 100%;
+}
+
+div#confirmBox table th,
+div#confirmBox table td
+{
+padding: 0.4em;
+}
+div#confirmBox table td
+{
+text-align: left;
+width: 50%;
+
+}
+
+div#confirmBox table th
+{
+color: #999;
+color: #586575;
+text-align: right;
+width: 50%;
+
+}
+fieldset {
+border: 1px solid #eee;
+}
+
+legend {
+color: #666;
+font-weight: bold;
+font-size: 1.2em;
+}
+
+/* inline styling for inline form items such as day/month/year elements */
+div.formfield.inline {
+
+width: 25%;
+clear: none;
+margin-right: 2%;
+float: left;
+
+}
+
+/* make the month field a bit wider */
+
+select#dob_mm {
+  
+  padding: 10px;
+  min-width: 9em;
+  
+}
+
+/* Make sure that the example stays inline. */
+
+div.formfield.inline.year {
+width: 30%;
+}
+span.help a, a.go_button,
+input.go-go-go,
+ a.button,
+ input[type="submit"]
+
+{
+background-color: #c3a260;
+border: 1px solid #79550d;
+border-radius: 3px ;
+-webkit-border-radius: 3px ;
+-moz-border-radius: 3px ;
+color: #fff;
+display: block;
+font-size: 1.2em;
+font-weight: bold;
+
+/*
+margin-top: 1em;
+margin-bottom: 10px;
+*/
+
+margin: 0.5em 0px 0.5em 0px;
+padding: 10px;
+
+/*
+text-align: left;
+*/
+text-decoration: none;
+/*
+max-width: 40%;
+*/
+
+/* IE10 Consumer Preview */ 
+background-image: -ms-linear-gradient(top, #C3A260 0%, #B0852E 100%);
+
+/* Mozilla Firefox */ 
+background-image: -moz-linear-gradient(top, #C3A260 0%, #B0852E 100%);
+
+/* Opera */ 
+background-image: -o-linear-gradient(top, #C3A260 0%, #B0852E 100%);
+
+/* Webkit (Safari/Chrome 10) */ 
+background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #C3A260), color-stop(1, #B0852E));
+
+/* Webkit (Chrome 11+) */ 
+background-image: -webkit-linear-gradient(top, #C3A260 0%, #B0852E 100%);
+
+/* W3C Markup, IE10 Release Preview */ 
+background-image: linear-gradient(to bottom, #C3A260 0%, #B0852E 100%);
+
+-moz-box-shadow: 0px 0px 2px 2px #eee;
+-webkit-box-shadow: 0px 0px 2px 2px #eee;
+box-shadow: 0px 0px 2px 2px #eee;
+
+}
+
+a.go_button {
+max-width: 40%;
+}
+
+span.help a:link, span.help a:visited, span.help a:active,
+a.go_button:link, a.go_button:active, a.go_button:visited,
+a.button:link, a.button:active, a.button:visited,
+input.go-go-go
+{
+color: #fff;
+}
+
+a.go_button,
+a.cancel {
+margin: 1.5em auto ;
+line-height: 1.2em;
+}
+span.help a
+{
+font-size: 1em;
+letter-spacing: 0.05em;
+margin-top: 0px;
+}
+
+a.go_button,
+input.go-go-go
+{
+
+/* IE10 Consumer Preview */ 
+background-image: -ms-linear-gradient(top, #A2CE18 0%, #749802 100%);
+
+/* Mozilla Firefox */ 
+background-image: -moz-linear-gradient(top, #A2CE18 0%, #749802 100%);
+
+/* Opera */ 
+background-image: -o-linear-gradient(top, #A2CE18 0%, #749802 100%);
+
+/* Webkit (Safari/Chrome 10) */ 
+background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #A2CE18), color-stop(1, #749802));
+
+/* Webkit (Chrome 11+) */ 
+background-image: -webkit-linear-gradient(top, #A2CE18 0%, #749802 100%);
+
+/* W3C Markup, IE10 Release Preview */ 
+background-image: linear-gradient(to bottom, #A2CE18 0%, #749802 100%);
+border-color: #354503;
+
+margin-left: auto;
+margin-right: auto;
+}
+
+span.help a:active, span.help a:hover,
+a.go_button:hover, a.go_button:active,
+a.button:hover, a.button:active,
+form input.go-go-go:active, form input.go-go-go:hover
+{
+/* IE10 Consumer Preview */ 
+background-image: -ms-linear-gradient(top, #FF9D3B 0%, #B55D04 100%);
+
+/* Mozilla Firefox */ 
+background-image: -moz-linear-gradient(top, #FF9D3B 0%, #B55D04 100%);
+
+/* Opera */ 
+background-image: -o-linear-gradient(top, #FF9D3B 0%, #B55D04 100%);
+
+/* Webkit (Safari/Chrome 10) */ 
+background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #FF9D3B), color-stop(1, #B55D04));
+
+/* Webkit (Chrome 11+) */ 
+background-image: -webkit-linear-gradient(top, #FF9D3B 0%, #B55D04 100%);
+
+/* W3C Markup, IE10 Release Preview */ 
+background-image: linear-gradient(to bottom, #FF9D3B 0%, #B55D04 100%);
+border-color: #600;
+
+cursor: hand;
+
+}
+a.go_button span.continue-to{
+background: url('../images/small-white-tick.png') no-repeat 0px 3px;
+padding-left: 20px;  
+  
+}
+
+a.cancel {
+    clear: both;
+
+    font-size: 1em;
+    margin-top: 20px;
+}
+
+/* colour for emphasized text, strong, error messages, etc...*/
+strong, 
+ul.failures li,
+.pleaseNote
+{
+color: #c37500;
+
+}
+
+ul.failures li
+{
+list-style: none;
+font-weight: bold;
+}   
+.pleaseNote {
+    font-size: 1.2em;
+    font-style: italic;
+}
+/* absolutely position the help link to the top right of the content div */
+span.help a
+{
+position: absolute;
+top: 10px;
+right: 5px;
+display: block;
+padding: 5px;
+}
+
+/* general form styling stuff */
+
+form
+{
+background-color:#fdfdfd;
+border: 1px solid #ddd;
+padding: 0.2em;
+}
+div#logoutBox form
+{
+
+/* remove styling from logout form, as it's only a button and looks weird with a border and bg colour  */
+background-color: #fff;
+border-style: none;
+
+padding-top: 1.4em;
+}
+form div
+{
+padding: 0.4em;
+}
+label
+{
+color: #666;
+clear: both;
+display: block;
+font-size: 1.2em;
+font-weight: bold;
+margin: 0.5em 0;
+}
+
+.form-help,
+a.form-help,
+.postscript a {
+       color: #777; 
+}
+
+
+div#errorBox, div#error, div#remuserError, div#failures
+{
+margin: 10px;
+border: 1px solid #ddd;
+background: url("../images/cross.png") no-repeat 10px 5px ;
+padding-left: 55px;
+padding-bottom: 10px;
+}
+
+div#errorBox ul , div#error ul , div#remuserError ul
+{
+padding-left: 0px;
+}
+div#errorBox ul ul , div#error ul ul , div#remuserError ul ul
+{
+padding-left: 1em;
+}
+
+div#logoutBox dl dd
+{
+margin-top: 0.5em;
+margin-bottom: 1.2em;
+margin-left: 0px;
+}
+div#errorBox {
+        font-weight: bold;
+}
+
+.postscript {
+    margin-top: 2em;
+
+}
+
+/* hide anything that's for non-visual exposition */
+
+.nonvis-exposition
+{
+position: absolute;
+top: -1600px;
+}
+/* Allow spans to have the option of not wrapping (without littering &nbsp; everywhere)*/
+
+span.nowrap {
+white-space: nowrap;
+}
