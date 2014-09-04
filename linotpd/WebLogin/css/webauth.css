@@ -348,7 +348,7 @@ margin-top: 1em;
 margin-bottom: 10px;
 */
 
-margin: 0.5em 0px 0.5em 0px;
+margin: 0.5em auto;
 padding: 10px;
 
 /*
@@ -410,7 +410,7 @@ margin-top: 0px;
 a.go_button,
 input.go-go-go
 {
-
+background-color: #A2CE18;
 /* IE10 Consumer Preview */ 
 background-image: -ms-linear-gradient(top, #A2CE18 0%, #749802 100%);
 

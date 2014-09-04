@@ -1,164 +1,146 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-  <head>
-    <http-equiv="pragma" content="no-cache">
-    <title>WebAuth Login</title>
-	<link rel="stylesheet" type="text/css" href="/elm/css/webauth.css" media="all"/>
-	<link rel="stylesheet" type="text/css" href="/elm/css/webauth-handheld.css" media="screen and (max-width: 639px)"/>
-	<link rel="stylesheet" type="text/css" href="/elm/css/webauth-large.css" media="screen and (min-width: 640px)" />
-  </head>
+<!DOCTYPE html>
+<html lang="en"> 
+<!--<![endif]-->
+	<head> 
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<link rel="icon" href="/elm/images/favicon.ico" type="image/x-icon" />
 
-  [% IF notdefined %]
-<!--
-This is the template for the WebAuth login page.  This page is called from
-login.fcgi script on the weblogin server.  It displays a form asking the
-user for username and password.  Variables used:
+		<link rel="shortcut icon" href="/elm/images/favicon.ico" type="image/x-icon" />
+		<meta name="author" content="University of Oxford" />
+		<link rel="stylesheet" type="text/css" href="/elm/css/webauth.css?1.21" media="all"/>
 
-error                  : some error occurred
-err_missinginput       : one of username or password missing
-err_username           : no username error
-err_password           : no password error
-err_loginfailed        : username and password were incorrect
-err_forced             : web site requires username/password login
-err_rejected           : username not permitted to authenticate
-RT                     : Response Token
-ST                     : Service Token
-username               : the username
-login_cancel           : a cancel URL was specified
-cancel_url             : the specified cancel URL
-show_remuser           : show a button for REMOTE_USER authentication
-remuser_failed         : REMOTE_USER authentication was tried and failed
-remuser_url            : where to send the user for REMOTE_USER auth
--->
-  [% END %]
+		<link rel="stylesheet" type="text/css" href="/elm/css/webauth-handheld.css?1.21" media="screen and (max-width: 639px)"/>
+		<link rel="stylesheet" type="text/css" href="/elm/css/webauth-large.css?1.21" media="screen and (min-width: 640px)" />
 
-  <body onload="document.login.username.focus();">
-    <h1 align="center">WebAuth Login</h1>
-    [% IF error %]
-      <div class="error" align="center">
-        <p><strong>
-          [% IF err_missinginput %]
-            <!-- This is just the combination of err_username and
-                 err_password if you want only one error message.  We
-                 don't use it. -->
-          [% END %]
-          [% IF err_username && err_password %]
-            <!-- Error: no username or password submitted. -->
-            Error: Enter your username and password.
-          [% ELSIF err_username %]
-            <!-- Error: no username submitted. -->
-            Error: Enter your username.
-          [% ELSIF err_password %]
-            <!-- Error: no password submitted. -->
-            Error: Enter your password.
-          [% END %]
+		<!--[if (lt IE 9)&(!IEMobile)]>
+		<link rel="stylesheet" type="text/css" href="/css/webauth-large.css?1.21" media="screen"/>
+		<![endif]-->
+		
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 
-          [% IF err_loginfailed %]
-            <!-- Error: login failed. -->
-            Error: You entered an incorrect username or password (or both).
-          [% END %]
+		<title>University of Oxford Single Sign-On Login</title>
+		<script type="text/javascript">
+		 <!--
+		 function init() {
+		   if (self != top) top.location = self.location;
+		 }
+		 // -->
+		</script>
+	</head>
 
-          [% IF err_rejected %]
-            <!-- Error: user principal rejected. -->
-            Error: That username may not authenticate to this service.
-          [% END %]
+	<body  onload="document.login.username.focus(); init();">
+		<div class="content" id="loginPage">
+		<h1>Log in <span class="name"></span></h1>
+		
+		[% IF error %]
+			<div id="error">
+				<ul class="failures">
+					  [% IF err_missinginput %]
+						<!-- This is just the combination of err_username and
+							 err_password if you want only one error message.  We
+							 don't use it. -->
+					  [% END %]
+					  [% IF err_username || err_password %]
+						<li>Enter both your Oxford username and its password</li>
+					  [% END %]
 
-          [% IF err_forced %]
-            <!-- Not really an error, forced login. -->
-            This web site requires that you log in with username and
-            password.
-          [% END %]
-        </strong></p>
-        <p>Click <a href="/help.html">help</a> for assistance.</p>
-      </div>
-    [% END %]
+					  [% IF err_loginfailed %]
+						<li>Incorrect Oxford username or password (or both). The most common 
+						problems are:
+							<ul>	
+								<li>You were using some other username or password instead of your 
+									<a href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Oxford</a> username/password.
+								</li>
+							  <li>You mis-typed the username or password, e.g.
+								<ul> 
+								  <li>
+									You accidentally had the &lt;Caps Lock&gt; key engaged.
+								  </li>
+								  <li>
+									You used upper-case letters where lower-case were needed,
+									or vice-versa.
+								  </li>
+								  <li>
+									Your password contains a character such as '$' which is
+									produced by a different key to the one you pressed.
+								  </li>
+								</ul>
+							  </li>
+							  <li>
+								You have misremembered your password - see our 
+								<a href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml.ID=body.1_div.6">
+								forgotten passwords</a> page.
+							  </li>
+							  <li>
+								Your password has expired and needs resetting via our
+								<a href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml.ID=body.1_div.6">
+								forgotten passwords</a> page.
+							  </li>
+							  <li>
+								Your University Card and/or username has expired and you
+								are no longer eligible to use the system.
+							  </li>
+							</ul>
+						  </li>
+					  [% END %]
 
-    [% IF remuser_failed %]
-      <div class="error" align="center">
-        <p><strong>Error: Apache authentication was tried and
-        failed.</strong></p>
-      </div>
-    [% END %]
+					  [% IF err_rejected %]
+						<!-- Error: user principal rejected. -->
+						<li>That username may not authenticate to this service.</li>
+					  [% END %]
 
-    <div class="loginbox" align="center">
-      <table border="1" width="70%">
-        <tr>
-          <td><img alt="Login" src="/elm/images/login.png"
-                   width="160" height="160"/></td>
-          <td>
-            <div class="loginform">
-              <form name="login"
-                    action="[% script_name FILTER html %]"
-                    method="post" autocomplete="OFF"
-                    enctype="application/x-www-form-urlencoded">
-                <input type="hidden" name="rm" value="index">
-                <input type="hidden" name="RT"
-                       value="[% RT FILTER html %]">
-                <input type="hidden" name="ST"
-                       value="[% ST FILTER html %]">
-                <input type="hidden" name="login" value="yes">
-                <table>
-                  <tr>
-                    <td><strong>Username:</strong></td>
-                    <td><input name="username" type="text"
-                               value="[% username FILTER html %]"
-                               size="18"><br/></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Password:</strong></td>
-                    <td><input name="password" type="password" size="18"></td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" align="right">
-                      <input type="submit" name="Submit" value="Login">
-                    </td>
-                  </tr>
-                </table>
-              </form>
-            </div>
-            <div class="loginlinks">
-              <a href="/help.html">help</a>
-              [% IF login_cancel %]
-                <!-- The WebAuth Server has a cancel url.-->
-                <a href="[% cancel_url FILTER html %]">cancel</a>
-              [% END %]
-            </div>
-          </td>
-        </tr>
-      </table>
-    </div>
+					  [% IF err_forced %]
+						<!-- Not really an error, forced login. -->
+						<li>This web site requires that you log in with username and
+						password.</li>
+					  [% END %]
+				  <!-- Error: login failed. -->
+				</ul>
+			<!-- div#error closes --> 
+			</div>     
+		[% END %]
 
-    [% IF show_remuser %]
-      <div class="remuserbox" align="center">
-        <table border="1" width="70%">
-          <tr>
-              <td>
-                Or skip entering your username and password.  Instead,
-                log in using your computer login information via
-                Apache authentication:
-              </td>
-              <td>
-                <form action="[% remuser_url FILTER html %]"
-                      method="get">
-                  <input type="hidden" name="rm" value="index">
-                  <input type="hidden" name="RT"
-                         value="[% RT FILTER html %]">
-                  <input type="hidden" name="ST"
-                         value="[% ST FILTER html %]">
-                  <input type="submit" name="Submit" value="remuser">
-                </form>
-              </td>
-            </tr>
-        </table>
-      </div>
-    [% END %]
+			<div id="loginForm" style="width: 70%;">
+				<form id="login" name="login" action="[% script_name FILTER html %]" method="post" autocomplete="OFF" enctype="application/x-www-form-urlencoded">
+					<div class="form-intro"><p>Please enter your <a title="Further help and information regarding your Oxford Username." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Oxford username</a> and password then click the &quot;Login&quot; button.</p></div>
+					<input type="hidden" name="rm" value="index">
+					<input type="hidden" name="RT" value="[% RT FILTER html %]">
+					<input type="hidden" name="ST" value="[% ST FILTER html %]">
+					<input type="hidden" name="login" value="yes">
+					<div class="formfield">
+						<label title="Previously known as your herald username." for="username">Username</label>
+						<input id="username" name="username" type="text" size="12" maxlength="32" tabindex="1" />				
+					</div>
+					<div class="formfield">
+						<label title="Previously your herald password. NOT your barcode or Weblearn password." for="password">Password</label>
+						<input id="password" name="password" type="password" size="12" tabindex="2" />
+					</div>
+					<div class="formsubmit">
+						<input type="submit" name="Submit" class="go-go-go" value="Login" tabindex="3" />
+						<p><a class="form-help forgot-password" title="Helpful advice on what to do about forgotten or expired passwords and other how to get help if you're having trouble." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml.ID=body.1_div.6">Having trouble logging in?</a></p>				
+					  </div>
+				</form>
+				  
 
-    <div class="trailer">
-      <h2>Caution:</h2>
+				<span class="help"><a title="Help on how to use the Oxford Single Sign-On System." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Help</a></span>
+	
+				<p class="postscript">
+					<a href="http://www.ict.ox.ac.uk/oxford/rules/">University of Oxford  Computer Usage Rules and Etiquette</a>
+				</p>
+				 <!-- div#loginForm closes -->
+			</div>
 
-      <p>Never enter your WebAuth username and password on a web page
-      unless the page is a page directly served by the WebAuth login
-      server.</p>
-    </div>
-  </body>
+		  <!-- div.content closes -->
+		</div>
+		  
+		<div id="footer">
+			<div id="site-info">
+				<h2 class="nonvis-exposition">Site Information</h2>
+				<dl>
+					<dt class="nonvis-exposition">Institution</dt><dd id="institution">University of Oxford</dd>
+					<dt class="nonvis-exposition">Service</dt><dd id="serviceName" >WebAuth</dd>
+				</dl>
+			</div>
+		</div> 
+	</body>
 </html>
