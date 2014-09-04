@@ -209,7 +209,7 @@ class ManageController(BaseController):
 
             http_host = request.environ.get("HTTP_HOST")
             url_scheme = request.environ.get("wsgi.url_scheme")
-            c.logout_url = "%s://log-me-out:fake@%s/manage/logout" % (url_scheme, http_host)
+            c.logout_url = "%s://%s/account/logout" % (url_scheme, http_host)
 
             Session.commit()
             ren = render('/manage/manage-base.mako')
