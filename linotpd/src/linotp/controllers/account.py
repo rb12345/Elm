@@ -118,7 +118,11 @@ class AccountController(BaseController):
             # After logout We always redirect to the start page
             redirect("/")
             
-        redirect('https://webauth.ox.ac.uk/logout')
+        http_host = request.environ.get("HTTP_HOST")
+        url_scheme = request.environ.get("wsgi.url_scheme")
+        redirect("%s://%s/elm/logout" % (url_scheme, http_host))
+        #redirect('https://webauth.ox.ac.uk/logout')
+        
         Session.close()
         
         

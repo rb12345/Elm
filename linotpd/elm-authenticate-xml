@@ -24,24 +24,11 @@ import crypt
 
 from getopt import getopt, GetoptError
 
-import logging
-
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s %(levelname)-5.5s "
-                "[%(name)s][%(funcName)s #%(lineno)d] %(message)s"
-    )
-
 LINOTP_URL = "https://mfa-test.bsp.ox.ac.uk"
 DISABLE_SSL_VALIDATION = True
 
-log = logging.getLogger(__name__)
 
 def usage():
-    """
-    print the usage info
-
-    """
 
     print "Script to contact the LinOTP server and transmit the result back to WebAuth."
     print '''
@@ -72,7 +59,6 @@ def call_linotp(path, params):
     try:
         http = httplib2.Http(disable_ssl_certificate_validation = DISABLE_SSL_VALIDATION)
     except TypeError as exx:
-        log.warning("httplib2 'disable_ssl_certificate_validation' attribute error: %r" % exx)
         http = httplib2.Http()
     
 	# POST and get our response
@@ -131,20 +117,21 @@ def main():
     
     if (command == "webkdc-userinfo"):
         # Did we get enough arguments for this command?
-        if (len(sys.argv) < 8):
-            print "Not enough arguments."
+        if (len(sys.argv) < 3):
+            print "Not enough arguments!"
+            print sys.argv
             usage()
             sys.exit(1)
         
-        print webkdc_userinfo(sys.argv[2]) # 2 = username
+        print webkdc_userinfo(sys.argv[2]) # third arg is username
     elif (command == "webkdc-validate"):
         # Did we get enough arguments for this command?
-        if (len(sys.argv) < 7):
+        if (len(sys.argv) < 5):
             print "Not enough arguments."
             usage()
             sys.exit(1)
         
-        print webkdc_validate(sys.argv[2], sys.argv[4]) # 2 = username, 4 = code
+        print webkdc_validate(sys.argv[2], sys.argv[4]) # third is username, fifth is the code
     else:
         print "Unrecognized command."
         usage()

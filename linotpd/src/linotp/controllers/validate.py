@@ -814,7 +814,7 @@ class ValidateController(BaseController):
             
     def webkdc_validate(self):
         param = {}
-        
+                
         try:
             param.update(request.params)
             username = param["user"]
