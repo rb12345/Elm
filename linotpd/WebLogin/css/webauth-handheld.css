@@ -4,25 +4,16 @@ handheld-specific styles for University of Oxford Webauth pages
 
 */
 
-
-
-
-
-
 /* restyle the layout a little to take account of the smaller header */
 
 body
 {
-
 }
-
 
 div.content
 {
 margin: 0 0 0 0 ;
 }
-
-
 
 div.content h1
 {
@@ -32,16 +23,11 @@ font-size: 1.3em;
 
 h1, h2, h3, h4, h5, h6
 {
-
 letter-spacing: 0em;
-
 }
 
 .pleaseNote {
-    
     font-size: 1.1em;
-
-    
 }
 
 
@@ -75,10 +61,6 @@ padding-right: 2px;
 text-align: right;
 }
 
-
-
-
-
 form
 {
 padding: 5px;
@@ -97,8 +79,6 @@ div#logoutBox form
 padding-top: 1px;
 }
 
-
-
 div.formfield input {
 
 	padding: 4px;
@@ -113,7 +93,6 @@ background: url("../images/cross-small.png") no-repeat 1px 1px ;
 
 padding-left: 1px;
 }
-
 
 div#errorBox ul ul , div#error ul ul , div#remuserError ul ul
 {
@@ -134,29 +113,18 @@ display: block;
 clear: both;
 }
 
- input[type="text"],
-  input[type="password"] {
+input[type="text"], input[type="password"] {
 	font-size: 2em;  
 	height: 1.5em;
 	width: 95%;     
  }
 
-
-
 /* make the month field a bit wider */
 
 select#dob_mm {
-  
   min-height: 3em;
   min-width: 7em;
-  
-  
 }
-
-
-
-
-
 
 div#site-info dl dd#serviceName
 {
@@ -172,26 +140,18 @@ left: 150px;
 /* hide the text */
 display: block;
 text-indent: -7000px;
-
 }
 
 div#site-info dl dd#institution
 {
-
 
 left: 5px;
 position: absolute;
 top: 5px;
 width: 141px;
 
-
-
 /* hide the text */
 display: block;
 text-indent: -7000px;
 
-
 }
-
-
-

@@ -2,7 +2,7 @@
 <html>
   <head>
     <http-equiv="pragma" content="no-cache">
-    <title>WebAuth Multifactor</title>
+    <title>University of Oxford - Single Sign-On</title>
 	<link rel="icon" href="/elm/images/favicon.ico" type="image/x-icon" />
 
 	<link rel="shortcut icon" href="/elm/images/favicon.ico" type="image/x-icon" />
@@ -31,43 +31,51 @@ err_multifactor_invalid : could not validate a submitted OTP
 
   <body onload="document.multifactor_login.otp.focus();">
 	<div class="content" id="loginpage">
-		<h1 align="center">WebAuth Multifactor</h1>
-		[% IF error %]
+		<h1 id=pageTitle>University of Oxford - Single Sign On<span class="name"></span></h1>
+		[% IF error || user_message %]
 		  <div class="error" align="center">
-			<p><strong>
-			  [% IF err_multifactor_missing %]
-				<!-- Error: no OTP submitted. -->
-				Error: Enter a one-time password.
-			  [% END %]
+			<p>
+				[% IF user_message %]
+					[% user_message %]
+				[% ELSE %]
+					[% IF err_multifactor_missing %]
+						<!-- Error: no OTP submitted. -->
+						Error: Enter a one-time password.
+					[% END %]
 
-			  [% IF err_multifactor_invalid %]
-				<!-- Error: login failed. -->
-				Error: You entered an incorrect one-time password.
-			  [% END %]
-
-			</strong></p>
+					[% IF err_multifactor_invalid %]
+						<!-- Error: login failed. -->
+						Error: You entered an incorrect one-time password.
+					[% END %]
+				[% END %]
+			</p>
 		  </div>
 		[% END %]
 
 		<div id="loginForm" style="width: 70%;">
 
 			<form name="multifactor_login"	action="[% script_name FILTER html %]" method="post" autocomplete="OFF" enctype="application/x-www-form-urlencoded">
-				<div class="form-intro"><p>Please enter your PIN, followed by your one-time password. For example, if your PIN is 1234 and your access code is 000000, enter 123456000000.</p></div>
+                <img class="form-logo" src="/elm/images/crest.png" alt=""></img>
+
+				<div class="form-intro"><p>Please enter your PIN, followed by your one-time password.</p></div>
 				<input type="hidden" name="rm" value="multifactor">
 				<input type="hidden" name="RT" value="[% RT FILTER html %]">
 				<input type="hidden" name="ST" value="[% ST FILTER html %]">
 				<input type="hidden" name="username" value="[% username FILTER html %]">
 				<input type="hidden" name="factor_type" value="[% factor_type FILTER html %]">
-				<div class="formfield">
-					<label title="A one-time code generate by your phone, plus your PIN" for="otp">Access Code</label>
-					<input id="otp" type="password" name="otp" value=""	size="10" maxlength="10" tabindex="1"/>
-				</div>
+
+				<!--[if lte IE 9]>
+						<label class="ie-label" for="otp">Access Code</label>
+					<![endif]-->
+				<input id="otp" type="password" name="otp" value="" placeholder="Access Code" size="10" maxlength="10" tabindex="1"/>
 				
-				<input type="submit" name="Submit" class="go-go-go" value="Login" tabindex="2" />
+				<div class="formsubmit">
+					<input type="submit" name="Submit" class="go-go-go" value="Login" tabindex="2" />
+					<p><a class="form-help forgot-password" title="Helpful advice on what to do about forgotten or expired passwords and other how to get help if you're having trouble." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Having trouble logging in?</a></p>				
+				</div>
 			</form>
 		</div>
 
-		<span class="help"><a title="Help on how to use the Oxford Single Sign-On System." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Help</a></span>
 		<p class="postscript">
 			<a href="http://www.ict.ox.ac.uk/oxford/rules/">University of Oxford  Computer Usage Rules and Etiquette</a>
 		</p>
@@ -75,11 +83,6 @@ err_multifactor_invalid : could not validate a submitted OTP
 	</div>
 	<div id="footer">
 		<div id="site-info">
-			<h2 class="nonvis-exposition">Site Information</h2>
-			<dl>
-				<dt class="nonvis-exposition">Institution</dt><dd id="institution">University of Oxford</dd>
-				<dt class="nonvis-exposition">Service</dt><dd id="serviceName" >WebAuth</dd>
-			</dl>
 		</div>
 	</div> 
   </body>

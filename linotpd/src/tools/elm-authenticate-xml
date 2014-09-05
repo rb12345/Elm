@@ -69,19 +69,26 @@ def call_linotp(path, params):
     return rv.get('result')
 
 def webkdc_userinfo(user):
-    reply = '<authdata user="%s"><factors>%s</factors></authdata>'
+    reply = '<authdata user="%s"><factors>%s</factors>%s</authdata>'
     factors = "<factor>p</factor>"
     response = call_linotp("/validate/webkdc_userinfo", {"user" : user})
 	# Did the call succeed?
+    extra = ""
     if (response.get("status")):
         # Call succeeded. Get the results and send them back in the required form.
         tokens = response.get("value") 
-        if tokens is not None:
-            factors += "<factor>m</factor><factor>o</factor><factor>o3</factor>"
+        if tokens:
+            # If they have a token, require multifactor authentication.
+            factors += "<factor>m</factor><factor>o</factor><factor>o1</factor><factor>o2</factor><factor>o3</factor>"
+            # We require MFA here rather than in WebAuthRequireInitialFactor because 
+            # this seems to be the only way to get MFA-if-token/password-if-not working.
+
+            extra = "<multifactor-required>yes</multifactor-required>"
+        # If they don't have a token, they get nothing.
             
-        return reply % (user, factors)
+        return reply % (user, factors, extra)
     else:
-        print >> sys.stderror, response.get("error")
+        print >> sys.stderr, response.get("error")
         sys.exit(1)
         
 def webkdc_validate(user, code):

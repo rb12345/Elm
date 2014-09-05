@@ -18,7 +18,7 @@
 		
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 
-		<title>University of Oxford Single Sign-On Login</title>
+		<title>University of Oxford - Single Sign-On</title>
 		<script type="text/javascript">
 		 <!--
 		 function init() {
@@ -28,9 +28,9 @@
 		</script>
 	</head>
 
-	<body  onload="document.login.username.focus(); init();">
+	<body onload="document.login.username.focus(); init();">
 		<div class="content" id="loginPage">
-		<h1>Log in <span class="name"></span></h1>
+		<h1 id=pageTitle>University of Oxford - Single Sign On<span class="name"></span></h1>
 		
 		[% IF error %]
 			<div id="error">
@@ -100,32 +100,32 @@
 			</div>     
 		[% END %]
 
-			<div id="loginForm" style="width: 70%;">
+			<div id="loginForm">
 				<form id="login" name="login" action="[% script_name FILTER html %]" method="post" autocomplete="OFF" enctype="application/x-www-form-urlencoded">
-					<div class="form-intro"><p>Please enter your <a title="Further help and information regarding your Oxford Username." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Oxford username</a> and password then click the &quot;Login&quot; button.</p></div>
+                    <img class="form-logo" src="/elm/images/crest.png" alt=""></img>
 					<input type="hidden" name="rm" value="index">
 					<input type="hidden" name="RT" value="[% RT FILTER html %]">
 					<input type="hidden" name="ST" value="[% ST FILTER html %]">
 					<input type="hidden" name="login" value="yes">
-					<div class="formfield">
-						<label title="Previously known as your herald username." for="username">Username</label>
-						<input id="username" name="username" type="text" size="12" maxlength="32" tabindex="1" />				
-					</div>
-					<div class="formfield">
-						<label title="Previously your herald password. NOT your barcode or Weblearn password." for="password">Password</label>
-						<input id="password" name="password" type="password" size="12" tabindex="2" />
-					</div>
+
+					<!--[if lte IE 9]>
+						<label class="ie-label" for="username">Username</label>
+					<![endif]-->
+
+                    <input id="username" name="username" type="text" placeholder="Username" size="12" maxlength="32" tabindex="1"/>
+					<!--[if lte IE 9]>
+						<label class="ie-label" for="password">Password</label>
+					<![endif]-->
+					<input id="password" name="password" type="password" placeholder="Password" size="12" tabindex="2"/>
+
 					<div class="formsubmit">
 						<input type="submit" name="Submit" class="go-go-go" value="Login" tabindex="3" />
 						<p><a class="form-help forgot-password" title="Helpful advice on what to do about forgotten or expired passwords and other how to get help if you're having trouble." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml.ID=body.1_div.6">Having trouble logging in?</a></p>				
-					  </div>
+					</div>
 				</form>
-				  
-
-				<span class="help"><a title="Help on how to use the Oxford Single Sign-On System." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Help</a></span>
 	
 				<p class="postscript">
-					<a href="http://www.ict.ox.ac.uk/oxford/rules/">University of Oxford  Computer Usage Rules and Etiquette</a>
+					<a href="http://www.ict.ox.ac.uk/oxford/rules/">University of Oxford Computer Usage Rules and Etiquette</a>
 				</p>
 				 <!-- div#loginForm closes -->
 			</div>
@@ -135,11 +135,6 @@
 		  
 		<div id="footer">
 			<div id="site-info">
-				<h2 class="nonvis-exposition">Site Information</h2>
-				<dl>
-					<dt class="nonvis-exposition">Institution</dt><dd id="institution">University of Oxford</dd>
-					<dt class="nonvis-exposition">Service</dt><dd id="serviceName" >WebAuth</dd>
-				</dl>
 			</div>
 		</div> 
 	</body>

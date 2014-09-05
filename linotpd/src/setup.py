@@ -81,7 +81,9 @@ setup(
              'tools/linotp-backup',
              'tools/linotp-decrypt-otpkey',
              'tools/linotp-convert-gemalto',
-             'tools/linotp-restore'],
+             'tools/linotp-restore',
+             'tools/elm-authenticate-xml',
+             'tools/elm-authenticate'],
     setup_requires=['PasteScript>=1.6.3',
                     'nose>=0.11'],
     packages=find_packages(exclude=['ez_setup']),
@@ -96,7 +98,8 @@ setup(
                 (get_debian_package() + 'etc/apache2/sites-available/', ['config/linotp2',
                                                                          'config/linotp2-radius',
                                                                          'config/linotp2-certs',
-                                                                         'config/linotp2-ldap'
+                                                                         'config/linotp2-ldap',
+                                                                         'config/linotp2-elm'
                                                                          ]),
                 (get_debian_package() + 'etc/init.d/', ['config/linotp2-paster']),
                 ('share/doc/linotp/', ["tools/README-migrate.txt"]),

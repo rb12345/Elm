@@ -23,18 +23,9 @@ import crypt
 
 from getopt import getopt, GetoptError
 
-import logging
-
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s %(levelname)-5.5s "
-                "[%(name)s][%(funcName)s #%(lineno)d] %(message)s"
-    )
-
 LINOTP_URL = "https://mfa-test.bsp.ox.ac.uk"
 DISABLE_SSL_VALIDATION = True
 
-log = logging.getLogger(__name__)
 
 def usage():
     """
@@ -89,7 +80,6 @@ def call_linotp(path, params):
     try:
         http = httplib2.Http(disable_ssl_certificate_validation = DISABLE_SSL_VALIDATION)
     except TypeError as exx:
-        log.warning("httplib2 'disable_ssl_certificate_validation' attribute error: %r" % exx)
         http = httplib2.Http()
     
 	# POST and get our response
@@ -112,7 +102,7 @@ def webkdc_userinfo(data):
         if (response.get("status")):
             # Call succeeded. Get the results and send them back in the required form.
             tokens = response.get("value") 
-            if tokens is not None:
+            if tokens:
                 reply["factors"].extend(["m", "o", "o3"])
                 tokenList = []
                 for serial in tokens:
@@ -123,13 +113,16 @@ def webkdc_userinfo(data):
                         "default" : False,
                     })                   
                 
-                if (tokenList is not None):
+                if (tokenList):
                     tokenList[0]["default"] = True
                     ret = tokenList
+                    
                     
                 reply["capabilities"] = {
                     "o3" : tokens,
                 }
+                
+                reply["required_factors"] = ["m", "o3"]
             
             return json.dumps({
                 "success" : True,

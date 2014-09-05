@@ -18,61 +18,38 @@
 		<![endif]-->
 
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-		<title>University of Oxford Single Sign-On Logout</title>
+		<title>University of Oxford - Single Sign-On</title>
 
 	</head>
 
 	<body>
 		<div class="content" id="logoutPage">
-			<h1>University of Oxford Single Sign-On Logout</h1>
-			<div id="logoutBox" > 
-				[% IF cookies_flag %]
-					<dl>
-					  <dt><strong class="logout">Still Logged In!</strong></dt>
-					  <dd>
-						You are still logged in to the University of Oxford Single
-						Sign-On system.  To log out completely you must close down your
-						web browser
-						 [<a href="http://www.ict.ox.ac.uk/oxford/logout/"
-						>How?</a>] once you have finished working.
-					  </dd>
-					  <dt><strong class="logout">Cannot close your browser?</strong></dt>
-					  <dd>
-						If you are unable to close down your browser, make sure you log
-						out of all Single Sign-On services you used, and log out of the
-						Single Sign-On system using the button below.
-						<form action="logout" method="post">
-						  <div class="formsubmit"><input type="submit" name="expunge" id="expunge"
-						   value="Proceed with Single Sign-On Logout" />
-						   </div>
-						</form>
-					  </dd>
-					</dl>
-				  [% ELSE %]
-					<dl>
-					  <dt><strong class="logout">Not Logged In!</strong></dt>
-					  <dd>
-						You are not logged into the University of Oxford Single Sign-On System.
-					  </dd>
-					</dl>
-				[% END %]
-				
-				<span class="help"><a title="Help on how to log out from the Oxford Single Sign-On System." href="http://www.ict.ox.ac.uk/oxford/logout/">Help</a></span>
-				 
-			   <!-- div#logoutBox closes -->     
+			<h1 id=pageTitle>University of Oxford - Single Sign On<span class="name"></span></h1>
+			<div id="logoutBox"> 
+				<form id="loginForm" action="logout" method="post">
+					<img class="form-logo" src="/elm/images/crest.png" alt=""></img>
+					[% IF cookies_flag %]
+						<div class="form-intro"><p>You are still logged in to the University of Oxford Single
+							Sign-On system.  To log out completely you must close down your
+							web browser once you have finished working.</p></div>
+
+						<div class="formsubmit">
+							<input type="submit" name="expunge" id="expunge" value="Log out"/>
+							<p><a class="form-help forgot-password" title="Helpful advice on what to do about forgotten or expired passwords and other how to get help if you're having trouble." href="http://www.ict.ox.ac.uk/oxford/logout/">Having trouble logging out?</a></p>	
+						</div>
+					[% ELSE %]
+						<div class="not-logged-in"><p>You are not logged into the University of Oxford Single Sign-On System.</p></div>
+					[% END %]
+				</form>	  
 			</div>
-		  <!-- div.content closes -->
+			
+			<p class="postscript">
+				<a href="http://www.ict.ox.ac.uk/oxford/rules/">University of Oxford  Computer Usage Rules and Etiquette</a>
+			</p>
 		</div>
 		<div id="footer">
 			<div id="site-info">
-				<h2 class="nonvis-exposition">Site Information</h2>
-				<dl>
-					<dt class="nonvis-exposition">Institution</dt><dd id="institution">University of Oxford</dd>
-					<dt class="nonvis-exposition">Service</dt><dd id="serviceName" >WebAuth</dd>
-				</dl>
-		   <!-- div#site-info closes -->
 			</div>
-		 <!-- div#footer closes -->
 		</div> 
 	  
 	</body>

@@ -42,41 +42,33 @@ pwchange_url           : URL for the password change form
 		
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 
-		<title>University of Oxford Single Sign-On Confirmation</title>
+		<title>University of Oxford - Single Sign-On</title>
 	</head>
 
 	<body onload="document.links[1].focus();">
 	
 		<div class="content" id="confirmPage">
-			<h1>University of Oxford Single Sign-On Confirmation</h1>
+			<h1 id=pageTitle>University of Oxford - Single Sign On<span class="name"></span></h1>
 			<div id="confirmBox" >
-				<p class='pleaseNote'>The service you have requested is accessed via the University of Oxford Single Sign-On system.</p>
-				<div>You are logged in as user <strong>[% username FILTER html %]</strong>.  <em><a href="https://mfa-test.bsp.ox.ac.uk/elm/logout">Not you?</a></em></div>
-				<div><a class="go_button" tabindex="1" title="[% pretty_return_url FILTER html %]" href="[% return_url FILTER html %]"><span class="continue-to">Continue to</span> <span class="destination-name">[% pretty_return_url FILTER html %]</span></a></div>
-				<p><strong class="warning">For complete security you should always close down your web browser once you have finished working. 
-				<a href="http://www.ict.ox.ac.uk/oxford/logout/">Information on logging out</a>.
-				</strong></p>
+			    <img class="form-logo" src="/elm/images/crest.png" alt=""></img>
+
+				<div>You are logged in as user <strong>[% username FILTER html %]</strong>. <a href="https://mfa-test.bsp.ox.ac.uk/elm/logout">Not you?</a></div>
+				<div>
+					<a class="go_button" tabindex="1" title="[% pretty_return_url FILTER html %]" href="[% return_url FILTER html %]">Continue to [% pretty_return_url FILTER html %]</a>
+					<p><a class="form-help forgot-password" title="Helpful advice on what to do about forgotten or expired passwords and other how to get help if you're having trouble." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Why is this page here?</a></p>				
+					<p><a class="form-help forgot-password" title="How to log out" href="http://www.ict.ox.ac.uk/oxford/logout/">How do I log out?</a></p>	
+				</div>
 			
-			<span class="help"><a title="Help on how to use the Oxford Single Sign-On System." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Help</a></span>
-			 
-			<p class="postscript">
-			   <a href="http://www.ict.ox.ac.uk/oxford/confirm/">Why is this page here?</a><br />
-			   <a href="http://www.ict.ox.ac.uk/oxford/rules/">
-				 Oxford University Computer Usage Rules and Etiquette
-			   </a>
-			</p>
-		   <!-- div#confirmBox closes -->     
 		</div>
+		
+		<p class="postscript">
+			<a href="http://www.ict.ox.ac.uk/oxford/rules/">Oxford University Computer Usage Rules and Etiquette</a>
+		</p>
 	  <!-- div.content closes -->
 	  </div>
   
 		<div id="footer">
 			<div id="site-info">
-				<h2 class="nonvis-exposition">Site Information</h2>
-				<dl>
-					<dt class="nonvis-exposition">Institution</dt><dd id="institution">University of Oxford</dd>
-					<dt class="nonvis-exposition">Service</dt><dd id="serviceName" >WebAuth</dd>
-				</dl>
 			</div>
 		</div> 
   

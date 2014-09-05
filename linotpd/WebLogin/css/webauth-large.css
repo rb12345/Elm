@@ -4,19 +4,15 @@
 /* make room for the siteinfo header athe top of the page*/
 body
 {
-
 margin:0px;
 padding-top: 140px;
-
 }
-
 
 /* position the site-info div at the top of the page */
 #site-info
 {
 height: 116px;
 background: url(../images/header-bg.jpg) repeat-x 620px 0px ;
-
 }
 
 div#site-info dl dd#serviceName
@@ -24,12 +20,9 @@ div#site-info dl dd#serviceName
 /* position the element
 */
 left: 291px;
-
 /* size the element to the  size of the bg image, plus appropriate margin */
-
 width: 325px;
 height: 118px;
-
 /* place the bg image */
 background: url('../images/servicename.png') no-repeat 0px 0px;
 background-color: #fff;
@@ -50,7 +43,6 @@ background-position: 20px 19px ;
 left: 0px;
 top: 0px;
 }
-
 
 /* content element styling  begins */
 
@@ -73,21 +65,9 @@ margin-left:auto;
 margin-right: auto;
 margin-top: 10px;
 max-width: 675px;
-background-color: #f7f5f1;
-background-color: #fff;
-border:  1px solid #999;
-margin-bottom: 1em;
+}
 
-border-radius: 3px 3px 3px 3px;
--webkit-border-radius: 3px 3px 3px 3px;
--moz-border-radius: 3px 3px 3px 3px;
-box-shadow: #f0f0f0 3em 3em 3em;
--webkit-box-shadow: #f0f0f0 3em 3em 3em;
--moz-box-shadow: #f0f0f0 3em 3em 3em;
--moz-box-shadow: 0px 0px 10px 6px #f0f0f0;
--webkit-box-shadow: 0px 0px 10px 6px #f0f0f0;
-box-shadow: 0px 0px 10px 6px #f0f0f0;
-}/* absolutely position the help link to the top right of the content div */
+/* absolutely position the help link to the top right of the content div */
 span.help a
 {
 
@@ -97,17 +77,15 @@ top:8px;
 
 div.content h1
 {
+	font-family: Helvetica, Verdana;
+	font-size: 20pt;
+	font-weight: 300;
 
-border-radius: 3px 3px 0px 0px;
--webkit-border-radius: 3px 3px 0px 0px;
--moz-border-radius: 3px 3px 0px 0px;
-padding: 10px 0 ;
-margin: 0px;
-margin-bottom: 1em;
-border-bottom: 1px solid #999;
+	padding: 10px 0 ;
+	margin: 0px;
+	margin-bottom: 1em;
 
-background-color:#f5f5f5;
-color: #222;
+	color: #222;
 }
 
 div.content div, div.content h2, div.content h3, div.content p
@@ -116,11 +94,12 @@ div.content div, div.content h2, div.content h3, div.content p
 	padding-right: 1em;
 }
 
-     input#password,
-     input#username {
-     width: 10em;
+input#password, input#username, input#otp {  
+	width: 200px;
+	height: 2em;
+	padding: 0 8px;
+	margin: 0 auto;
  }
- 
  
 
 /* two col layout for security question setting */
@@ -160,5 +139,3 @@ clear: both;
 .clear {
     clear: both;
 }
-
-
