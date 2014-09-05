@@ -183,7 +183,7 @@ def check_selfservice_session():
     # All functions starting with /selfservice/user are data functions and protected
     # by the session key
     if request.path.lower()[:17] != "/selfservice/user":
-        log.info('[check_selfservice_session] nothing to check')
+        log.debug('[check_selfservice_session] nothing to check')
     else:
         expiry = request.environ.get('WEBAUTH_TOKEN_EXPIRATION')
         if expiry is not None:

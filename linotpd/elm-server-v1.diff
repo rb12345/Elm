@@ -1,0 +1,1347 @@
+Description: <short description, required>
+ <long description that can span multiple lines, optional>
+Author: <name and email of author, optional>
+Origin: <upstream|backport|vendor|other>, <URL, required except if Author is present>
+Bug: <URL to the upstream bug report if any, implies patch has been forwarded, optional>
+Bug-<Vendor>: <URL to the vendor bug report if any, optional>
+Forwarded: <URL|no|not-needed, useless if you have a Bug field, optional>
+Applied-Upstream: <version|URL|commit, identifies patches merged upstream, optional>
+Reviewed-by: <name and email of a reviewer, optional>
+Last-Update: <YYYY-MM-DD, last update of the meta-information, optional>
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/config/who.ini
++++ b/config/who.ini
+@@ -1,38 +1 @@
+-[plugin:form]
+-#use = repoze.who.plugins.form:make_redirecting_plugin
+-use = linotp.lib.repoze_identify:make_redirecting_plugin
+-login_form_url = /account/login
+-login_handler_path = /account/dologin
+-logout_handler_path = /account/logout
+-rememberer_name = auth_tkt
+ 
+-[plugin:auth_tkt]
+-use = repoze.who.plugins.auth_tkt:make_plugin
+-secret = ThisIsOurLinOTP2Secret
+-timeout = 3000
+-reissue_time = 1000
+-secure = "true"
+-#include_ip = "true"
+-cookie_name = linotp_selfservice
+-
+-[general]
+-request_classifier = repoze.who.classifiers:default_request_classifier
+-challenge_decider = repoze.who.classifiers:default_challenge_decider
+-
+-[identifiers]
+-#plugins = 
+-#    linotp.lib.repoze_identify:form
+-#    auth_tkt
+-
+-plugins = 
+-    form;browser
+-    auth_tkt
+-
+-[authenticators]
+-plugins = linotp.lib.repoze_auth:UserModelPlugin
+-
+-[challengers]
+-plugins = form;browser
+-
+-[mdproviders]
+-plugins = linotp.lib.repoze_auth:UserModelPlugin
+--- a/linotp/config/environment.py
++++ b/linotp/config/environment.py
+@@ -347,6 +347,7 @@
+     module_list.add("useridresolver.PasswdIdResolver")
+     module_list.add("useridresolver.LDAPIdResolver")
+     module_list.add("useridresolver.SQLIdResolver")
++    module_list.add("useridresolver.OakIdResolver")
+ 
+     config_modules = config.get("linotpResolverModules", '')
+     log.debug("[get_resolver_module_list] %s " % config_modules)
+--- a/linotp/controllers/account.py
++++ b/linotp/controllers/account.py
+@@ -104,56 +104,26 @@
+ 
+     def login(self):
+         log.debug("[login] selfservice login screen")
+-        identity = request.environ.get('repoze.who.identity')
++        identity = request.environ.get('REMOTE_USER')
+         if identity is not None:
+             # After login We always redirect to the start page
+-            redirect("/")
+-
+-        res = {}
+-        try:
+-            c.defaultRealm = getDefaultRealm()
+-            res = getRealms()
+-
+-            c.realmArray = []
+-            #log.debug("[login] %s" % str(res) )
+-            for (k, v) in res.items():
+-                c.realmArray.append(k)
+-
+-            c.realmbox = getRealmBox()
+-            log.debug("[login] displaying realmbox: %i" % int(c.realmbox))
+-
+-            Session.commit()
+-            response.status = '%i Logout from LinOTP selfservice' % LOGIN_CODE
+-            return render('/selfservice/login.mako')
+-
+-        except Exception as e:
+-            log.error('[login] failed %r' % e)
+-            log.error('[login] %s' % traceback.format_exc())
+-            Session.rollback()
+-            return sendError(response, e)
++            redirect("/selfservice")
+ 
+-        finally:
+-            Session.close()
++        Session.close()
+ 
+ 
+-    def test(self):
+-        identity = request.environ.get('repoze.who.identity')
++    def logout(self):
++        identity = request.environ.get('REMOTE_USER')
+         if identity is None:
+-            # Force skip the StatusCodeRedirect middleware; it was stripping
+-            #   the WWW-Authenticate header from the 401 response
+-            request.environ['pylons.status_code_redirect'] = True
+-            # Return a 401 (Unauthorized) response and signal the repoze.who
+-            #   basicauth plugin to set the WWW-Authenticate header.
+-            abort(401, 'You are not authenticated')
+-
+-        log.debug(u"[test] identity: %r" % identity)
+-        return """
+-<body>
+-Hello, you are logged in as %s.
+-<a href="/account/logout">logout</a>
+-</body>
+-</html>
+-""" % identity['repoze.who.userid']
++            # After logout We always redirect to the start page
++            redirect("/")
++
++        http_host = request.environ.get("HTTP_HOST")
++        url_scheme = request.environ.get("wsgi.url_scheme")
++        redirect("%s://%s/elm/logout" % (url_scheme, http_host))
++        #redirect('https://webauth.ox.ac.uk/logout')
++
++        Session.close()
+ 
+ 
+ #eof##########################################################################
+--- a/linotp/controllers/admin.py
++++ b/linotp/controllers/admin.py
+@@ -2142,6 +2142,16 @@
+                 res['rows'] = num
+                 res['err_string'] = err_str
+ 
++            elif type == "oak":
++                import useridresolver.OakIdResolver
++
++                param['OAKREALM'] = getParam(param, 'oak_realm', required)
++                param['SIZELIMIT'] = getParam(param, 'oak_sizelimit', required)
++
++                (success, desc) = useridresolver.OakIdResolver.IdResolver.testconnection(param)
++                res['result'] = success
++                res['desc'] = str(desc)
++
+             Session.commit()
+             return sendResult(response, res)
+ 
+--- a/linotp/controllers/manage.py
++++ b/linotp/controllers/manage.py
+@@ -48,7 +48,7 @@
+ from linotp.lib.token   import newToken
+ 
+ 
+-from linotp.lib.user    import getUserFromParam, getUserFromRequest
++from linotp.lib.user    import getUserFromParam, getUserFromRequest, getAdminRealms
+ from linotp.lib.user    import getUserList, User
+ 
+ from linotp.lib.util    import getParam
+@@ -145,7 +145,14 @@
+             c.title = "LinOTP Management"
+             admin_user = getUserFromRequest(request)
+             if admin_user.has_key('login'):
+-                c.admin = admin_user['login']
++                c.login = admin_user['login']
++                realms = getAdminRealms(c.login)
++                if (realms):
++                    c.realm = realms[0]
++                else:
++                    realm = getDefaultRealm()
++
++                c.admin = "%s@%s" % (c.login, c.realm)
+ 
+             log.debug("[index] importers: %s" % IMPORT_TEXT)
+             c.importers = IMPORT_TEXT
+@@ -202,7 +209,7 @@
+ 
+             http_host = request.environ.get("HTTP_HOST")
+             url_scheme = request.environ.get("wsgi.url_scheme")
+-            c.logout_url = "%s://log-me-out:fake@%s/manage/logout" % (url_scheme, http_host)
++            c.logout_url = "%s://%s/account/logout" % (url_scheme, http_host)
+ 
+             Session.commit()
+             ren = render('/manage/manage-base.mako')
+@@ -366,18 +373,22 @@
+                     { 'id' : tok['LinOtp.TokenSerialnumber'],
+                         'cell': [
+                             tok['LinOtp.TokenSerialnumber'],
++                            tok['LinOtp.TokenType'],
++                            tok['LinOtp.TokenDesc'],
+                             tok['LinOtp.Isactive'],
++
+                             tok['User.username'],
+                             tok['LinOtp.RealmNames'],
+-                            tok['LinOtp.TokenType'],
++                            tok['LinOtp.IdResolver'],
++                            tok['LinOtp.Userid'],
++
+                             tok['LinOtp.FailCount'],
+-                            tok['LinOtp.TokenDesc'],
+                             tok['LinOtp.MaxFail'],
+                             tok['LinOtp.OtpLen'],
+                             tok['LinOtp.CountWindow'],
+                             tok['LinOtp.SyncWindow'],
+-                            tok['LinOtp.Userid'],
+-                            tok['LinOtp.IdResolver'], ]
++
++                        ]
+                     }
+                     )
+ 
+@@ -460,13 +471,11 @@
+                     { 'id' : u['username'],
+                         'cell': [
+                             (u['username']) if u.has_key('username') else (""),
+-                            (resolver_display),
+-                            (u['surname']) if u.has_key('surname') else (""),
+                             (u['givenname']) if u.has_key('givenname') else (""),
++                            (u['surname']) if u.has_key('surname') else (""),
+                             (u['email']) if u.has_key('email') else (""),
+-                            (u['mobile']) if u.has_key('mobile') else (""),
+-                            (u['phone']) if u.has_key('phone') else (""),
+                             (u['userid']) if u.has_key('userid') else (""),
++                            (resolver_display),
+                              ]
+                     }
+                     )
+--- a/linotp/controllers/selfservice.py
++++ b/linotp/controllers/selfservice.py
+@@ -40,7 +40,7 @@
+     import simplejson as json
+ 
+ import webob
+-
++import time
+ 
+ from pylons import request, response, config, tmpl_context as c
+ from pylons.controllers.util import abort
+@@ -98,7 +98,7 @@
+ from linotp.lib.reply import create_img
+ 
+ from linotp.lib.selfservice import get_imprint
+-from linotp.lib.user import getUserInfo, User
++from linotp.lib.user import getUserInfo, User, getAllUserRealms
+ 
+ from linotp.lib.error import SelfserviceException
+ 
+@@ -178,21 +178,21 @@
+                 self.authUser = User(c.user, c.realm, '')
+                 log.debug("[__before__] authenticating as %s in realm %s!" % (c.user, c.realm))
+             else:
+-                identity = request.environ.get('repoze.who.identity')
++                identity = request.environ.get('REMOTE_USER')
+                 if identity is None:
+-                    abort(401, "You are not authenticated")
+-
+-                log.debug("[__before__] doing getAuthFromIdentity in action %s" % action)
++					abort(401, "You are not authenticated")
+ 
+-                user_id = request.environ.get('repoze.who.identity').get('repoze.who.userid')
+-                if type(user_id) == unicode:
+-                    user_id = user_id.encode(ENCODING)
+-                identity = user_id.decode(ENCODING)
+-                log.debug("[__before__] getting identity from repoze.who: %r" % identity)
++                realms = getAllUserRealms(User(identity, "", ""))
++                if (realms):
++                    c.user = identity
++                    c.realm = realms[0]
+ 
+-                (c.user, _foo, c.realm) = identity.rpartition('@')
+                 self.authUser = User(c.user, c.realm, '')
+ 
++            	age = int(request.environ.get('WEBAUTH_TOKEN_EXPIRATION')) - time.time()
++            	response.set_cookie('linotp_selfservice', 'REMOTE_USER', max_age = int(age))
++
++
+                 log.debug("[__before__] set the self.authUser to: %s, %s " % (self.authUser.login, self.authUser.realm))
+                 log.debug('[__before__] param for action %s: %s' % (action, param))
+ 
+@@ -289,9 +289,10 @@
+                         c.user = "--ua--"
+                         env = request.environ
+                         uuser = env.get('REMOTE_USER')
+-                        if uuser is not None:
+-                            (c.user, _foo, c.realm) = uuser.rpartition('@')
+-
++                        realms = getAllUserRealms(User(uuser, "", ""))
++                        if (realms):
++                            c.user = uuser
++                            c.realm = realms[0]
+     ### This makes no sense...
+     #                c.audit['user'] = c.user
+     #                c.audit['realm'] =  c.realm
+@@ -1442,7 +1443,7 @@
+                     t_type = "totp"
+ 
+                 if prefix is None:
+-                    prefix = "LSGO"
++                    prefix = "GOOG"
+                 if serial is None:
+                     serial = genSerial(t_type, prefix)
+ 
+@@ -1822,7 +1823,7 @@
+         :return: hash of {tokentype : html for tab}
+     '''
+ 
+-    dynanmic_actions = {}
++    dynamic_actions = {}
+     g = config['pylons.app_globals']
+     tokenclasses = g.tokenclasses
+ 
+@@ -1843,7 +1844,7 @@
+                     ''' remove empty lines '''
+                     t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
+                     e_name = "%s.%s.%s" % (tok, 'selfservice', 'enroll')
+-                    dynanmic_actions[e_name] = t_html
++                    dynamic_actions[e_name] = t_html
+ 
+                 ## check if there are other selfserive policy actions
+                 policy = tclass_object.getClassInfo('policy', ret=None)
+@@ -1861,14 +1862,14 @@
+                             ''' remove empty lines '''
+                             t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
+                             e_name = "%s.%s.%s" % (tok, 'selfservice', action)
+-                            dynanmic_actions[e_name] = t_html
++                            dynamic_actions[e_name] = t_html
+ 
+ 
+             except Exception as e:
+-                log.info('[_add_dynamic_actions] no policy for tokentype '
++                log.debug('[_add_dynamic_actions] no policy for tokentype '
+                          '%s found (%r)' % (unicode(tok), e))
+ 
+-    return dynanmic_actions
++    return dynamic_actions
+ 
+ 
+ def add_dynamic_selfservice_policies(actions):
+--- a/linotp/controllers/system.py
++++ b/linotp/controllers/system.py
+@@ -1599,7 +1599,8 @@
+ 
+         finally:
+             Session.close()
+-            log.error("[getSupportInfo] done")
++            log.debug("[getSupportInfo] done")
++
+ 
+     def isSupportValid(self):
+         """
+@@ -1634,7 +1635,7 @@
+ 
+         finally:
+             Session.close()
+-            log.error("[isSupportValid] done")
++            log.debug("[isSupportValid] done")
+ 
+     def setSupport(self):
+         """
+--- a/linotp/controllers/validate.py
++++ b/linotp/controllers/validate.py
+@@ -70,7 +70,11 @@
+ 
+ from linotp.lib.error import ParameterError
+ 
++from linotp import model
++from linotp.model import Token
++
+ import traceback
++import time
+ 
+ audit = config.get('audit')
+ 
+@@ -239,6 +243,13 @@
+             # by sending a request w.o. pass parameter
+             try:
+                 (ok, opt) = self._check(param)
++                if (not ok):
++                    if opt == None:
++                        opt = {}
++
++                    opt['error'] = c.audit.get('info')
++                    log.error("[check] authorization failed for validate/check: %s" % opt['error'])
++
+             except (AuthorizeException, ParameterError) as exx:
+                 log.warning("[check] authorization failed for validate/check: %r"
+                             % exx)
+@@ -249,6 +260,8 @@
+                     if opt == None:
+                         opt = {}
+                     opt['error'] = c.audit.get('info')
++                    log.error("[check] authorization failed for validate/check: %s" % opt['error'])
++
+ 
+             Session.commit()
+ 
+@@ -736,7 +749,7 @@
+                 state = opt.get('state', '') or ''
+                 message = opt.get('message', '') or 'No sms message defined!'
+ 
+-            # sucessfull submit
++            # sucessful submit
+             if (message in ['sms with otp already submitted',
+                             'sms submitted']
+                 and len(state) > 0):
+@@ -768,5 +781,79 @@
+             Session.close()
+             log.debug("[smspin] done")
+ 
++    def webkdc_userinfo(self):
++        param = {}
++
++        try:
++            param.update(request.params)
++            user = getUserFromParam(param, optionalOrRequired = True)
++            if (user is not None and user.isEmpty() == False):
++                (userid, idResolver, idResolverClass) = getUserId(user)
++
++                sqlQuery = Session.query(model.Token).with_lockmode("update").filter(
++                   model.Token.LinOtpUserid == userid).filter(
++                    model.Token.LinOtpIdResClass == idResolverClass)
++
++                tokenList = []
++                for token in sqlQuery:
++                    tokenList.append(token.LinOtpTokenSerialnumber)
++
++            Session.commit()
++
++            return sendResult(response, tokenList, 0)
++
++        except Exception as exx:
++            log.error("[webkdc_userinfo] validate/webkdc_userinfo failed: %r" % exx)
++            log.error("[webkdc_userinfo] %s" % traceback.format_exc())
++
++            Session.rollback()
++            return sendError(response, u"validate/webkdc_userinfo failed: %s"
++                             % unicode(exx), 0)
++        finally:
++            Session.close()
++
++    def webkdc_validate(self):
++        param = {}
++
++        try:
++            param.update(request.params)
++            username = param["user"]
++            code = param["code"]
++
++            user = User(username, "", "")
++
++            if ('token' in param):
++                serial = param["token"]
++                (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
++            else:
++                (ok, opt) = checkUserPass(user, code)
++
++            ret = {
++                "success" : ok,
++            }
++
++            if (ok):
++                ret['expiration']  = round(time.time()) + 60 * 60, # one hour from now
++            else:
++                if opt == None:
++                    opt = {}
++                ret['error'] = c.audit.get('info')
++                log.error("[webkdc_validate] authorization failed: %s" % ret['error'])
++                ret['code'] = -310
++
++            Session.commit()
++
++            return sendResult(response, ret, 0, opt=opt)
++
++        except Exception as exx:
++            log.error("[webkdc_validate] validate/webkdc_validate failed: %r" % exx)
++            log.error("[webkdc_validate] %s" % traceback.format_exc())
++
++            Session.rollback()
++            return sendError(response, u"validate/webkdc_validate failed: %s"
++                             % unicode(exx), 0)
++        finally:
++            Session.close()
++
+ #eof###########################################################################
+ 
+--- a/linotp/lib/base.py
++++ b/linotp/lib/base.py
+@@ -332,7 +332,7 @@
+         for language in languages:
+             for lang in language.split(','):
+                 try:
+-                    if lang == "en":
++                    if lang == "en" or lang == "en-gb" or lang == "en-GB":
+                         found_lang = True
+                         break
+                     set_lang(lang)
+--- a/linotp/lib/reply.py
++++ b/linotp/lib/reply.py
+@@ -207,7 +207,7 @@
+            "id": id }
+ 
+     if opt is not None and len(opt) > 0:
+-        res["detail"] = opt
++        res["result"].update(opt)
+ 
+     return json.dumps(res, indent=3)
+ 
+--- a/linotp/lib/token.py
++++ b/linotp/lib/token.py
+@@ -1254,6 +1254,8 @@
+                       (typ, tokenclasses))
+             continue
+ 
++        # Allow tokens in any realm.
++        '''
+         ## now check if the token is in the same realm as the user
+         if user is not None:
+             t_realms = token.token.getRealmNames()
+@@ -1261,6 +1263,7 @@
+             if (len(t_realms) > 0 and len(u_realm) > 0 and
+                 u_realm.lower() not in t_realms) :
+                 continue
++        '''
+ 
+         tok_va = linotp.lib.validate.ValidateToken(token, context=c)
+         ## in case of a failure during checking token, we log the error and
+@@ -1335,6 +1338,7 @@
+         sortedAuditList = sorted(auditList, key=lambda audit_entry: audit_entry.get("weight", 0))
+         highest_audit = sortedAuditList[-1]
+         c.audit['action_detail'] = highest_audit.get('action_detail', '')
++        c.audit['info'] = c.audit['action_detail']
+         # check how many highest_audit values entries exist!
+         highest_list = filter(lambda audit_entry: audit_entry.get("weight", 0) == highest_audit.get("weight", 0), sortedAuditList)
+         if len(highest_list) == 1:
+--- a/linotp/lib/user.py
++++ b/linotp/lib/user.py
+@@ -421,6 +421,18 @@
+ 
+     return Resolver
+ 
++def getAllUserRealms(user):
++    results = [];
++    realms = getRealms();
++
++    # get a list of realms the user is present in
++    for key, v in realms.items():
++        resolvers = getResolversOfUser(User(user.login, v['realmname'], ""))
++        if (resolvers):
++            results.append(v['realmname'])
++
++    return results;
++
+ def getResolversOfUser(user):
+     '''
+     This returns the list of the Resolvers of a user in a given realm.
+@@ -512,7 +524,15 @@
+     loginUser = u''
+     loginUser = user.login;
+ 
+-    resolvers = getResolversOfUser(user)
++    resolvers = '';
++    realms = getRealms();
++
++    # Get the first resolver they're present in, because UID is independent of realm.
++    for key, v in realms.items():
++        resolvers = getResolversOfUser(User(user.login, v['realmname'], ""))
++        if (resolvers):
++            break;
++
+     for reso in resolvers:
+         resId = ""
+         resIdC = ""
+@@ -752,5 +772,22 @@
+ 
+     return success
+ 
++def getAdminRealms(username):
++    results = []
++    if username is None:
++		return results
++
++    from linotp.lib.policy import checkPolicyPre
++
++    log.error("checking for %s" % username)
++
++    try:
++        res = checkPolicyPre('admin', 'show', {}, user = User(username, '', ""))
++        results = res['realms']
++    finally:
++        pass
++
++    return results
++
+ #eof###########################################################################
+ 
+--- a/linotp/lib/util.py
++++ b/linotp/lib/util.py
+@@ -34,6 +34,7 @@
+ 
+ import binascii
+ import os
++import time
+ 
+ import string
+ from linotp.lib.crypt import urandom
+@@ -182,18 +183,16 @@
+     # All functions starting with /selfservice/user are data functions and protected
+     # by the session key
+     if request.path.lower()[:17] != "/selfservice/user":
+-        log.info('[check_selfservice_session] nothing to check')
++        log.debug('[check_selfservice_session] nothing to check')
+     else:
+-        try:
+-            cookie = request.cookies.get('linotp_selfservice')[0:40]
+-            session = request.params.get('session')[0:40]
+-        except Exception as e:
+-            log.warning("[check_selfservice_session] failed to check selfservice session: %r" % e)
+-            res = False
+-        log.info("[check_selfservice_session]: session: %s" % session)
+-        log.info("[check_selfservice_session]: cookie:  %s" % cookie)
+-        if session is None or session != cookie:
+-            log.error("[check_selfservice_session] The request %s did not pass a valid session!" % request.url)
++        expiry = request.environ.get('WEBAUTH_TOKEN_EXPIRATION')
++        if expiry is not None:
++            log.debug("[check_selfservice_session] Got header!")
++            if (expiry < time.time()):
++                log.warning("[check_selfservice_session] Webauth token has expired.")
++                res = False
++        else:
++            log.warning("[check_selfservice_session] No expiry found.")
+             res = False
+     return res
+ 
+--- a/linotp/public/js/manage.js
++++ b/linotp/public/js/manage.js
+@@ -99,6 +99,8 @@
+ var $dialog_ldap_resolver;
+ var $dialog_file_resolver;
+ var $dialog_sql_resolver;
++var $dialog_oak_resolver;
++
+ var $dialog_edit_realms;
+ var $dialog_ask_new_resolvertype;
+ var $dialog_resolvers;
+@@ -286,7 +288,7 @@
+ 
+ // ####################################################
+ //
+-//  functions for seletected tokens and selected users
++//  functions for selected tokens and selected users
+ //
+ 
+ function get_selected_tokens(){
+@@ -1965,6 +1967,36 @@
+     return false;
+ }
+ 
++function save_oak_config(){
++    // Save all Oak config
++    var resolvername = $('#oak_resolvername').val();
++    var resolvertype = "oakresolver";
++    var oak_map = {
++        '#oak_realm': 'OAKREALM',
++        '#oak_sizelimit': 'SIZELIMIT',
++    };
++    var url = '/system/setResolver?name='+resolvername+'&type='+resolvertype+'&';
++    for (var key in oak_map) {
++        var data = $(key).serialize();
++        var new_data = data.replace(/^.*=/, oak_map[key] + '=');
++        url += new_data + "&";
++    }
++
++    url += "session="+getsession();
++    show_waiting();
++    $.get(url,
++     function(data, textStatus, XMLHttpRequest){
++        hide_waiting();
++        if (data.result.status == false) {
++            alert_info_text("text_error_oak", data.result.error.message, ERROR);
++        } else {
++            resolvers_load();
++            $dialog_oak_resolver.dialog('close');
++        }
++    });
++    return false;
++}
++
+ function save_realm_config(){
+     var realm = $('#realm_name').val();
+     show_waiting();
+@@ -2212,7 +2244,10 @@
+     var reso = g.resolver_to_edit.replace(/(\S+)\s+\S+/, "$1");
+     var type = g.resolver_to_edit.replace(/\S+\s+\[(\S+)\]/, "$1");
+     switch (type) {
+-        case "ldapresolver":
++		case "oakresolver":
++			resolver_oak(reso)
++			break;
++		case "ldapresolver":
+             resolver_ldap(reso);
+             break;
+         case "sqlresolver":
+@@ -2948,6 +2983,15 @@
+                     text: "LDAP"
+ 
+             },
++			'Oak': { click: function(){
++                        // calling with no parameter, creates a new resolver
++                        resolver_oak("");
++                        $(this).dialog('close');
++                    },
++                    id: "button_new_resolver_type_oak",
++                    text: "Oak"
++
++            },
+             'SQL': { click: function(){
+                     // calling with no parameter, creates a new resolver
+                     resolver_sql("");
+@@ -3028,6 +3072,67 @@
+         }
+     });
+ 
++    $dialog_oak_resolver = $('#dialog_oak_resolver').dialog({
++        autoOpen: false,
++        title: 'Oak Resolver',
++        width: 600,
++        modal: true,
++        maxHeight: 500,
++        buttons: {
++            'Cancel': { click: function(){
++                $(this).dialog('close');
++                },
++                id: "button_oak_resolver_cancel",
++                text: "Cancel"
++                },
++            'Save': { click: function(){
++                    // Save the LDAP configuration
++                    if ($("#form_oakconfig").valid()) {
++                        save_oak_config();
++                        //$(this).dialog('close');
++                    }
++                },
++                id: "button_oak_resolver_save",
++                text: "Save"
++            }
++        },
++        open: function() {
++            do_dialog_icons();
++        }
++    });
++
++	$('#button_test_oak').click(function(event){
++        $('#progress_test_oak').show();
++
++        var url = '/admin/testresolver';
++        var params = {};
++        params['type']              = 'oak';
++        params['oak_realm']          = $('#oak_realm').val();
++        params['oak_sizelimit']    = $('#oak_sizelimit').val();
++
++        clientUrlFetch(url, params, function(xhdr, textStatus) {
++                    var resp = xhdr.responseText;
++                    var obj = jQuery.parseJSON(resp);
++                    $('#progress_test_oak').hide();
++                    if (obj.result.status == true) {
++                        result = obj.result.value.result;
++                        if (result == "success") {
++                            // show number of found users
++                            var num = obj.result.value.desc;
++                            alert_box("Oak Test", "text_oak_config_success", num);
++                        }
++                        else {
++                            alert_box("Oak Test", obj.result.value.desc);
++                        }
++                    }
++                    else {
++                        alert_box("Oak Test", obj.result.error.message);
++                    }
++                    return false;
++                 });
++        return false;
++    });
++
+     $('#button_test_ldap').click(function(event){
+         $('#progress_test_ldap').show();
+ 
+@@ -4098,6 +4203,9 @@
+                         alert_info_text("text_regexp_error", reso, ERROR);
+                     }
+                     switch (t) {
++						case 'oakresolver':
++							g.resolvers_in_realm_to_edit += 'useridresolver.OakIdResolver.IdResolver.' + r;
++							break;
+                         case 'ldapresolver':
+                             g.resolvers_in_realm_to_edit += 'useridresolver.LDAPIdResolver.IdResolver.' + r;
+                             break;
+@@ -4159,7 +4267,7 @@
+                     'LDAPURI': 'ldap://linotpserver1, ldap://linotpserver2',
+                     'LDAPBASE': 'dc=yourdomain,dc=tld',
+                     'TIMEOUT': '5',
+-                    'SIZELIMIT' : '500',
++                    'SIZELIMIT' : '1000',
+                     'LOGINNAMEATTRIBUTE': 'sAMAccountName',
+                     'LDAPSEARCHFILTER': '(sAMAccountName=*)(objectClass=user)',
+                     'LDAPFILTER': '(&(sAMAccountName=%s)(objectClass=user))',
+@@ -4264,6 +4372,72 @@
+ 
+ }
+ 
++function resolver_set_oak(obj) {
++    $('#oak_realm').val(obj.result.value.data.OAKREALM);
++    $('#oak_sizelimit').val(obj.result.value.data.SIZELIMIT);
++
++}
++
++function resolver_oak(name){
++
++    var obj = {
++        'result': {
++            'value': {
++                'data': {
++                    'OAKREALM': '',
++                    'SIZELIMIT' : '1000',
++                }
++            }
++        }
++    };
++
++
++    if (name) {
++        // load the config of the resolver "name".
++        clientUrlFetch('/system/getResolver', {'resolver' : name}, function(xhdr, textStatus) {
++            var resp = xhdr.responseText;
++            var obj = jQuery.parseJSON(resp);
++            $('#oak_resolvername').val(name);
++            if (obj.result.status) {
++                resolver_set_oak(obj);
++            } else {
++                // error reading resolver
++                alert_box("", "text_oak_load_error", obj.result.error.message);
++            }
++
++          });
++    } // end if
++    else {
++        $('#oak_resolvername').val("");
++        resolver_set_oak(obj);
++    }
++
++    $('#progress_test_oak').hide();
++    $dialog_oak_resolver.dialog('open');
++
++    jQuery.validator.addMethod("resolvername", function(value, element, param){
++        return value.match(/^[a-z0-9_\-]+$/i);
++    }, "Please enter a valid resolver name. It may contain characters, numbers and '_-'.");
++
++	jQuery.validator.addMethod("oak_realm", function(value, element, param){
++        return value.match(/^[a-z0-9]+$/i);
++    }, "Please enter a valid Oak realm identifier. It may contain characters or numbers.");
++
++	$("#form_oakconfig").validate({
++        rules: {
++            oak_resolvername: {
++                required: true,
++                minlength: 4,
++                resolvername: true
++            },
++            oak_resolvername: {
++                required: true,
++                minlength: 4,
++                oak_realm: true
++            },
++        }
++    });
++}
+ 
+ function resolver_set_sql(obj) {
+ 
+@@ -4459,7 +4633,21 @@
+             searchbutton: true
+     });
+ 
+-    $('#policy_export').attr("href", '/system/getPolicy/policy.cfg?session=' + getsession());
++    $('#policy_import').button({
++        icons: {
++            primary: 'ui-icon-arrowthick-1-n'
++        }
++    });
++    $('#policy_export').button({
++        icons: {
++            primary: 'ui-icon-arrowthick-1-s'
++        }
++    });
++
++
++     $('#policy_export').click(function(){
++		window.location.href = 'https://' + location.href + '/system/getPolicy/policy.cfg?session=' + getsession();
++	 });
+ 
+     $('#policy_import').click(function(){
+         $dialog_import_policy.dialog("open");
+@@ -4530,20 +4718,23 @@
+             url : '/manage/tokenview_flexi?session='+getsession(),
+             method: 'GET',
+             dataType : 'json',
+-            colModel : [ {display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
+-                            {display: 'active', name : 'Isactive', width : 30, sortable : true, align: 'center'},
++            colModel : [
++							{display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
++                            {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
++							{display: 'description', name : 'TokenDesc', width : 200, sortable : true, align: 'center'},
++                            {display: 'active', name : 'Isactive', width : 35, sortable : true, align: 'center'},
++
+                             {display: 'username', name : 'Username', width : 100, sortable : false, align: 'center'},
+                             {display: 'realm', name : 'realm', width : 100, sortable : false, align: 'center'},
+-                            {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
+-                            {display: 'counter login', name : 'FailCount', width : 30, sortable : true, align: 'center'},
+-                            {display: 'description', name : 'TokenDesc', width : 100, sortable : true, align: 'center'},
+-                            {display: 'maxfailcount', name : 'maxfailcount', width : 50, sortable : false, align: 'center'},
++                            {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'},
++							{display: 'userid', name : 'Userid', width : 100, sortable : true, align: 'center'},
++
++                            {display: 'fail count', name : 'FailCount', width : 60, sortable : true, align: 'center'},
++                            {display: 'max fails', name : 'maxfailcount', width : 60, sortable : false, align: 'center'},
+                             {display: 'otplen', name : 'otplen', width : 50, sortable : false, align: 'center'},
+                             {display: 'countwindow', name : 'countwindow', width : 50, sortable : false, align: 'center'},
+-                            {display: 'syncwindow', name : 'syncwindow', width : 50, sortable : false, align: 'center'},
+-                            {display: 'userid', name : 'Userid', width : 100, sortable : true, align: 'center'},
+-                            {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'}
+-                                ],
++                            {display: 'syncwindow', name : 'syncwindow', width : 50, sortable : false, align: 'center'}
++            ],
+             height: 400,
+             searchitems : [
+                 {display: 'in loginname', name: 'loginname', isdefault: true },
+@@ -4574,26 +4765,22 @@
+             url : '/manage/userview_flexi?session='+getsession(),
+             method: 'GET',
+             dataType : 'json',
+-            colModel : [ {display: 'username', name : 'username', width : 90, sortable : true, align:"left"},
+-                        {display: 'useridresolver', name : 'useridresolver', width : 200, sortable : true, align:"left"},
+-            {display: 'surname', name : 'surname', width : 100, sortable : true, align:"left"},
+-            {display: 'givenname', name : 'givenname', width : 100, sortable : true, align:"left"},
+-            {display: 'email', name : 'email', width : 100, sortable : false, align:"left"},
+-                        {display: 'mobile', name : 'mobile', width : 50, sortable : true, align:"left"},
+-            {display: 'phone', name : 'phone', width : 50, sortable : false, align:"left"},
+-                        {display: 'userid', name : 'userid', width : 200, sortable : true, align:"left"}
++            colModel : [
++				{display: 'username', name : 'username', width : 100, sortable : true, align:"left"},
++				{display: 'givenname', name : 'givenname', width : 150, sortable : true, align:"left"},
++				{display: 'surname', name : 'surname', width : 150, sortable : true, align:"left"},
++				{display: 'email', name : 'email', width : 300, sortable : false, align:"left"},
++                {display: 'userid', name : 'userid', width : 100, sortable : true, align:"left"},
++				{display: 'useridresolver', name : 'useridresolver', width : 200, sortable : true, align:"left"}
+             ],
+             height: 400,
+             searchitems : [
+                 {display: 'in username          ', name : 'username', isdefault: true},
+-                {display: 'surname          ', name : 'surname'},
+                 {display: 'given name           ', name : 'givenname'},
+-                {display: 'description          ', name : 'description'},
++				{display: 'surname          ', name : 'surname'},
++			    {display: 'email            ', name : 'email'},
+                 {display: 'userid           ', name : 'userid'},
+-                {display: 'email            ', name : 'email'},
+-                {display: 'mobile           ', name : 'mobile'},
+-                {display: 'phone            ', name : 'phone'}
+-                ],
++            ],
+             rpOptions: [15,20,50,100],
+             sortname: "username",
+             sortorder: "asc",
+--- a/linotp/public/js/selfservice.js
++++ b/linotp/public/js/selfservice.js
+@@ -351,7 +351,7 @@
+     } finally {
+         hide_waiting();
+         showTokenlist();
+-    }
++    }
+ 
+     return false;
+ 
+--- /dev/null
++++ b/linotp/public/manage/custom-style.css
+@@ -0,0 +1,147 @@
++ a {
++ 	color: #3277AE;
++ }
++ 
++  body {
++	font-family: Helvetica Neue, Helvetica, Verdana,Arial,sans-serif; 
++	font-size: 1.0em;
++ }
++  
++ #header #logo {
++	margin: 0;
++	
++}
++ 
++ #logo div{
++	background-image:  url(/images/crest.png);
++	background-size: cover;
++	float: right;
++	width: 220px;
++	height: 68px;
++	margin: 0px;
++}
++ 
++ #wrap {
++	 width: 95%;
++	 position: relative;
++ }
++ 
++ #header {
++	background:#002147;
++	background-image: inherit;
++	margin: 0;
++	margin-bottom: 1em;
++	padding: 1em;
++	border: 1px solid #dedede;
++	border-radius: 0;
++	height:70px;
++	width: auto;
++	width: initial;
++	font-size: large;
++	float: none;
++}
++
++#header .sf-menu {
++	width: 100%;
++}
++
++ #main {
++	 padding: 3px;
++	 background: #eeeeee;
++	 border: 1px solid #aeaeae
++ }
++
++ #sidebar {
++	width:12%;
++	background:#eeeeee;
++	border: 1px solid #aeaeae;
++ }
++ 
++ .sf-menu > li {
++	height: 70px;
++	padding: 0 !important;
++ }
++ 
++ #menu.sf-menu > li > a {
++	border-top: none;
++	padding: 0;
++	padding-right: 2.25em;
++	padding-left: 1em;
++	color: #fff;
++ }
++  
++ #menu.sf-menu > li:hover > a { color: #3277AE; }
++ 
++ #menu.sf-menu > li > ul > li > a {
++	padding: .75em 1em;
++ }
++
++  
++ .float_left{
++ 	float: left;
++	text-align: left;
++	color: #fff;
++	font-weight: normal;
++	margin-right: 1.5em !important;
++ }
++ 
++ .float_left:hover {
++	background: #002147;
++ }
++
++ .portalname{
++	font-size:200%;
++	text-shadow:black 3px 2px 4px;
++	line-height: normal;
++
++ }
++ 
++ .sf-menu a.sf-with-ul {
++	color: #fff;
++	border-left: none;
++	font-family: Helvetica Neue, Helvetica, Verdana, sans-serif;
++	display: table-cell;
++	vertical-align: middle;
++	height: 70px;
++	padding: 0;
++ }
++ 
++ .sf-menu li li {
++	height: 2em;
++ }
++
++ 
++.ui-button {
++	border-radius: 0 !important;
++	font-family: Helvetica Neue, Helvetica, verdana, sans-serif !important;
++}
++
++#main > div > div > .ui-button {
++	margin-bottom: 1em;
++}
++
++.ui-widget {
++	font-family: Helvetica Neue, Helvetica, verdana, sans-serif !important;
++}
++
++ .ui-tabs.ui-widget {
++	border: none;
++	border-radius: 0;
++}
++
++.ui-corner-all {
++	border-radius: 0 !important;
++}
++
++.ui-state-default.ui-corner-top {
++	border-radius: 0;
++}
++
++.ui-tabs-nav.ui-widget-header {
++	background: #002147;
++	border-radius: 0;
++}
++
++#menu > li:nth-child(1):hover {
++	background: #002147;
++}
+\ No newline at end of file
+--- /dev/null
++++ b/linotp/public/selfservice/custom-style.css
+@@ -0,0 +1,68 @@
++a {
++ 	color: #3277AE;
++}
++
++h1 {
++	color: #3277AE;
++}
++
++body {
++	font-family: Helvetica Neue, helvetica, impact, sans-serif;
++}
++	
++a.activeToken {
++	color: #3277AE;
++	text-decoration: underline;
++}
++
++#main {
++	background: #eeeeee;
++	border: 1px solid #aeaeae;
++	margin-bottom: 1em;
++}
++
++#sidebar {
++	border: 1px solid #aeaeae;
++}
++
++#header {
++	background:#002147;
++	background-image: inherit;
++	margin: 0;
++	margin-bottom: 1em;
++	padding: 1em;
++	border: 1px solid #dedede;
++}
++
++#logo{
++	background-image:  url(/images/crest.png);
++	background-size: cover;
++	float: right;
++	width: 220px;
++	margin: 0px;
++}
++
++ #logout {
++	color: #3277AE;
++ }
++ 
++/* float the logo left and the title right to match the admin page */
++ .float_right{
++	color: #fff;
++ 	float: left;
++	text-align: left;
++ }
++
++.ui-tabs.ui-widget {
++	border: none;
++	border-radius: 0;
++}
++
++.ui-state-default.ui-corner-top {
++	border-radius: 0;
++}
++
++.ui-tabs-nav.ui-widget-header {
++	background: #002147;
++	border-radius: 0;
++}
+\ No newline at end of file
+--- a/linotp/templates/manage/manage-base.mako
++++ b/linotp/templates/manage/manage-base.mako
+@@ -65,7 +65,13 @@
+ <div id="wrap">
+ <div id="header" class="ui-widget-header ui-corner-all">
+     <ul id='menu' class='sf-menu sf-vertical'>
+-        <li><a href='#'>${_("LinOTP Config")}</a>
++		<li>
++				<div class="float_left">
++				Elm Authentication System<br>
++				<span class=portalname>${_("Management Portal")}</span>
++				</div>
++		</li>
++		<li><a href='#'>${_("LinOTP Config")}</a>
+             <ul>
+                 <li><a href='#' id='menu_edit_resolvers'>${_("useridresolvers")}</a></li>
+                 <li><a href='#' id='menu_edit_realms'>${_("realms")}</a></li>
+@@ -102,8 +108,8 @@
+                 <li><a href='#' id='menu_about'>${_("About LinOTP")}</a></li>
+             </ul>
+         </li>
++		<li id="logo"><div></div></li>
+     </ul>
+-    <div id="logo"><img src="/images/linotp_logo_118x40.png" alt="LinOTP"/></div>
+ </div> <!-- header -->
+ <div class="javascript_error" id="javascript_error">
+ 	${_("You need to enable Javascript to use the LinOTP Management Web UI.")}
+@@ -119,9 +125,12 @@
+     <div id="selected_tokens"></div>
+     <span id="selected_users_header">${_("selected users")}</span>
+     <div id="selected_users"></div>
+-    <p>${_("Logged in as")}: ${c.admin}
+-        <a href="${c.logout_url}">${_("Logout")}</a>
++    <p>
++		User: ${c.login}<br/>
++		Realm: ${c.realm}</br>
++		<a id="logout_url" href="${c.logout_url}">${_("Logout")}</a>
+     </p>
++
+     <div id="realms">
+     ${_("Realms")}: <select id=realm></select>
+     </div>
+@@ -884,6 +893,7 @@
+ 		$('#button_new_resolver_type_ldap .ui-button-text').html('${_("LDAP")}');
+ 		$('#button_new_resolver_type_sql .ui-button-text').html('${_("SQL")}');
+ 		$('#button_new_resolver_type_flatfile .ui-button-text').html('${_("Flatfile")}');
++		$('#button_new_resolver_type_oak .ui-button-text').html('${_("Oak")}');
+ 		$('#button_new_resolver_type_cancel .ui-button-text').html('${_("Cancel")}');
+ 	}
+ </script>
+@@ -1269,6 +1279,38 @@
+ 	}
+ </script>
+ 
++<!-- ################## dialog Oak resolver ######################### -->
++
++<div id="dialog_oak_resolver">
++	<form class="cmxform" id="form_oakconfig">
++		<fieldset name='${_("Oak configuration")}'>
++			<table>
++				<tr>
++					<td><label for=oak_resolvername>${_("Resolver name")}:</label></td>
++					<td><input type="text" name="oak_resolvername" class="required"  id="oak_resolvername" size="35" maxlength="20"></td>
++				</tr>
++				<tr>
++					<td><label for=oak_realm>${_("Realm code (eg 'ball' or 'admn')")}:</label></td>
++					<td><input type="text" name="oak_realm" class="required"  id="oak_realm" size="10" maxlength="6"></td>
++				</tr>
++				<tr>
++					<td><label for=ldap_sizelimit>${_("Response size limit")}:</label></td>
++					<td><input type="text" name="oak_sizelimit" class="required"  id="oak_sizelimit" size="10" maxlength="10"></td>
++				</tr>
++			</table>
++		</fieldset>
++	</form>
++	<div id="progress_test_oak"><img src="/images/ajax-loader.gif" border="0" alt=""> ${_("Testing connections...")} </div>
++		<button class="action-button" id="button_test_oak">${_("Test Oak connection")}</button>\
++</div>
++
++<script>
++	function translate_dialog_oak_resolver() {
++		$("#dialog_oak_resolver" ).dialog( "option", "title", '${_("Oak Resolver")}' );
++		$('#button_test_oak .ui-button-text').html('${_("Test Oak connection")}');
++	}
++</script>
++
+ <!-- #################### dialog SQL resolver #################################### -->
+ 
+ <div id='dialog_sql_resolver'>
+@@ -1368,6 +1410,8 @@
+ <div id="text_subscription_import_failed">${_("Failed to load support subscription")}: <span class="text_param1"> </span></div>
+ <div id="text_subscription_import_result">${_("Support subscription import result")}: <span class="text_param1"> </span></div>
+ <div id="text_error_ldap">${_("Error saving ldap configuration.")}: <span class="text_param1"> </span></div>
++<div id="text_error_oak">${_("Error saving Oak configuration.")}: <span class="text_param1"> </span></div>
++
+ <div id="text_error_realm">${_("Error saving realm configuration.")}: <span class="text_param1"> </span></div>
+ <div id="text_realm_created">${_("Realm created")}: <span class="text_param1"> </span></div>
+ <div id="text_error_set_realm">${_("Error setting Token realms")}: <span class="text_param1"> </span></div>
+@@ -1380,6 +1424,10 @@
+ <div id="text_regexp_error">${_("Error in regular expression for")}: <span class="text_param1"> </span></div>
+ <div id="text_ldap_config_success">${_("LDAP config seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
+ <div id="text_ldap_load_error">${_("Error loading LDAP resolver")}: <span class="text_param1"> </span></div>
++
++<div id="text_oak_config_success">${_("Oak config seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
++<div id="text_oak_load_error">${_("Error loading Oak resolver")}: <span class="text_param1"> </span></div>
++
+ <div id="text_sql_load_error">${_("Error loading SQL resolver")}: <span class="text_param1"> </span></div>
+ <div id="text_sql_config_success">${_("SQL config seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
+ <div id="text_sql_config_fail">${_("SQL config contains errors")}: <span class="text_param1"> </span></div>
+--- a/linotp/templates/manage/policies.mako
++++ b/linotp/templates/manage/policies.mako
+@@ -25,9 +25,9 @@
+  *    Support: www.lsexperts.de
+  *
+ -->
+-<a id=policy_export>${_("Export policies")}</a>
++<button class='ui-button' id=policy_export>${_("Export policies")}</button>
+ 
+-<button id=policy_import>${_("Import policies")}</button>
++<button class='ui-button' id=policy_import>${_("Import policies")}</button>
+ 
+ <table id="policy_table" class="flexme2" style="display:none"></table>
+    
+--- a/linotp/templates/selfservice/base.mako
++++ b/linotp/templates/selfservice/base.mako
+@@ -66,7 +66,7 @@
+ 	</div>
+ 
+ 	<div class="float_right">
+-	Open Source Edition<br>
++	Elm Authentication System<br>
+ 	<span class=portalname>${_("Selfservice Portal")}</span>
+ 	</div>
+ </div>

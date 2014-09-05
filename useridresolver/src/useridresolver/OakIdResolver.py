@@ -91,7 +91,7 @@ class IdResolver (UserIdResolver):
     def setup(cls, config=None, cache_dir=None):
         log.info("[setup] Setting up the OakResolver")
         return
-        
+
     # The mapping of these search fields to the ldap attributes it
     # stored in self.userinfo
 
@@ -109,7 +109,7 @@ class IdResolver (UserIdResolver):
             # do a bind
             uri = 'ldap://ldap.oak.ox.ac.uk:389'
             base = "ou=people,dc=oak,dc=ox,dc=ac,dc=uk"
-            
+
             auth = ldap.sasl.gssapi("")
             l = ldap.initialize(uri)
 
@@ -121,7 +121,7 @@ class IdResolver (UserIdResolver):
             realmfilter = "(eduPersonOrgUnitDN=oakUnitCode=%s,ou=units,dc=oak,dc=ox,dc=ac,dc=uk)" % params['OAKREALM']
 
             searchfilter = "(&(oakOxfordSSOUsername=*)%s)" % realmfilter
-            
+
             # get a userlist:
             results = 0;
             sizelimit = int(DEFAULT_SIZELIMIT)
@@ -162,11 +162,11 @@ class IdResolver (UserIdResolver):
         self.filter = ""
         self.searchfilter = ""
         self.realmfilter = ""
-        
-        self.userinfo = { 
-            "username": "oakOxfordSSOUsername", 
-            "email" : "mail", 
-            "surname" : "sn", 
+
+        self.userinfo = {
+            "username": "oakOxfordSSOUsername",
+            "email" : "mail",
+            "surname" : "sn",
             "givenname" : "givenName"
         }
         self.timeout = 10
@@ -222,7 +222,7 @@ class IdResolver (UserIdResolver):
             log.debug("[bind] LDAP: Try to bind to %r", uri)
             auth = ldap.sasl.gssapi("")
             l_obj = ldap.initialize(uri, trace_level=0)
-					
+
             l_obj.network_timeout = self.timeout
 
             l_obj.start_tls_s()
@@ -234,7 +234,7 @@ class IdResolver (UserIdResolver):
             log.error("[bind] LDAP error: %r" % e)
             log.error("[bind] LDAPURI   : %r" % uri)
             log.error("[bind] %s" % traceback.format_exc())
-        				
+
         # We were not able to do a successful bind! :-(
         self.bind_not_possible = True
         self.bind_not_possible_time = datetime.now()
@@ -590,7 +590,7 @@ class IdResolver (UserIdResolver):
         log.debug("[loadConfig] Config:  %r" % config)
         log.debug("[loadConfig] Conf  :  %r" % conf)
         self.conf = conf
-        
+
         self.realm = self.getConfigEntry(config, "linotp.oakresolver.OAKREALM", conf)
 
         sizelimit = self.getConfigEntry(config,
@@ -611,7 +611,7 @@ class IdResolver (UserIdResolver):
 
         self.filter = "(&(%s=%%s)%s)" % (self.loginnameattribute, self.realmfilter)
         self.searchfilter = "(%s=*)%s" % (self.loginnameattribute, self.realmfilter)
-        
+
         return self
 
     def getSearchFields(self, searchDict=None):
@@ -722,7 +722,7 @@ class IdResolver (UserIdResolver):
                      "on LDAP server %r" % (DN, uri))
             auth = ldap.sasl.gssapi("")
             l = ldap.initialize(uri, trace_level=0)
-             
+
             l.network_timeout = self.timeout
             l.start_tls_s()
             l.sasl_interactive_bind_s("",auth)
@@ -798,7 +798,7 @@ class IdResolver (UserIdResolver):
                 attrlist = []
                 for ukey, uval in self.userinfo.iteritems():
                     attrlist.append(str(uval))
-                
+
                 attrlist.append("oakPrimaryPersonID")
 
                 ldap_result_id = l_obj.search_ext(self.base,
@@ -845,30 +845,31 @@ class IdResolver (UserIdResolver):
                 return resultList
 
         return ""
-        
+
+        # Code to list all Oak realms just in case we ever need to
         '''        auth = ldap.sasl.gssapi("")
         l_obj = ldap.initialize("ldap://ldap.oak.ox.ac.uk:389", trace_level=0)
-					
+
         l_obj.network_timeout = self.timeout
         l_obj.start_tls_s()
         l_obj.sasl_interactive_bind_s("",auth)
 
         resultList = []
-        
-        groupinfo = { 
-            "username": "oakUnitCode", 
-            "email" : "oakUnitCode", 
-            "surname" : "oakUnitCode", 
+
+        groupinfo = {
+            "username": "oakUnitCode",
+            "email" : "oakUnitCode",
+            "surname" : "oakUnitCode",
             "givenname" : "displayName"
         }
-        
-        attrlist = []
+
+       attrlist = []
         for ukey, uval in groupinfo.iteritems():
             attrlist.append(str(uval))
-                    
+
         searchFilter = "(&(oakUnitCode=*))"
-        
-        try: 
+
+        try:
             ldap_result_id = l_obj.search_ext("ou=units,dc=oak,dc=ox,dc=ac,dc=uk",
                              ldap.SCOPE_SUBTREE,
                              filterstr=searchFilter.encode(ENCODING),
@@ -903,12 +904,12 @@ class IdResolver (UserIdResolver):
                                     userdata[ukey] = udata
 
                         resultList.append(userdata)
-               
+
         except ldap.LDAPError as exce:
             log.error("[getUserList] LDAP error: %r" % exce)
         except Exception as exce:
             log.error("[getUserList] error during LDAP access: %r" % exce)
-            log.error("[getUserList] %s" % traceback.format_exc())                         
+            log.error("[getUserList] %s" % traceback.format_exc())
 
         if resultList:
             return resultList'''
