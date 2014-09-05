@@ -1328,7 +1328,7 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
                     audit['action_detail'] = "Failcounter exceeded"
             else:
                 audit['action_detail'] = "Token inactive"
-            
+
         # add the audit information to the auditList
         auditList.append(audit)
 

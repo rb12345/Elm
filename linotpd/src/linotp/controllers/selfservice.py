@@ -186,20 +186,23 @@ class SelfserviceController(BaseController):
                 if (realms):
                     c.user = identity
                     c.realm = realms[0]
-                    c.realmArray = realms
-                self.authUser = User(c.user, c.realm, '')
-                    
-				
-            # checking the session
-            if (False == check_selfservice_session()):
-                c.audit['action'] = request.path[1:]
-                c.audit['info'] = "session expired"
-                audit.log(c.audit)
-                abort(401, "No valid session")
 
-            age = int(request.environ.get('WEBAUTH_TOKEN_EXPIRATION')) - time.time()
-            response.set_cookie('linotp_selfservice', 'REMOTE_USER', max_age = int(age))
-                
+                self.authUser = User(c.user, c.realm, '')
+
+            	age = int(request.environ.get('WEBAUTH_TOKEN_EXPIRATION')) - time.time()
+            	response.set_cookie('linotp_selfservice', 'REMOTE_USER', max_age = int(age))
+
+
+                log.debug("[__before__] set the self.authUser to: %s, %s " % (self.authUser.login, self.authUser.realm))
+                log.debug('[__before__] param for action %s: %s' % (action, param))
+
+                # checking the session
+                if (False == check_selfservice_session()):
+                    c.audit['action'] = request.path[1:]
+                    c.audit['info'] = "session expired"
+                    audit.log(c.audit)
+                    abort(401, "No valid session")
+
             c.imprint = get_imprint(c.realm)
 
             c.tokenArray = []
@@ -290,8 +293,15 @@ class SelfserviceController(BaseController):
                         if (realms):
                             c.user = uuser
                             c.realm = realms[0]
-                            c.realmArray = realms
-
+    ### This makes no sense...
+    #                c.audit['user'] = c.user
+    #                c.audit['realm'] =  c.realm
+    #            else:
+    #                user = getUserFromRequest(request).get("login")
+    #                c.audit['user'] ,c.audit['realm'] = user.split('@')
+    #                uc = user.split('@')
+    #                c.audit['realm'] = uc[-1]
+    #                c.audit['user'] = '@'.join(uc[:-1])
 
                 log.debug("[__after__] authenticating as %s in realm %s!" % (c.user, c.realm))
 
@@ -1186,62 +1196,6 @@ class SelfserviceController(BaseController):
             Session.close()
             log.debug('[token_call] done')
 
-    def change_realm(self):
-        '''
-            the generic method call for an dynamic token
-        '''
-        param = {}
-
-        res = {}
-
-        try:
-            param.update(request.params)
-               
-            realm = getParam(param, "realm", required)
-
-            # Are they allowed to create a token in that realm?
-            pols = getPolicy({ "realm" : realm,
-                                "scope" : "selfservice" })
-            found = False
-            for policy in pols.values():
-                action = u'' + policy.get('action')
-                actions_in = action.split(',')
-
-                actions = []
-                for act in actions_in:
-                    actions.append(act.strip())
-
-                if 'webprovisionGOOGLEtime' in actions:
-                    found = True
-                    break
-
-            if found == False:
-                log.error('user %r not authorized to call %s'
-                          % (self.authUser, method))
-                raise PolicyException('user %r not authorized to call %s'
-                                      % (self.authUser, method))
-
-            c.realm = realm;
-            
-            Session.commit()
-            return sendResult(response, 'okay', 1)
-
-        except PolicyException as pe:
-            log.error("[token_call] policy failed: %r" % pe)
-            log.error("[token_call] %s" % traceback.format_exc())
-            Session.rollback()
-            return sendError(response, unicode(pe), 1)
-
-        except Exception as e:
-            log.error("[token_call] calling method %s.%s of user %s failed! %r"
-                      % (typ, method, c.user, e))
-            log.error("[token_call] %s" % traceback.format_exc())
-            Session.rollback()
-            return sendError(response, e, 1)
-
-        finally:
-            Session.close()
-            log.debug('[token_call] done')
 
     def usergetmultiotp(self):
         '''

@@ -87,7 +87,6 @@
 </table> 
 <script type="text/javascript"> 
 	view_policy();
-	policybuttons();
 </script>
 
 

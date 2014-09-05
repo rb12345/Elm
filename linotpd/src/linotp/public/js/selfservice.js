@@ -899,23 +899,3 @@ function view_audit_selfservice() {
             addTitleToCell: true
     });
 }
-
-$('#realm').change(function(){
-    var new_realm = $('#realm').val();
-    params['session'] = get_selfservice_session();
-	params['realm'] = new_realm;
-
-	show_waiting();
-    $.post('/selfservice/change_realm', params, function(data, textStatus, XMLHttpRequest) {
-            hide_waiting();
-            if (data.result.status == false) {
-                alert("Error changing realm: " + data.result.error.message);
-            };
-            if (data.result.status == true) {
-                showTokenlist();
-				$('.selectedToken').val("");
-            };
-        });
-        // end of get
-    }
-);

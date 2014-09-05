@@ -4633,6 +4633,74 @@ function view_policy() {
             searchbutton: true
     });
 
+    $('#policy_import').button({
+        icons: {
+            primary: 'ui-icon-arrowthick-1-n'
+        }
+    });
+    $('#policy_export').button({
+        icons: {
+            primary: 'ui-icon-arrowthick-1-s'
+        }
+    });
+
+
+     $('#policy_export').click(function(){
+		window.location.href = 'https://' + location.href + '/system/getPolicy/policy.cfg?session=' + getsession();
+	 });
+
+    $('#policy_import').click(function(){
+        $dialog_import_policy.dialog("open");
+    });
+
+    $('#button_policy_add').click(function(){
+        var pol_name = $('#policy_name').val();
+        pol_name = $.trim(pol_name);
+        if (pol_name.length == 0) {
+        alert_box('Policy Name',"text_policy_name_not_empty");
+            return;
+        }
+
+        if ($('#policy_active').is(':checked')) {
+            pol_active = "True";
+        } else {
+            pol_active = "False";
+        }
+
+        $.get('/system/setPolicy',
+            { 'name' : $('#policy_name').val(),
+              'user' : $('#policy_user').val(),
+              'action' : $('#policy_action').val(),
+              'scope' : $('#policy_scope_combo').val(),
+              'realm' : $('#policy_realm').val(),
+              'time' : $('#policy_time').val(),
+              'client' : $('#policy_client').val(),
+              'active' : pol_active,
+              'session':getsession() },
+         function(data, textStatus, XMLHttpRequest){
+            if (data.result.status == true) {
+                alert_info_text("text_policy_set");
+                $('#policy_table').flexReload();
+            }else {
+                alert_info_text(data.result.error.message,"" , ERROR);
+            }
+        });
+    });
+
+    $('#button_policy_delete').click(function(){
+        var policy = get_selected_policy().join(',');
+        if (policy) {
+            $.get('/system/delPolicy', {'name' : policy, 'session':getsession()},
+             function(data, textStatus, XMLHttpRequest){
+                if (data.result.status == true) {
+                    alert_info_text("text_policy_deleted");
+                    $('#policy_table').flexReload();
+                } else {
+                    alert_info_text(data.result.error.message, "", ERROR);
+                }
+            });
+        }
+    });
 
 
     $('#policy_scope_combo').change(function(){
@@ -4787,81 +4855,5 @@ function view_audit() {
             addTitleToCell: true,
             searchbutton: true
     });
-}
-
-function policybuttons(){
-    /*
-     * This is the function to call handle the buttons, that will only work
-     * with policies.
-     */
-    $('#policy_import').button({
-        icons: {
-            primary: 'ui-icon-arrowthick-1-n'
-        }
-    });
-    $('#policy_export').button({
-        icons: {
-            primary: 'ui-icon-arrowthick-1-s'
-        }
-    });
-
-
-     $('#policy_export').click(function(){
-		window.location.href = 'https://' + location.href + '/system/getPolicy/policy.cfg?session=' + getsession();
-	 });
-
-    $('#policy_import').click(function(){
-        $dialog_import_policy.dialog("open");
-    });
-
-    $('#button_policy_add').click(function(){
-        var pol_name = $('#policy_name').val();
-        pol_name = $.trim(pol_name);
-        if (pol_name.length == 0) {
-        alert_box('Policy Name',"text_policy_name_not_empty");
-            return;
-        }
-
-        if ($('#policy_active').is(':checked')) {
-            pol_active = "True";
-        } else {
-            pol_active = "False";
-        }
-
-        $.get('/system/setPolicy',
-            { 'name' : $('#policy_name').val(),
-              'user' : $('#policy_user').val(),
-              'action' : $('#policy_action').val(),
-              'scope' : $('#policy_scope_combo').val(),
-              'realm' : $('#policy_realm').val(),
-              'time' : $('#policy_time').val(),
-              'client' : $('#policy_client').val(),
-              'active' : pol_active,
-              'session':getsession() },
-         function(data, textStatus, XMLHttpRequest){
-            if (data.result.status == true) {
-                alert_info_text("text_policy_set");
-                $('#policy_table').flexReload();
-            }else {
-                alert_info_text(data.result.error.message,"" , ERROR);
-            }
-        });
-    });
-
-    $('#button_policy_delete').click(function(){
-        var policy = get_selected_policy().join(',');
-        if (policy) {
-            $.get('/system/delPolicy', {'name' : policy, 'session':getsession()},
-             function(data, textStatus, XMLHttpRequest){
-                if (data.result.status == true) {
-                    alert_info_text("text_policy_deleted");
-                    $('#policy_table').flexReload();
-                } else {
-                    alert_info_text(data.result.error.message, "", ERROR);
-                }
-            });
-        }
-    });
-
 }
 
