@@ -1777,7 +1777,57 @@ class SelfserviceController(BaseController):
             Session.close()
             log.debug('[userfinshocra2token] done')
 
+    def userelmfinal(self):
+        '''
+        This is the internal disable function that is called from within
+        the self service portal to enable a token
+        '''
+        param = request.params
 
+        param['type'] = "elm_totp"
+        
+        serial = getParam(param, "serial", required)
+                    
+        try:
+            # check selfservice authorization
+            checkPolicyPre('selfservice', 'usersetpin', param, self.authUser)
+
+            otp = getParam(otp, "otp", required)
+
+            (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
+
+            ret = {
+                "success" : ok,
+            }
+
+            if (ok):
+                ret["enable"] = enableToken(True, None, serial)
+            else:
+                if opt == None:
+                    opt = {}
+                ret['error'] = c.audit.get('info')
+                log.error("[userelmfinal] activation failed: %s" % ret['error'])
+                ret['code'] = -309
+
+            Session.commit()
+            return sendResult(response, ret, 1)
+
+        except PolicyException as pe:
+            log.error("[userelmfinal] policy failed: %r" % pe)
+            log.error("[userelmfinal] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, unicode(pe), 1)
+
+        except Exception as e:
+            log.error("[userelmfinal] enabling token %s of user %s failed! %r" % (serial, c.user, e))
+            log.error("[userelmfinal] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, e, 1)
+
+        finally:
+            Session.close()
+            log.debug('[userelmfinal] done')
+            
     def useractivateocratoken(self):
         '''
 
@@ -1872,53 +1922,7 @@ class SelfserviceController(BaseController):
             Session.close()
             log.debug('[useractivateocratoken] done')
 
-    def userelmfinal(self):
-        '''
-        This is the internal disable function that is called from within
-        the self service portal to enable a token
-        '''
-        param = request.params
 
-        try:
-            # check selfservice authorization
-            checkPolicyPre('selfservice', 'webprovisionElm', param, self.authUser)
-
-            serial = getParam(param, "serial", required)
-            otp = getParam(otp, "serial", required)
-
-            (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
-
-            ret = {
-                "success" : ok,
-            }
-
-            if (ok):
-                ret["enable"] = enableToken(True, None, serial)
-            else:
-                if opt == None:
-                    opt = {}
-                ret['error'] = c.audit.get('info')
-                log.error("[userelmfinal] activation failed: %s" % ret['error'])
-                ret['code'] = -309
-
-            Session.commit()
-            return sendResult(response, ret, 1)
-
-        except PolicyException as pe:
-            log.error("[userelmfinal] policy failed: %r" % pe)
-            log.error("[userelmfinal] %s" % traceback.format_exc())
-            Session.rollback()
-            return sendError(response, unicode(pe), 1)
-
-        except Exception as e:
-            log.error("[userelmfinal] enabling token %s of user %s failed! %r" % (serial, c.user, e))
-            log.error("[userelmfinal] %s" % traceback.format_exc())
-            Session.rollback()
-            return sendError(response, e, 1)
-
-        finally:
-            Session.close()
-            log.debug('[userelmfinal] done')
 
 def add_dynamic_selfservice_enrollment(actions):
     '''

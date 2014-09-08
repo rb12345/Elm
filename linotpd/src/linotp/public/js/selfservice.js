@@ -941,7 +941,7 @@ function elmProvisionFinal() {
 	var otp = $('#otp').val();
 	var serial = $('#token_serial').val();
 
-    $.post('/selfservice/userelmconfirm', {
+    $.post('/selfservice/userelmfinal', {
 		otp: otp,
 		serial: serial,
         session : get_selfservice_session()

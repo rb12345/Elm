@@ -2020,10 +2020,11 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             if ((typ == 'oathtoken'
                     and 'webprovisionOATH' not in user_selfservice_actions)
                 or (typ == 'googleauthenticator_time'and
-                    'webprovisionGOOGLEtime' not in user_selfservice_actions and
-                    'webprovisionElm' not in user_selfservice_actions)
+                    'webprovisionGOOGLEtime' not in user_selfservice_actions)
                 or (typ == 'googleauthenticator'
-                    and 'webprovisionGOOGLE' not in user_selfservice_actions)):
+                    and 'webprovisionGOOGLE' not in user_selfservice_actions)
+                or (typ == "elm_totp"
+                    and "webprovisionElm" not in user_selfservice_actions)):
                 log.warning("[userwebprovision] user %r@%r is not allowed to "
                             "call this function!" % (authUser.login,
                                                      authUser.realm))
