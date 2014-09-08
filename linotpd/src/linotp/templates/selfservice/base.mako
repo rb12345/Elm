@@ -28,10 +28,10 @@
 -->
 <html>
 <head>
-<title>${_("Elm Self Service Portal")}</title>
-<meta name="author" content="Richard May">
+<title>${_("LinOTP 2 User self service")}</title>
+<meta name="author" content="Cornelius Kölbel">
 <meta name="date" content="2010-03-14T20:35:38+0100">
-<meta name="copyright" content="University of Oxford">
+<meta name="copyright" content="LSE Leading Security Experts GmbH">
 <meta name="keywords" content="LinOTP 2, self service">
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8">

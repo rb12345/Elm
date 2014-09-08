@@ -70,7 +70,7 @@
 				Elm Authentication System<br>
 				<span class=portalname>${_("Management Portal")}</span>
 				</div>
-		</li>        
+		</li>
 		<li><a href='#'>${_("LinOTP Config")}</a>
             <ul>
                 <li><a href='#' id='menu_edit_resolvers'>${_("useridresolvers")}</a></li>
@@ -126,10 +126,10 @@
     <span id="selected_users_header">${_("selected users")}</span>
     <div id="selected_users"></div>
     <p>
-		User: ${c.login}<br/> 
-		Realm: ${c.realm}</br> 
-		<a id="logout_url" href="${c.logout_url}">${_("Logout")}</a> 
-    </p> 
+		User: ${c.login}<br/>
+		Realm: ${c.realm}</br>
+		<a id="logout_url" href="${c.logout_url}">${_("Logout")}</a>
+    </p>
 
     <div id="realms">
     ${_("Realms")}: <select id=realm></select>
