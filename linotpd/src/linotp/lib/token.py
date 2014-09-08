@@ -316,8 +316,6 @@ def initToken(param, user, tokenrealm=None):
         prefix = param.get('prefix', None)
         serial = genSerial(typ, prefix)
 
-
-
     # if a token was initialized for a user, the param "realm" might be contained.
     # otherwise - without a user the param tokenrealm could be contained.
     log.debug("[initToken] initilizing token %r for user %r " % (serial, user.login))
@@ -382,7 +380,6 @@ def initToken(param, user, tokenrealm=None):
         tokenObj.setDefaults()
 
     tokenObj.update(param)
-
 
     if user is not None and user.login != "" :
         tokenObj.setUser(user, report=True)

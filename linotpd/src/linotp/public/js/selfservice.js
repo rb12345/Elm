@@ -643,11 +643,6 @@ function finishOcra() {
 
 }
 
-
-
-
-
-
 function provisionGoogle() {
     show_waiting();
     var type = "googleauthenticator";
@@ -897,5 +892,61 @@ function view_audit_selfservice() {
             onError: error_flexi,
             onSubmit: load_flexi,
             addTitleToCell: true
+    });
+}
+
+function elmProvision() {
+    show_waiting();
+
+	var pin1 = $('#pin1').val();
+    var pin2 = $('#pin2').val();
+
+    if (pin1 != pin2) {
+		$('#error_pin ').val("PIN codes must match.");
+        hide_waiting();
+    } else {
+        $.post('/selfservice/userwebprovision', {
+			userpin : pin1,
+			type : 'elm_totp',
+            session : get_selfservice_session()
+        }, function(data, textStatus, XMLHttpRequest) {
+            hide_waiting();
+            if (data.result.status == false) {
+				$('#error_pin').val("Error assigning token: " + data.result.error.message);
+            };
+			if (data.result.status == true) {
+				showTokenlist();
+				// The token was successfully initialized and we will display the url
+                //var qr_code = generate_qrcode(10, data.result.value.oathtoken.url);
+                var url = data.result.value.oathtoken.url;
+                var img = data.result.value.oathtoken.img;
+                $('#google_link').attr("href", url);
+                $('#google_qr_code').html(img);
+				$('#provisionElmInstall').hide();
+                $('#provisionElmResultDiv').show();
+			}
+        });
+    }
+}
+
+function elmProvisionFinal() {
+    show_waiting();
+
+	var otp = $('#otp').val();
+
+    $.post('/selfservice/userelmconfirm', {
+		code : code,
+        session : get_selfservice_session()
+    },  function(data, textStatus, XMLHttpRequest) {
+		hide_waiting();
+        if (data.result.status == false) {
+			$('#error_otp').val("Error activating token: " + data.result.error.message);
+        };
+		if (data.result.status == true) {
+			showTokenlist();
+			$('#provisionElmInstall').hide();
+            $('#provisionElmGoogleResultDiv').hide();
+			$('#provisionElmComplete').show();
+		}
     });
 }

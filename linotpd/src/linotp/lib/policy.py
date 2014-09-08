@@ -152,6 +152,7 @@ def getPolicyDefinitions(scope=""):
             'webprovisionOATH': {'type': 'bool'},
             'webprovisionGOOGLE': {'type': 'bool'},
             'webprovisionGOOGLEtime': {'type': 'bool'},
+            'webprovisionElm' : {'type' : 'bool'},
             'max_count_dpw': {'type': 'int'},
             'max_count_hotp': {'type': 'int'},
             'max_count_totp': {'type': 'int'},
@@ -2019,7 +2020,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             if ((typ == 'oathtoken'
                     and 'webprovisionOATH' not in user_selfservice_actions)
                 or (typ == 'googleauthenticator_time'and
-                    'webprovisionGOOGLEtime' not in user_selfservice_actions)
+                    'webprovisionGOOGLEtime' not in user_selfservice_actions and 
+                    'webprovisionElm' not in user_selfservice_actions)
                 or (typ == 'googleauthenticator'
                     and 'webprovisionGOOGLE' not in user_selfservice_actions)):
                 log.warning("[userwebprovision] user %r@%r is not allowed to "

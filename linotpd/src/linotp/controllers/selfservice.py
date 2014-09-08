@@ -278,6 +278,7 @@ class SelfserviceController(BaseController):
                                     'selfservice/userwebprovision',
                                     'selfservice/usergetmultiotp',
                                     'selfservice/userhistory',
+                                    'selfservice/userelmfinal',
                                     'selfservice/index']:
                 if isSelfTest():
                     log.debug("[__after__] Doing selftest!")
@@ -527,6 +528,12 @@ class SelfserviceController(BaseController):
             Session.close()
             log.debug('[webprovisiongoogletoken] done')
 
+    def webprovisionelm(self):
+        '''
+            Form for Elm token adding. Basically a merged PIN and Google Authenticator form.
+        '''
+        return render('/selfservice/webprovisionelm.mako')
+        
 ###### API functions
     def userhistory(self):
         '''
@@ -1378,6 +1385,7 @@ class SelfserviceController(BaseController):
             ret = {}
             ret1 = False
             ret2 = False
+            ret3 = False
             param.update(request.params)
 
             # check selfservice authorization
@@ -1449,6 +1457,7 @@ class SelfserviceController(BaseController):
 
                 log.debug("[userwebprovision] Initializing the token serial: %s, desc: %s for user %s @ %s." %
                         (serial, desc, self.authUser.login, self.authUser.realm))
+                        
                 (ret1, tokenObj) = initToken({ 'type': t_type,
                                 'serial': serial,
                                 'otplen': 6,
@@ -1471,8 +1480,60 @@ class SelfserviceController(BaseController):
                             'counter' : 0,
                             'digits':   6,
                         }
+            elif type.lower == "elm_totp":
+                desc	 = "Google Authenticator web prov"
+
+                # ideal: 32 byte.
+                otpkey = generate_otpkey(32)
+                t_type = "totp"
+
+                if prefix is None:
+                    prefix = "GOOG"
+                if serial is None:
+                    serial = genSerial(t_type, prefix)
+
+                log.debug("[userwebprovision] Initializing the token serial: %s, desc: %s for user %s @ %s." %
+                        (serial, desc, self.authUser.login, self.authUser.realm))
+                        
+                (ret1, tokenObj) = initToken({ 'type': t_type,
+                                'serial': serial,
+                                'otplen': 6,
+                                'description' : desc,
+                                'otpkey' : otpkey,
+                                'timeStep' : 30,
+                                'timeWindow' : 180,
+                                'hashlib' : "sha1"
+                                }, self.authUser)
+
+                userPin = getParam(param, "userpin", required)
+
+                check_res = checkOTPPINPolicy(userPin, self.authUser)
+
+                if not check_res['success']:
+                    log.warning("[usersetpin] Setting of OTP PIN for Token %s by user %s failed: %s" % (serial, c.user, check_res['error']))
+                    return sendError(response, u"Setting OTP PIN failed: %s" % check_res['error'])
+
+                if 1 == getOTPPINEncrypt(serial=serial, user=User(c.user, "", c.realm)):
+                    param['encryptpin'] = "True"
+                        
+                ret2 = setPin(userPin, None, serial)
+                
+                ret3 = enableToken(False, None, serial)                
+                if ret1:
+                        url = create_google_authenticator_url(self.authUser.login, self.authUser.realm, otpkey, serial=serial, type=t_type)
+                        label = "%s@%s" % (self.authUser.login, self.authUser.realm)
+                        ret = {
+                            'url' :     url,
+                            'img' :     create_img(url, width=300, alt=serial),
+                            'key' :     otpkey,
+                            'label' :   label,
+                            'serial' :  serial,
+                            'counter' : 0,
+                            'digits':   6,
+                        }
+
             else:
-                return sendError(response, "valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time'. You provided %s" % type)
+                return sendError(response, "valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time' and'elm_totp'. You provided %s" % type)
 
             logTokenNum()
             c.audit['serial'] = serial
@@ -1489,7 +1550,7 @@ class SelfserviceController(BaseController):
                 # TODO: This random PIN could be processed.
 
             Session.commit()
-            return sendResult(response, { 'init': ret1, 'setpin' : ret2, 'oathtoken' : ret})
+            return sendResult(response, { 'init': ret1, 'setpin' : ret2, 'oathtoken' : ret, 'enable' : ret3})
 
         except PolicyException as pe:
             log.error("[userwebprovision] policy failed: %r" % pe)
@@ -1811,6 +1872,7 @@ class SelfserviceController(BaseController):
             Session.close()
             log.debug('[useractivateocratoken] done')
 
+    
 
 def add_dynamic_selfservice_enrollment(actions):
     '''

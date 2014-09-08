@@ -792,7 +792,8 @@ class ValidateController(BaseController):
                     
                 sqlQuery = Session.query(model.Token).with_lockmode("update").filter(
                    model.Token.LinOtpUserid == userid).filter(
-                    model.Token.LinOtpIdResClass == idResolverClass)
+                    model.Token.LinOtpIdResClass == idResolverClass).filter(
+                     model.Token.LinOtpIsactive == 1)
 
                 tokenList = []
                 for token in sqlQuery:
