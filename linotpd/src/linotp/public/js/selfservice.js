@@ -930,6 +930,9 @@ function elmProvision() {
 
 				// Regenerate the now-visible accordion so it's got the right height (it defaults to 0 if it's initialized while hidden)
 				$('#accordion2').accordion('refresh');
+
+				// Disable the previous submit button. Otherwise, hitting enter tries to register another token for some reason.
+				$('#elmprovision').attr('disabled', 'disabled');
 			}
         });
     }
@@ -947,14 +950,17 @@ function elmProvisionFinal() {
         session : get_selfservice_session()
     },  function(data, textStatus, XMLHttpRequest) {
 		hide_waiting();
-        if (data.result.status == false || data.result.value.success == false) {
-			$('#error_otp').text("Error activating token: " + data.result.error.message + ". Please try again.");
-        };
-		if (data.result.status == true && data.result.value.success == true) {
+        if (data.result.status == false) {
+			$('#error_otp').text("Error activating token: " + data.result.error + ". Please try again.");
+        }
+		else if (data.result.value.success == false) {
+			$('#error_otp').text("Error activating token: " + data.result.value.error + ". Please try again.");
+		}
+		else {
 				showTokenlist();
 				$('#provisionElmInstall').hide();
-				$('#provisionElmGoogleResultDiv').hide();
+				$('#provisionElmResultDiv').hide();
 				$('#provisionElmComplete').show();
-		}
+		};
     });
 }

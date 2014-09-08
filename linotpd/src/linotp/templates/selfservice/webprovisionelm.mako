@@ -62,7 +62,7 @@
 							<td><input id="pin2" autocomplete="off" type="password" placeholder="Confirm PIN" size="10" maxlength="4" tabindex="1" onkeyup="checkpins('pin1', 'pin2');" class="text ui-widget-content ui-corner-all"/></td>
 						</tr>
 					</table>
-					<button class='action-button' onclick="elmProvision(); return false;">
+					<button class='action-button' id="elmprovision" onclick="elmProvision(); return false;">
 						${_("Activate token")}
 					</button>
 				</li>
@@ -94,7 +94,7 @@
 							<td><input id="otp" autocomplete="off" type="password" placeholder="Access Code" size="10" maxlength="10" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
 						</tr>
 					</table>
-					<button class='action-button' onclick="elmProvisionFinal(); return false;">
+					<button class='action-button' id="elmfinal" onclick="elmProvisionFinal(); return false;">
 						${_("Finish installation")}
 					</button>
 					<input type=hidden id=token_serial value="">
@@ -109,11 +109,13 @@
 </div>
 
 <script>
+		// Initial display.
 		$('#provisionElmInstall').show();
 	   	$('#provisionElmResultDiv').hide();
 		$('#provisionElmComplete').hide();
 	   	$('#qr_code_download').show();
 	   	$('#qr_code_download').html(generate_qrcode(10,"https://mfa-test.bsp.ox.ac.uk/selfservice/authenticator.html"));
+		// Set up the accordion drop-downs for the QR codes.
 		$(function() {
 			$("#accordion").accordion({
 				'collapsible' : true,
@@ -126,4 +128,5 @@
 				'active' : false
 			});
 		});
+
 </script>

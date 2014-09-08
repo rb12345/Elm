@@ -135,7 +135,7 @@
 		<li><a href="/selfservice/reset"><span>${_("Reset Failcounter")}</span></a></li>
 		%endif
 		%if 'setOTPPIN' in c.actions:
-		<li><a href="/selfservice/setpin"><span>${_("set PIN")}</span></a></li>
+		<li><a href="/selfservice/setpin"><span>${_("Change Token PIN")}</span></a></li>
 		%endif
 		%if 'setMOTPPIN' in c.actions:
 		<li><a href="/selfservice/setmpin"><span>${_("set mOTP PIN")}</span></a></li>

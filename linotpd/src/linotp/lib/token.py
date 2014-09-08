@@ -1310,7 +1310,7 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
             #any valid otp increments, independend of the tokens state !!
             token.incOtpCounter(matchinCounter)
 
-            if (token.isActive() == True):
+            if ("allow_inactive" in options or token.isActive() == True):
                 if token.getFailCount() < token.getMaxFailCount():
                     if token.check_auth_counter():
                         if token.check_validity_period():

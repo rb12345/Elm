@@ -1784,17 +1784,16 @@ class SelfserviceController(BaseController):
         '''
         param = request.params
 
-        param['type'] = "elm_totp"
-        
         serial = getParam(param, "serial", required)
-                    
+
         try:
             # check selfservice authorization
             checkPolicyPre('selfservice', 'usersetpin', param, self.authUser)
 
-            otp = getParam(otp, "otp", required)
+            otp = getParam(param, "otp", required)
 
-            (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
+            # Check the passcode (and indicate that inactive tokens should be considered valid in this case)
+            (ok, opt) = checkSerialPass(serial, otp, options = {"allow_inactive" : True}, user=self.authUser)
 
             ret = {
                 "success" : ok,
@@ -1802,11 +1801,12 @@ class SelfserviceController(BaseController):
 
             if (ok):
                 ret["enable"] = enableToken(True, None, serial)
+                log.info("[userelmfinal] Activated token %s for user %s." % (serial, c.user))
             else:
                 if opt == None:
                     opt = {}
                 ret['error'] = c.audit.get('info')
-                log.error("[userelmfinal] activation failed: %s" % ret['error'])
+                log.error("[userelmfinal] Activation of token %s for user %s failed: %s" % (serial, c.user, ret['error']))
                 ret['code'] = -309
 
             Session.commit()
@@ -1827,7 +1827,7 @@ class SelfserviceController(BaseController):
         finally:
             Session.close()
             log.debug('[userelmfinal] done')
-            
+
     def useractivateocratoken(self):
         '''
 
