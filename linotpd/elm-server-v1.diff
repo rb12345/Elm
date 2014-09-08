@@ -63,7 +63,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      log.debug("[get_resolver_module_list] %s " % config_modules)
 --- a/linotp/controllers/account.py
 +++ b/linotp/controllers/account.py
-@@ -104,56 +104,26 @@
+@@ -104,57 +104,26 @@
  
      def login(self):
          log.debug("[login] selfservice login screen")
@@ -129,11 +129,13 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +        url_scheme = request.environ.get("wsgi.url_scheme")
 +        redirect("%s://%s/elm/logout" % (url_scheme, http_host))
 +        #redirect('https://webauth.ox.ac.uk/logout')
-+
+ 
 +        Session.close()
  
+-#eof##########################################################################
  
- #eof##########################################################################
++#eof##########################################################################
+\ No newline at end of file
 --- a/linotp/controllers/admin.py
 +++ b/linotp/controllers/admin.py
 @@ -2142,6 +2142,16 @@
@@ -284,7 +286,15 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  log.debug("[__before__] set the self.authUser to: %s, %s " % (self.authUser.login, self.authUser.realm))
                  log.debug('[__before__] param for action %s: %s' % (action, param))
  
-@@ -289,9 +289,10 @@
+@@ -278,6 +278,7 @@
+                                     'selfservice/userwebprovision',
+                                     'selfservice/usergetmultiotp',
+                                     'selfservice/userhistory',
++                                    'selfservice/userelmfinal',
+                                     'selfservice/index']:
+                 if isSelfTest():
+                     log.debug("[__after__] Doing selftest!")
+@@ -289,9 +290,10 @@
                          c.user = "--ua--"
                          env = request.environ
                          uuser = env.get('REMOTE_USER')
@@ -298,16 +308,186 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      ### This makes no sense...
      #                c.audit['user'] = c.user
      #                c.audit['realm'] =  c.realm
-@@ -1442,7 +1443,7 @@
+@@ -526,6 +528,12 @@
+             Session.close()
+             log.debug('[webprovisiongoogletoken] done')
+ 
++    def webprovisionelm(self):
++        '''
++            Form for Elm token adding. Basically a merged PIN and Google Authenticator form.
++        '''
++        return render('/selfservice/webprovisionelm.mako')
++
+ ###### API functions
+     def userhistory(self):
+         '''
+@@ -1377,6 +1385,7 @@
+             ret = {}
+             ret1 = False
+             ret2 = False
++            ret3 = False
+             param.update(request.params)
+ 
+             # check selfservice authorization
+@@ -1442,12 +1451,50 @@
                      t_type = "totp"
  
                  if prefix is None:
 -                    prefix = "LSGO"
 +                    prefix = "GOOG"
++                if serial is None:
++                    serial = genSerial(t_type, prefix)
++
++                log.debug("[userwebprovision] Initializing the token serial: %s, desc: %s for user %s @ %s." %
++                        (serial, desc, self.authUser.login, self.authUser.realm))
++
++                (ret1, tokenObj) = initToken({ 'type': t_type,
++                                'serial': serial,
++                                'otplen': 6,
++                                'description' : desc,
++                                'otpkey' : otpkey,
++                                'timeStep' : 30,
++                                'timeWindow' : 180,
++                                'hashlib' : "sha1"
++                                }, self.authUser)
++
++                if ret1:
++                        url = create_google_authenticator_url(self.authUser.login, self.authUser.realm, otpkey, serial=serial, type=t_type)
++                        label = "%s@%s" % (self.authUser.login, self.authUser.realm)
++                        ret = {
++                            'url' :     url,
++                            'img' :     create_img(url, width=300, alt=serial),
++                            'key' :     otpkey,
++                            'label' :   label,
++                            'serial' :  serial,
++                            'counter' : 0,
++                            'digits':   6,
++                        }
++            elif type.lower() == "elm_totp":
++                desc	 = "Google Authenticator web prov"
++
++                # ideal: 32 byte.
++                otpkey = generate_otpkey(32)
++                t_type = "totp"
++
++                if prefix is None:
++                    prefix = "GOOG"
                  if serial is None:
                      serial = genSerial(t_type, prefix)
  
-@@ -1822,7 +1823,7 @@
+                 log.debug("[userwebprovision] Initializing the token serial: %s, desc: %s for user %s @ %s." %
+                         (serial, desc, self.authUser.login, self.authUser.realm))
++
+                 (ret1, tokenObj) = initToken({ 'type': t_type,
+                                 'serial': serial,
+                                 'otplen': 6,
+@@ -1458,6 +1505,20 @@
+                                 'hashlib' : "sha1"
+                                 }, self.authUser)
+ 
++                userPin = getParam(param, "userpin", required)
++
++                check_res = checkOTPPINPolicy(userPin, self.authUser)
++
++                if not check_res['success']:
++                    log.warning("[usersetpin] Setting of OTP PIN for Token %s by user %s failed: %s" % (serial, c.user, check_res['error']))
++                    return sendError(response, u"Setting OTP PIN failed: %s" % check_res['error'])
++
++                if 1 == getOTPPINEncrypt(serial=serial, user=User(c.user, "", c.realm)):
++                    param['encryptpin'] = "True"
++
++                ret2 = setPin(userPin, None, serial)
++
++                ret3 = enableToken(False, None, serial)
+                 if ret1:
+                         url = create_google_authenticator_url(self.authUser.login, self.authUser.realm, otpkey, serial=serial, type=t_type)
+                         label = "%s@%s" % (self.authUser.login, self.authUser.realm)
+@@ -1470,8 +1531,9 @@
+                             'counter' : 0,
+                             'digits':   6,
+                         }
++
+             else:
+-                return sendError(response, "valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time'. You provided %s" % type)
++                return sendError(response, "Valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time' and 'elm_totp'. You provided %s" % type)
+ 
+             logTokenNum()
+             c.audit['serial'] = serial
+@@ -1488,7 +1550,7 @@
+                 # TODO: This random PIN could be processed.
+ 
+             Session.commit()
+-            return sendResult(response, { 'init': ret1, 'setpin' : ret2, 'oathtoken' : ret})
++            return sendResult(response, { 'init': ret1, 'setpin' : ret2, 'oathtoken' : ret, 'enable' : ret3})
+ 
+         except PolicyException as pe:
+             log.error("[userwebprovision] policy failed: %r" % pe)
+@@ -1715,6 +1777,56 @@
+             Session.close()
+             log.debug('[userfinshocra2token] done')
+ 
++    def userelmfinal(self):
++        '''
++        This is the internal disable function that is called from within
++        the self service portal to enable a token
++        '''
++        param = request.params
++
++        serial = getParam(param, "serial", required)
++
++        try:
++            # check selfservice authorization
++            checkPolicyPre('selfservice', 'usersetpin', param, self.authUser)
++
++            otp = getParam(param, "otp", required)
++
++            # Check the passcode (and indicate that inactive tokens should be considered valid in this case)
++            (ok, opt) = checkSerialPass(serial, otp, options = {"allow_inactive" : True}, user=self.authUser)
++
++            ret = {
++                "success" : ok,
++            }
++
++            if (ok):
++                ret["enable"] = enableToken(True, None, serial)
++                log.info("[userelmfinal] Activated token %s for user %s." % (serial, c.user))
++            else:
++                if opt == None:
++                    opt = {}
++                ret['error'] = c.audit.get('info')
++                log.error("[userelmfinal] Activation of token %s for user %s failed: %s" % (serial, c.user, ret['error']))
++                ret['code'] = -309
++
++            Session.commit()
++            return sendResult(response, ret, 1)
++
++        except PolicyException as pe:
++            log.error("[userelmfinal] policy failed: %r" % pe)
++            log.error("[userelmfinal] %s" % traceback.format_exc())
++            Session.rollback()
++            return sendError(response, unicode(pe), 1)
++
++        except Exception as e:
++            log.error("[userelmfinal] enabling token %s of user %s failed! %r" % (serial, c.user, e))
++            log.error("[userelmfinal] %s" % traceback.format_exc())
++            Session.rollback()
++            return sendError(response, e, 1)
++
++        finally:
++            Session.close()
++            log.debug('[userelmfinal] done')
+ 
+     def useractivateocratoken(self):
+         '''
+@@ -1811,6 +1923,7 @@
+             log.debug('[useractivateocratoken] done')
+ 
+ 
++
+ def add_dynamic_selfservice_enrollment(actions):
+     '''
+         add_dynamic_actions - load the html of the dynamic tokens
+@@ -1822,7 +1935,7 @@
          :return: hash of {tokentype : html for tab}
      '''
  
@@ -316,7 +496,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      g = config['pylons.app_globals']
      tokenclasses = g.tokenclasses
  
-@@ -1843,7 +1844,7 @@
+@@ -1843,7 +1956,7 @@
                      ''' remove empty lines '''
                      t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
                      e_name = "%s.%s.%s" % (tok, 'selfservice', 'enroll')
@@ -325,7 +505,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
                  ## check if there are other selfserive policy actions
                  policy = tclass_object.getClassInfo('policy', ret=None)
-@@ -1861,14 +1862,14 @@
+@@ -1861,14 +1974,14 @@
                              ''' remove empty lines '''
                              t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
                              e_name = "%s.%s.%s" % (tok, 'selfservice', action)
@@ -425,7 +605,8 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +
 +                sqlQuery = Session.query(model.Token).with_lockmode("update").filter(
 +                   model.Token.LinOtpUserid == userid).filter(
-+                    model.Token.LinOtpIdResClass == idResolverClass)
++                    model.Token.LinOtpIdResClass == idResolverClass).filter(
++                     model.Token.LinOtpIsactive == 1)
 +
 +                tokenList = []
 +                for token in sqlQuery:
@@ -440,8 +621,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +            log.error("[webkdc_userinfo] %s" % traceback.format_exc())
 +
 +            Session.rollback()
-+            return sendError(response, u"validate/webkdc_userinfo failed: %s"
-+                             % unicode(exx), 0)
++            return sendError(response, u"validate/webkdc_userinfo failed: %s" % unicode(exx), 0)
 +        finally:
 +            Session.close()
 +
@@ -483,8 +663,8 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +            log.error("[webkdc_validate] %s" % traceback.format_exc())
 +
 +            Session.rollback()
-+            return sendError(response, u"validate/webkdc_validate failed: %s"
-+                             % unicode(exx), 0)
++            return sendError(response, u"validate/webkdc_validate failed: %s" % unicode(exx), 0)
++
 +        finally:
 +            Session.close()
 +
@@ -514,7 +694,24 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
 --- a/linotp/lib/token.py
 +++ b/linotp/lib/token.py
-@@ -1254,6 +1254,8 @@
+@@ -316,8 +316,6 @@
+         prefix = param.get('prefix', None)
+         serial = genSerial(typ, prefix)
+ 
+-
+-
+     # if a token was initialized for a user, the param "realm" might be contained.
+     # otherwise - without a user the param tokenrealm could be contained.
+     log.debug("[initToken] initilizing token %r for user %r " % (serial, user.login))
+@@ -383,7 +381,6 @@
+ 
+     tokenObj.update(param)
+ 
+-
+     if user is not None and user.login != "" :
+         tokenObj.setUser(user, report=True)
+ 
+@@ -1254,6 +1251,8 @@
                        (typ, tokenclasses))
              continue
  
@@ -523,7 +720,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
          ## now check if the token is in the same realm as the user
          if user is not None:
              t_realms = token.token.getRealmNames()
-@@ -1261,6 +1263,7 @@
+@@ -1261,6 +1260,7 @@
              if (len(t_realms) > 0 and len(u_realm) > 0 and
                  u_realm.lower() not in t_realms) :
                  continue
@@ -531,7 +728,16 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
          tok_va = linotp.lib.validate.ValidateToken(token, context=c)
          ## in case of a failure during checking token, we log the error and
-@@ -1335,6 +1338,7 @@
+@@ -1310,7 +1310,7 @@
+             #any valid otp increments, independend of the tokens state !!
+             token.incOtpCounter(matchinCounter)
+ 
+-            if (token.isActive() == True):
++            if ("allow_inactive" in options or token.isActive() == True):
+                 if token.getFailCount() < token.getMaxFailCount():
+                     if token.check_auth_counter():
+                         if token.check_validity_period():
+@@ -1335,6 +1335,7 @@
          sortedAuditList = sorted(auditList, key=lambda audit_entry: audit_entry.get("weight", 0))
          highest_audit = sortedAuditList[-1]
          c.audit['action_detail'] = highest_audit.get('action_detail', '')
@@ -988,6 +1194,92 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
      return false;
  
+@@ -643,11 +643,6 @@
+ 
+ }
+ 
+-
+-
+-
+-
+-
+ function provisionGoogle() {
+     show_waiting();
+     var type = "googleauthenticator";
+@@ -899,3 +894,73 @@
+             addTitleToCell: true
+     });
+ }
++
++function elmProvision() {
++    show_waiting();
++
++	var pin1 = $('#pin1').val();
++    var pin2 = $('#pin2').val();
++
++    if (pin1 != pin2) {
++		$('#error_pin').text("PIN codes must match.");
++        hide_waiting();
++    } else {
++        $.post('/selfservice/userwebprovision', {
++			userpin : pin1,
++			type : 'elm_totp',
++            session : get_selfservice_session()
++        }, function(data, textStatus, XMLHttpRequest) {
++            hide_waiting();
++            if (data.result.status == false) {
++				$('#error_pin').text("Error assigning token: " + data.result.error.message);
++            };
++			if (data.result.status == true) {
++				showTokenlist();
++				// The token was successfully initialized and we will display the url
++                //var qr_code = generate_qrcode(10, data.result.value.oathtoken.url);
++                var url = data.result.value.oathtoken.url;
++                var img = data.result.value.oathtoken.img;
++                $('#google_link').attr("href", url);
++                $('#google_qr_code').html(img);
++				$('#provisionElmInstall').hide();
++                $('#provisionElmResultDiv').show();
++
++				// Store the token's serial number for now. We send it back to the server in the next step.
++				$('#token_serial').val(data.result.value.oathtoken.serial);
++
++				// Regenerate the now-visible accordion so it's got the right height (it defaults to 0 if it's initialized while hidden)
++				$('#accordion2').accordion('refresh');
++
++				// Disable the previous submit button. Otherwise, hitting enter tries to register another token for some reason.
++				$('#elmprovision').attr('disabled', 'disabled');
++			}
++        });
++    }
++}
++
++function elmProvisionFinal() {
++    show_waiting();
++
++	var otp = $('#otp').val();
++	var serial = $('#token_serial').val();
++
++    $.post('/selfservice/userelmfinal', {
++		otp: otp,
++		serial: serial,
++        session : get_selfservice_session()
++    },  function(data, textStatus, XMLHttpRequest) {
++		hide_waiting();
++        if (data.result.status == false) {
++			$('#error_otp').text("Error activating token: " + data.result.error + ". Please try again.");
++        }
++		else if (data.result.value.success == false) {
++			$('#error_otp').text("Error activating token: " + data.result.value.error + ". Please try again.");
++		}
++		else {
++				showTokenlist();
++				$('#provisionElmInstall').hide();
++				$('#provisionElmResultDiv').hide();
++				$('#provisionElmComplete').show();
++		};
++    });
++}
 --- /dev/null
 +++ b/linotp/public/manage/custom-style.css
 @@ -0,0 +1,147 @@
@@ -1141,7 +1433,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 \ No newline at end of file
 --- /dev/null
 +++ b/linotp/public/selfservice/custom-style.css
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,72 @@
 +a {
 + 	color: #3277AE;
 +}
@@ -1188,6 +1480,10 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +
 + #logout {
 +	color: #3277AE;
++ }
++ 
++ #error_pin, #error_otp {
++	color: #FF0000;
 + }
 + 
 +/* float the logo left and the title right to match the admin page */
@@ -1345,3 +1641,132 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  	<span class=portalname>${_("Selfservice Portal")}</span>
  	</div>
  </div>
+@@ -115,6 +115,10 @@
+ 			<li><a href="/selfservice/webprovisiongoogletoken"><span>${_("Enroll Google Authenticator")}</span></a></li>
+ 		%endif
+ 
++		% if 'webprovisionElm' in c.actions:
++			<li><a href="/selfservice/webprovisionelm"><span>${_("Activate Two-Factor Authentication")}</span></a></li>
++		%endif
++
+ 		% if 'assign' in c.actions:
+ 			<li><a href="/selfservice/assign"><span>${_("Assign Token")}</span></a></li>
+ 		%endif
+@@ -131,7 +135,7 @@
+ 		<li><a href="/selfservice/reset"><span>${_("Reset Failcounter")}</span></a></li>
+ 		%endif
+ 		%if 'setOTPPIN' in c.actions:
+-		<li><a href="/selfservice/setpin"><span>${_("set PIN")}</span></a></li>
++		<li><a href="/selfservice/setpin"><span>${_("Change Token PIN")}</span></a></li>
+ 		%endif
+ 		%if 'setMOTPPIN' in c.actions:
+ 		<li><a href="/selfservice/setmpin"><span>${_("set mOTP PIN")}</span></a></li>
+--- a/linotp/lib/policy.py
++++ b/linotp/lib/policy.py
+@@ -152,6 +152,7 @@
+             'webprovisionOATH': {'type': 'bool'},
+             'webprovisionGOOGLE': {'type': 'bool'},
+             'webprovisionGOOGLEtime': {'type': 'bool'},
++            'webprovisionElm': {'type' : 'bool'},
+             'max_count_dpw': {'type': 'int'},
+             'max_count_hotp': {'type': 'int'},
+             'max_count_totp': {'type': 'int'},
+@@ -2021,7 +2022,9 @@
+                 or (typ == 'googleauthenticator_time'and
+                     'webprovisionGOOGLEtime' not in user_selfservice_actions)
+                 or (typ == 'googleauthenticator'
+-                    and 'webprovisionGOOGLE' not in user_selfservice_actions)):
++                    and 'webprovisionGOOGLE' not in user_selfservice_actions)
++                or (typ == "elm_totp"
++                    and "webprovisionElm" not in user_selfservice_actions)):
+                 log.warning("[userwebprovision] user %r@%r is not allowed to "
+                             "call this function!" % (authUser.login,
+                                                      authUser.realm))
+--- a/linotp/templates/selfservice/webprovisionelm.mako
++++ b/linotp/templates/selfservice/webprovisionelm.mako
+@@ -27,7 +27,7 @@
+ -->
+ <h1>${_("Activate Two-Factor Authentication")}</h1>
+ 
+-<div id='googletokenform'>
++<div id='elmform'>
+ 	<form class="cmxform" name='myForm'> 
+ 		<fieldset>
+ 			<ol id="provisionElmInstall">
+@@ -45,24 +45,24 @@
+ 						</div>
+ 					</div>
+ 				</li>
+-				<li>Choose a PIN code for the new token. Your PIN is required whenever you are asked for an access code - for example, if your PIN
++				<li>Choose a four-digit PIN code for the new token. Your PIN is required whenever you are asked for an access code - for example, if your PIN
+ 					is 1234 and your one-time-password is 000000, you would enter '1234000000'.
+ 					<table>
+-						<tr><td class="error_pin"></td></tr>
++						<tr><td><span id=error_pin></span></td></tr>
+ 						<tr>
+ 							<!--[if lte IE 9]>
+ 								<td><label class="ie-label" for="pin1">PIN</label></td>
+ 							<![endif]-->
+-							<td><input id="pin1" autocomplete="off" type="password" placeholder="PIN" size="10" maxlength="10" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
++							<td><input id="pin1" autocomplete="off" type="password" placeholder="PIN" size="10" maxlength="4" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
+ 						</tr>
+ 						<tr>
+ 							<!--[if lte IE 9]>
+ 								<td><label class="ie-label" for="pin2">Confirm PIN</label></td>
+ 							<![endif]-->						
+-							<td><input id="pin2" autocomplete="off" type='password' placeholder="Confirm PIN" onkeyup="checkpins('pin1', 'pin2');" class="text ui-widget-content ui-corner-all"/></td>
++							<td><input id="pin2" autocomplete="off" type="password" placeholder="Confirm PIN" size="10" maxlength="4" tabindex="1" onkeyup="checkpins('pin1', 'pin2');" class="text ui-widget-content ui-corner-all"/></td>
+ 						</tr>
+ 					</table>
+-					<button class='action-button' onclick="elmProvision(); return false;">
++					<button class='action-button' id="elmprovision" onclick="elmProvision(); return false;">
+ 						${_("Activate token")}
+ 					</button>
+ 				</li>
+@@ -86,7 +86,7 @@
+ 					on Single Sign On pages until you complete this step.
+ 					
+ 					<table>
+-						<tr><td class="error_otp"></td></tr>
++						<tr><td><span id=error_otp></span></td></tr>
+ 						<tr>
+ 							<!--[if lte IE 9]>
+ 								<td><label class="ie-label" for="otp">Access Code</label></td>
+@@ -94,24 +94,28 @@
+ 							<td><input id="otp" autocomplete="off" type="password" placeholder="Access Code" size="10" maxlength="10" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
+ 						</tr>
+ 					</table>
+-					<button class='action-button' onclick="elmProvisionFinal(); return false;">
++					<button class='action-button' id="elmfinal" onclick="elmProvisionFinal(); return false;">
+ 						${_("Finish installation")}
+ 					</button>
++					<input type=hidden id=token_serial value="">
+ 				</li>
+ 			</ol>
+ 			<div id="provisionElmComplete">
+ 				<p>Your token has now been activated. Single Sign-On pages will now prompt you for an access code when you attempt to login.</p>
+ 			</div>
+ 		</fieldset>
++		
+ 	</form>
+ </div>
+ 
+ <script>
++		// Initial display.
+ 		$('#provisionElmInstall').show();
+ 	   	$('#provisionElmResultDiv').hide();
+ 		$('#provisionElmComplete').hide();
+ 	   	$('#qr_code_download').show();
+ 	   	$('#qr_code_download').html(generate_qrcode(10,"https://mfa-test.bsp.ox.ac.uk/selfservice/authenticator.html"));
++		// Set up the accordion drop-downs for the QR codes.
+ 		$(function() {
+ 			$("#accordion").accordion({
+ 				'collapsible' : true,
+@@ -124,4 +128,5 @@
+ 				'active' : false
+ 			});
+ 		});
++
+ </script>
+Binary files a/linotp/public/favicon.ico and b/linotp/public/favicon.ico differ
+Binary files /dev/null and b/linotp/public/images/crest.png differ
