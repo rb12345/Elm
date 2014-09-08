@@ -249,7 +249,7 @@ class ValidateController(BaseController):
 
                     opt['error'] = c.audit.get('info')
                     log.error("[check] authorization failed for validate/check: %s" % opt['error'])
-                        
+
             except (AuthorizeException, ParameterError) as exx:
                 log.warning("[check] authorization failed for validate/check: %r"
                             % exx)
@@ -783,13 +783,13 @@ class ValidateController(BaseController):
 
     def webkdc_userinfo(self):
         param = {}
-        
+
         try:
             param.update(request.params)
             user = getUserFromParam(param, optionalOrRequired = True)
-            if (user is not None and user.isEmpty() == False):  
+            if (user is not None and user.isEmpty() == False):
                 (userid, idResolver, idResolverClass) = getUserId(user)
-                    
+
                 sqlQuery = Session.query(model.Token).with_lockmode("update").filter(
                    model.Token.LinOtpUserid == userid).filter(
                     model.Token.LinOtpIdResClass == idResolverClass).filter(
@@ -798,7 +798,7 @@ class ValidateController(BaseController):
                 tokenList = []
                 for token in sqlQuery:
                     tokenList.append(token.LinOtpTokenSerialnumber)
-                    
+
             Session.commit()
 
             return sendResult(response, tokenList, 0)
@@ -806,55 +806,54 @@ class ValidateController(BaseController):
         except Exception as exx:
             log.error("[webkdc_userinfo] validate/webkdc_userinfo failed: %r" % exx)
             log.error("[webkdc_userinfo] %s" % traceback.format_exc())
- 
+
             Session.rollback()
-            return sendError(response, u"validate/webkdc_userinfo failed: %s"
-                             % unicode(exx), 0)
+            return sendError(response, u"validate/webkdc_userinfo failed: %s" % unicode(exx), 0)
         finally:
             Session.close()
-            
+
     def webkdc_validate(self):
         param = {}
-                
+
         try:
             param.update(request.params)
             username = param["user"]
             code = param["code"]
-            
+
             user = User(username, "", "")
-            
+
             if ('token' in param):
                 serial = param["token"]
                 (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
             else:
-                (ok, opt) = checkUserPass(user, code)          
+                (ok, opt) = checkUserPass(user, code)
 
             ret = {
                 "success" : ok,
             }
 
             if (ok):
-                ret['expiration']  = round(time.time()) + 60 * 60, # one hour from now      
+                ret['expiration']  = round(time.time()) + 60 * 60, # one hour from now
             else:
                 if opt == None:
                     opt = {}
                 ret['error'] = c.audit.get('info')
                 log.error("[webkdc_validate] authorization failed: %s" % ret['error'])
                 ret['code'] = -310
-            
+
             Session.commit()
-            
+
             return sendResult(response, ret, 0, opt=opt)
-                        
+
         except Exception as exx:
             log.error("[webkdc_validate] validate/webkdc_validate failed: %r" % exx)
             log.error("[webkdc_validate] %s" % traceback.format_exc())
- 
+
             Session.rollback()
-            return sendError(response, u"validate/webkdc_validate failed: %s"
-                             % unicode(exx), 0)   
+            return sendError(response, u"validate/webkdc_validate failed: %s" % unicode(exx), 0)
+
         finally:
             Session.close()
-            
+
 #eof###########################################################################
 

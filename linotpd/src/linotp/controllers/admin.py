@@ -2141,13 +2141,13 @@ class AdminController(BaseController):
                 res['result'] = True
                 res['rows'] = num
                 res['err_string'] = err_str
-            
+
             elif type == "oak":
                 import useridresolver.OakIdResolver
-                
+
                 param['OAKREALM'] = getParam(param, 'oak_realm', required)
                 param['SIZELIMIT'] = getParam(param, 'oak_sizelimit', required)
-                
+
                 (success, desc) = useridresolver.OakIdResolver.IdResolver.testconnection(param)
                 res['result'] = success
                 res['desc'] = str(desc)

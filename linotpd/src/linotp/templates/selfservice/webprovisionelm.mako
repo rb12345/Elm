@@ -27,7 +27,7 @@
 -->
 <h1>${_("Activate Two-Factor Authentication")}</h1>
 
-<div id='googletokenform'>
+<div id='elmform'>
 	<form class="cmxform" name='myForm'> 
 		<fieldset>
 			<ol id="provisionElmInstall">
@@ -45,21 +45,21 @@
 						</div>
 					</div>
 				</li>
-				<li>Choose a PIN code for the new token. Your PIN is required whenever you are asked for an access code - for example, if your PIN
+				<li>Choose a four-digit PIN code for the new token. Your PIN is required whenever you are asked for an access code - for example, if your PIN
 					is 1234 and your one-time-password is 000000, you would enter '1234000000'.
 					<table>
-						<tr><td class="error_pin"></td></tr>
+						<tr><td><span id=error_pin></span></td></tr>
 						<tr>
 							<!--[if lte IE 9]>
 								<td><label class="ie-label" for="pin1">PIN</label></td>
 							<![endif]-->
-							<td><input id="pin1" autocomplete="off" type="password" placeholder="PIN" size="10" maxlength="10" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
+							<td><input id="pin1" autocomplete="off" type="password" placeholder="PIN" size="10" maxlength="4" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
 						</tr>
 						<tr>
 							<!--[if lte IE 9]>
 								<td><label class="ie-label" for="pin2">Confirm PIN</label></td>
 							<![endif]-->						
-							<td><input id="pin2" autocomplete="off" type='password' placeholder="Confirm PIN" onkeyup="checkpins('pin1', 'pin2');" class="text ui-widget-content ui-corner-all"/></td>
+							<td><input id="pin2" autocomplete="off" type="password" placeholder="Confirm PIN" size="10" maxlength="4" tabindex="1" onkeyup="checkpins('pin1', 'pin2');" class="text ui-widget-content ui-corner-all"/></td>
 						</tr>
 					</table>
 					<button class='action-button' onclick="elmProvision(); return false;">
@@ -86,7 +86,7 @@
 					on Single Sign On pages until you complete this step.
 					
 					<table>
-						<tr><td class="error_otp"></td></tr>
+						<tr><td><span id=error_otp></span></td></tr>
 						<tr>
 							<!--[if lte IE 9]>
 								<td><label class="ie-label" for="otp">Access Code</label></td>
@@ -97,12 +97,14 @@
 					<button class='action-button' onclick="elmProvisionFinal(); return false;">
 						${_("Finish installation")}
 					</button>
+					<input type=hidden id=token_serial value="">
 				</li>
 			</ol>
 			<div id="provisionElmComplete">
 				<p>Your token has now been activated. Single Sign-On pages will now prompt you for an access code when you attempt to login.</p>
 			</div>
 		</fieldset>
+		
 	</form>
 </div>
 

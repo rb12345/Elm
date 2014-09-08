@@ -1261,7 +1261,7 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
                 u_realm.lower() not in t_realms) :
                 continue
         '''
-        
+
         tok_va = linotp.lib.validate.ValidateToken(token, context=c)
         ## in case of a failure during checking token, we log the error and
         ## continue with the next one

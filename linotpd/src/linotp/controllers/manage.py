@@ -151,7 +151,7 @@ class ManageController(BaseController):
                     c.realm = realms[0]
                 else:
                     realm = getDefaultRealm()
-                        
+
                 c.admin = "%s@%s" % (c.login, c.realm)
 
             log.debug("[index] importers: %s" % IMPORT_TEXT)
@@ -376,18 +376,18 @@ class ManageController(BaseController):
                             tok['LinOtp.TokenType'],
                             tok['LinOtp.TokenDesc'],
                             tok['LinOtp.Isactive'],
-                            
+
                             tok['User.username'],
                             tok['LinOtp.RealmNames'],
                             tok['LinOtp.IdResolver'],
                             tok['LinOtp.Userid'],
-                            
+
                             tok['LinOtp.FailCount'],
                             tok['LinOtp.MaxFail'],
                             tok['LinOtp.OtpLen'],
                             tok['LinOtp.CountWindow'],
                             tok['LinOtp.SyncWindow'],
-                            
+
                         ]
                     }
                     )

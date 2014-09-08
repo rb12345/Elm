@@ -424,15 +424,15 @@ def getResolvers(user):
 def getAllUserRealms(user):
     results = [];
     realms = getRealms();
-    
+
     # get a list of realms the user is present in
     for key, v in realms.items():
         resolvers = getResolversOfUser(User(user.login, v['realmname'], ""))
         if (resolvers):
             results.append(v['realmname'])
-            
+
     return results;
-    
+
 def getResolversOfUser(user):
     '''
     This returns the list of the Resolvers of a user in a given realm.
@@ -523,16 +523,16 @@ def getUserId(user):
     uid = ''
     loginUser = u''
     loginUser = user.login;
- 
+
     resolvers = '';
     realms = getRealms();
-        
+
     # Get the first resolver they're present in, because UID is independent of realm.
     for key, v in realms.items():
         resolvers = getResolversOfUser(User(user.login, v['realmname'], ""))
         if (resolvers):
             break;
-                
+
     for reso in resolvers:
         resId = ""
         resIdC = ""
@@ -771,23 +771,23 @@ def check_user_password(username, realm, password):
                   "the username: %r" % e.description)
 
     return success
- 
-def getAdminRealms(username): 
-    results = [] 
-    if username is None: 
-		return results 
 
-    from linotp.lib.policy import checkPolicyPre 
-    
+def getAdminRealms(username):
+    results = []
+    if username is None:
+		return results
+
+    from linotp.lib.policy import checkPolicyPre
+
     log.error("checking for %s" % username)
- 
-    try: 
+
+    try:
         res = checkPolicyPre('admin', 'show', {}, user = User(username, '', ""))
         results = res['realms']
-    finally: 
+    finally:
         pass
-    
-    return results 
+
+    return results
 
 #eof###########################################################################
 

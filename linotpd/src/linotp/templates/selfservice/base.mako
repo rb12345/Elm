@@ -114,11 +114,11 @@
 		% if 'webprovisionGOOGLE' in c.actions or 'webprovisionGOOGLEtime' in c.actions:
 			<li><a href="/selfservice/webprovisiongoogletoken"><span>${_("Enroll Google Authenticator")}</span></a></li>
 		%endif
-		
+
 		% if 'webprovisionElm' in c.actions:
 			<li><a href="/selfservice/webprovisionelm"><span>${_("Activate Two-Factor Authentication")}</span></a></li>
 		%endif
-		
+
 		% if 'assign' in c.actions:
 			<li><a href="/selfservice/assign"><span>${_("Assign Token")}</span></a></li>
 		%endif

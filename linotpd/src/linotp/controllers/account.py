@@ -110,21 +110,20 @@ class AccountController(BaseController):
             redirect("/selfservice")
 
         Session.close()
-        
+
 
     def logout(self):
         identity = request.environ.get('REMOTE_USER')
         if identity is None:
             # After logout We always redirect to the start page
             redirect("/")
-            
+
         http_host = request.environ.get("HTTP_HOST")
         url_scheme = request.environ.get("wsgi.url_scheme")
         redirect("%s://%s/elm/logout" % (url_scheme, http_host))
         #redirect('https://webauth.ox.ac.uk/logout')
-        
-        Session.close()
-        
-        
-#eof##########################################################################
 
+        Session.close()
+
+
+#eof##########################################################################

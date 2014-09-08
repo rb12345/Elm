@@ -3071,7 +3071,7 @@ $(document).ready(function(){
             ldap_resolver_ldaps();
         }
     });
-	
+
     $dialog_oak_resolver = $('#dialog_oak_resolver').dialog({
         autoOpen: false,
         title: 'Oak Resolver',
@@ -3100,7 +3100,7 @@ $(document).ready(function(){
             do_dialog_icons();
         }
     });
-	    
+
 	$('#button_test_oak').click(function(event){
         $('#progress_test_oak').show();
 
@@ -3132,7 +3132,7 @@ $(document).ready(function(){
                  });
         return false;
     });
-	
+
     $('#button_test_ldap').click(function(event){
         $('#progress_test_ldap').show();
 
@@ -4718,17 +4718,17 @@ function view_token() {
             url : '/manage/tokenview_flexi?session='+getsession(),
             method: 'GET',
             dataType : 'json',
-            colModel : [ 
+            colModel : [
 							{display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
                             {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
 							{display: 'description', name : 'TokenDesc', width : 200, sortable : true, align: 'center'},
                             {display: 'active', name : 'Isactive', width : 35, sortable : true, align: 'center'},
-							
+
                             {display: 'username', name : 'Username', width : 100, sortable : false, align: 'center'},
                             {display: 'realm', name : 'realm', width : 100, sortable : false, align: 'center'},
-                            {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'},		
+                            {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'},
 							{display: 'userid', name : 'Userid', width : 100, sortable : true, align: 'center'},
-			
+
                             {display: 'fail count', name : 'FailCount', width : 60, sortable : true, align: 'center'},
                             {display: 'max fails', name : 'maxfailcount', width : 60, sortable : false, align: 'center'},
                             {display: 'otplen', name : 'otplen', width : 50, sortable : false, align: 'center'},
@@ -4765,7 +4765,7 @@ function view_user() {
             url : '/manage/userview_flexi?session='+getsession(),
             method: 'GET',
             dataType : 'json',
-            colModel : [ 
+            colModel : [
 				{display: 'username', name : 'username', width : 100, sortable : true, align:"left"},
 				{display: 'givenname', name : 'givenname', width : 150, sortable : true, align:"left"},
 				{display: 'surname', name : 'surname', width : 150, sortable : true, align:"left"},

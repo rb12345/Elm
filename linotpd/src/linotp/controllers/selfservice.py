@@ -181,7 +181,7 @@ class SelfserviceController(BaseController):
                 identity = request.environ.get('REMOTE_USER')
                 if identity is None:
 					abort(401, "You are not authenticated")
-                    
+
                 realms = getAllUserRealms(User(identity, "", ""))
                 if (realms):
                     c.user = identity
@@ -533,7 +533,7 @@ class SelfserviceController(BaseController):
             Form for Elm token adding. Basically a merged PIN and Google Authenticator form.
         '''
         return render('/selfservice/webprovisionelm.mako')
-        
+
 ###### API functions
     def userhistory(self):
         '''
@@ -1457,7 +1457,7 @@ class SelfserviceController(BaseController):
 
                 log.debug("[userwebprovision] Initializing the token serial: %s, desc: %s for user %s @ %s." %
                         (serial, desc, self.authUser.login, self.authUser.realm))
-                        
+
                 (ret1, tokenObj) = initToken({ 'type': t_type,
                                 'serial': serial,
                                 'otplen': 6,
@@ -1480,7 +1480,7 @@ class SelfserviceController(BaseController):
                             'counter' : 0,
                             'digits':   6,
                         }
-            elif type.lower == "elm_totp":
+            elif type.lower() == "elm_totp":
                 desc	 = "Google Authenticator web prov"
 
                 # ideal: 32 byte.
@@ -1494,7 +1494,7 @@ class SelfserviceController(BaseController):
 
                 log.debug("[userwebprovision] Initializing the token serial: %s, desc: %s for user %s @ %s." %
                         (serial, desc, self.authUser.login, self.authUser.realm))
-                        
+
                 (ret1, tokenObj) = initToken({ 'type': t_type,
                                 'serial': serial,
                                 'otplen': 6,
@@ -1515,10 +1515,10 @@ class SelfserviceController(BaseController):
 
                 if 1 == getOTPPINEncrypt(serial=serial, user=User(c.user, "", c.realm)):
                     param['encryptpin'] = "True"
-                        
+
                 ret2 = setPin(userPin, None, serial)
-                
-                ret3 = enableToken(False, None, serial)                
+
+                ret3 = enableToken(False, None, serial)
                 if ret1:
                         url = create_google_authenticator_url(self.authUser.login, self.authUser.realm, otpkey, serial=serial, type=t_type)
                         label = "%s@%s" % (self.authUser.login, self.authUser.realm)
@@ -1533,7 +1533,7 @@ class SelfserviceController(BaseController):
                         }
 
             else:
-                return sendError(response, "valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time' and'elm_totp'. You provided %s" % type)
+                return sendError(response, "Valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time' and 'elm_totp'. You provided %s" % type)
 
             logTokenNum()
             c.audit['serial'] = serial
@@ -1872,7 +1872,53 @@ class SelfserviceController(BaseController):
             Session.close()
             log.debug('[useractivateocratoken] done')
 
-    
+    def userelmfinal(self):
+        '''
+        This is the internal disable function that is called from within
+        the self service portal to enable a token
+        '''
+        param = request.params
+
+        try:
+            # check selfservice authorization
+            checkPolicyPre('selfservice', 'webprovisionElm', param, self.authUser)
+
+            serial = getParam(param, "serial", required)
+            otp = getParam(otp, "serial", required)
+
+            (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
+
+            ret = {
+                "success" : ok,
+            }
+
+            if (ok):
+                ret["enable"] = enableToken(True, None, serial)
+            else:
+                if opt == None:
+                    opt = {}
+                ret['error'] = c.audit.get('info')
+                log.error("[userelmfinal] activation failed: %s" % ret['error'])
+                ret['code'] = -309
+
+            Session.commit()
+            return sendResult(response, ret, 1)
+
+        except PolicyException as pe:
+            log.error("[userelmfinal] policy failed: %r" % pe)
+            log.error("[userelmfinal] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, unicode(pe), 1)
+
+        except Exception as e:
+            log.error("[userelmfinal] enabling token %s of user %s failed! %r" % (serial, c.user, e))
+            log.error("[userelmfinal] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, e, 1)
+
+        finally:
+            Session.close()
+            log.debug('[userelmfinal] done')
 
 def add_dynamic_selfservice_enrollment(actions):
     '''
@@ -1884,11 +1930,11 @@ def add_dynamic_selfservice_enrollment(actions):
 
         :return: hash of {tokentype : html for tab}
     '''
-   
+
     dynamic_actions = {}
     g = config['pylons.app_globals']
     tokenclasses = g.tokenclasses
-        
+
     for tok in tokenclasses.keys():
         tclass = tokenclasses.get(tok)
         tclass_object = newToken(tclass)

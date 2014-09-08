@@ -46,6 +46,10 @@ a.activeToken {
 	color: #3277AE;
  }
  
+ #error_pin, #error_otp {
+	color: #FF0000;
+ }
+ 
 /* float the logo left and the title right to match the admin page */
  .float_right{
 	color: #fff;

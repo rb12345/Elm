@@ -902,7 +902,7 @@ function elmProvision() {
     var pin2 = $('#pin2').val();
 
     if (pin1 != pin2) {
-		$('#error_pin ').val("PIN codes must match.");
+		$('#error_pin').text("PIN codes must match.");
         hide_waiting();
     } else {
         $.post('/selfservice/userwebprovision', {
@@ -912,7 +912,7 @@ function elmProvision() {
         }, function(data, textStatus, XMLHttpRequest) {
             hide_waiting();
             if (data.result.status == false) {
-				$('#error_pin').val("Error assigning token: " + data.result.error.message);
+				$('#error_pin').text("Error assigning token: " + data.result.error.message);
             };
 			if (data.result.status == true) {
 				showTokenlist();
@@ -924,6 +924,12 @@ function elmProvision() {
                 $('#google_qr_code').html(img);
 				$('#provisionElmInstall').hide();
                 $('#provisionElmResultDiv').show();
+
+				// Store the token's serial number for now. We send it back to the server in the next step.
+				$('#token_serial').val(data.result.value.oathtoken.serial);
+
+				// Regenerate the now-visible accordion so it's got the right height (it defaults to 0 if it's initialized while hidden)
+				$('#accordion2').accordion('refresh');
 			}
         });
     }
@@ -933,20 +939,22 @@ function elmProvisionFinal() {
     show_waiting();
 
 	var otp = $('#otp').val();
+	var serial = $('#token_serial').val();
 
     $.post('/selfservice/userelmconfirm', {
-		code : code,
+		otp: otp,
+		serial: serial,
         session : get_selfservice_session()
     },  function(data, textStatus, XMLHttpRequest) {
 		hide_waiting();
-        if (data.result.status == false) {
-			$('#error_otp').val("Error activating token: " + data.result.error.message);
+        if (data.result.status == false || data.result.value.success == false) {
+			$('#error_otp').text("Error activating token: " + data.result.error.message + ". Please try again.");
         };
-		if (data.result.status == true) {
-			showTokenlist();
-			$('#provisionElmInstall').hide();
-            $('#provisionElmGoogleResultDiv').hide();
-			$('#provisionElmComplete').show();
+		if (data.result.status == true && data.result.value.success == true) {
+				showTokenlist();
+				$('#provisionElmInstall').hide();
+				$('#provisionElmGoogleResultDiv').hide();
+				$('#provisionElmComplete').show();
 		}
     });
 }
