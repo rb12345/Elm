@@ -19,7 +19,6 @@ Some basic styling stuff
 
 .form-logo {
 	padding: 2em;
-	padding-bottom: 1em;
 }
 
 body{
@@ -334,7 +333,7 @@ padding: 5px;
 
 /* general form styling stuff */
 
-form, #confirmBox, #logoutBox
+form
 {
 	background-color:#f4f4f4;
 	border: 1px solid #ddd;
@@ -344,16 +343,16 @@ form, #confirmBox, #logoutBox
 	margin: 0 auto;
 }
 
-
-div#logoutBox form
+#confirmBox 
 {
-
-/* remove styling from logout form, as it's only a button and looks weird with a border and bg colour  */
-background-color: #fff;
-border-style: none;
-
-padding-top: 1.4em;
+	background-color:#f4f4f4;
+	border: 1px solid #ddd;
+	padding: 0.2em;
+	width: 300px;
+	box-shadow: 0px 0px 10px 6px #f0f0f0;
+	margin: 0 auto;
 }
+
 form div
 {
 padding: 0.4em;

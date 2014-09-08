@@ -17,20 +17,22 @@ margin: 0 0 0 0 ;
 
 div.content h1
 {
-margin: 0px;
-font-size: 1.3em;
+        font-family: Helvetica, Verdana;
+        font-size: 20pt;
+        font-weight: 300;
+
+        padding: 10px 0 ;
+        margin: 0px;
+        margin-bottom: 1em;
+
+        color: #222;
 }
+
 
 h1, h2, h3, h4, h5, h6
 {
 letter-spacing: 0em;
 }
-
-.pleaseNote {
-    font-size: 1.1em;
-}
-
-
 
 div.content div, div.content h2, div.content h3, div.content p
 {
@@ -126,32 +128,12 @@ select#dob_mm {
   min-width: 7em;
 }
 
-div#site-info dl dd#serviceName
+/* position the site-info div at the top of the page */
+#site-info
 {
-background: url('../images/servicename-handheld.png') no-repeat top center;
-/* position the element
-*/
-position: absolute;
-top: 5px;
-
-width: 164px;
-height: 56px;
-left: 150px;
-/* hide the text */
-display: block;
-text-indent: -7000px;
+	height:60px;
+	background: url(../images/header-bg.jpg) repeat-x;
+	background-size: 100%;
+	background-position-x: 5px;
 }
 
-div#site-info dl dd#institution
-{
-
-left: 5px;
-position: absolute;
-top: 5px;
-width: 141px;
-
-/* hide the text */
-display: block;
-text-indent: -7000px;
-
-}
