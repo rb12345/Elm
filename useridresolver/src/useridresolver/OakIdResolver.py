@@ -50,6 +50,8 @@ else:
 import logging
 
 import os
+
+# Path to the Oak LDAP credential file.
 os.environ["KRB5CCNAME"] = "/etc/krb5/oak-ldap.ccache"
 
 log = logging.getLogger(__name__)
@@ -118,11 +120,12 @@ class IdResolver (UserIdResolver):
             l.start_tls_s()
             l.sasl_interactive_bind_s("",auth)
 
+            # We use eduPersonOrgUnitDN's oakUnitCode attribute to identify user realms.
             realmfilter = "(eduPersonOrgUnitDN=oakUnitCode=%s,ou=units,dc=oak,dc=ox,dc=ac,dc=uk)" % params['OAKREALM']
 
+            # We use the oakOxfordSSOUsername as the user name.
             searchfilter = "(&(oakOxfordSSOUsername=*)%s)" % realmfilter
 
-            # get a userlist:
             results = 0;
             sizelimit = int(DEFAULT_SIZELIMIT)
             try:
@@ -130,10 +133,13 @@ class IdResolver (UserIdResolver):
             except:
                 pass
 
+            # Do the actual LDAP query.
             ldap_result_id = l.search_ext(base,
                                           ldap.SCOPE_SUBTREE,
                                           filterstr=searchfilter,
                                           sizelimit=sizelimit)
+                                          
+            # Loop through the results and count them.
             while 1:
                 result_type, result_data = l.result(ldap_result_id, 0)
                 if (result_data == []):
@@ -163,12 +169,14 @@ class IdResolver (UserIdResolver):
         self.searchfilter = ""
         self.realmfilter = ""
 
+        # What values do we get from Oak, and what internal labels do we map them to?
         self.userinfo = {
             "username": "oakOxfordSSOUsername",
             "email" : "mail",
             "surname" : "sn",
             "givenname" : "givenName"
         }
+        
         self.timeout = 10
         self.bind_not_possible = False
         self.bind_not_possible_time = datetime.now()
@@ -177,8 +185,7 @@ class IdResolver (UserIdResolver):
 
     def close(self):
         """
-        closes method is called, when the request ends
-        - here we close the ldap connection by unbind
+        end and unbind an LDAP connection
         """
 
         try:
@@ -192,7 +199,7 @@ class IdResolver (UserIdResolver):
 
     def bind(self):
         """
-        bind() - this function starts an ldap connection
+        bind() - this function starts an LDAP connection
         """
 
         if self.l_obj is not None:
@@ -207,11 +214,7 @@ class IdResolver (UserIdResolver):
                 log.info("[bind] Resetting the bind_not_possible timeout.")
                 self.bind_not_possible = False
             else:
-                log.error("[bind] LDAP bind timed out the last time. "
-                          "So we do not try to bind again at this moment. "
-                          "Skipping for performance sake! "
-                          "Trying a real bind again in %r seconds"
-                                % (BIND_NOT_POSSIBLE_TIMEOUT - tdelta.seconds))
+                log.error("[bind] Previous LDAP bind attempt timed out. Please wait %r seconds before retrying." % (BIND_NOT_POSSIBLE_TIMEOUT - tdelta.seconds))
                 return False
 
         uri = self.ldapuri
@@ -219,6 +222,7 @@ class IdResolver (UserIdResolver):
         l_obj = None
 
         try:
+            # Connect and bind.
             log.debug("[bind] LDAP: Try to bind to %r", uri)
             auth = ldap.sasl.gssapi("")
             l_obj = ldap.initialize(uri, trace_level=0)
@@ -254,20 +258,18 @@ class IdResolver (UserIdResolver):
 
         userid = ''
 
-        log.debug("[getUserId] resolving userid for %r: %r"
-                                                % (type(loginname), loginname))
+        log.debug("[getUserId] resolving userid for %r: %r" % (type(loginname), loginname))
 
         if type(loginname) == unicode:
-            ## we are called externally by an unicode string
+            ## we're being called externally with an unicode string
             LoginName = loginname.encode(ENCODING)
 
         elif type(loginname) == str:
-            ## we might be called internally, so the loginname is of utf-8 str
+            ## we're being called internally with a UTF-8 string
             LoginName = loginname
 
         else:
-            log.error("[getUserId] Unsupported type of loginname (%r): %s"
-                                                % (loginname, type(loginname)))
+            log.error("[getUserId] Unsupported type of loginname (%r): %s" % (loginname, type(loginname)))
             return userid
 
         if len(loginname) == 0:
@@ -276,14 +278,14 @@ class IdResolver (UserIdResolver):
         log.debug("[getUserId] type of LoginName %s" % type(LoginName))
 
         #fil = self.filter % LoginName.decode(ENCODING)
-        fil = ldap.filter.filter_format(self.filter,
-                                        [LoginName.decode(ENCODING)])
+        fil = ldap.filter.filter_format(self.filter, [LoginName.decode(ENCODING)])
         fil = fil.encode(ENCODING)
         l_obj = self.bind()
 
         if not l_obj:
             return userid
 
+        # We base the user ID off the oakPrimaryPersonID field.
         attrlist = []
         attrlist.append("oakPrimaryPersonID")
 
@@ -302,13 +304,13 @@ class IdResolver (UserIdResolver):
         if resultList == None:
             log.debug("[getUserId] : empty result ")
             return userid
+            
         log.debug("[getUserId] : resultList :%r: " % (resultList))
 
         # [0][0] is the distinguished name
 
         res = None
 
-        ## Ticket #754
         if len(resultList) == 0:
             log.debug("[getUserId] resultList is empty")
         else:
@@ -319,9 +321,9 @@ class IdResolver (UserIdResolver):
                         userid = res.get(key)[0]
 
         if res == None or userid == '':
-            log.debug("[getUserId] : empty result for  %r"
-                      % (loginname))
+            log.debug("[getUserId] : empty result for  %r" % (loginname))
         else:
+            # Calculate the user ID using a SHA-1 hash of the oakPrimaryPersonId parameter.
             log.debug("[getUserId] userid: %r:%r" % (type(userid), userid))
             uname_hash = sha1(userid.encode("utf-8")).digest()
             log.debug(binascii.hexlify(uname_hash))
@@ -376,7 +378,7 @@ class IdResolver (UserIdResolver):
 
         if l_obj:
             try:
-                # Ticket #754
+                # Search by oakPrimaryPersonID
                 filterstr = "(%s=%s)" % ("oakPrimaryPersonID", UserId)
                 l_id = l_obj.search_ext(self.base,
                                       ldap.SCOPE_SUBTREE,
