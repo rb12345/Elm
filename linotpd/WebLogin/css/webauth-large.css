@@ -11,68 +11,18 @@ padding-top: 140px;
 /* position the site-info div at the top of the page */
 #site-info
 {
-height: 116px;
-background: url(../images/header-bg.jpg) repeat-x 620px 0px ;
-}
-
-div#site-info dl dd#serviceName
-{
-/* position the element
-*/
-left: 291px;
-/* size the element to the  size of the bg image, plus appropriate margin */
-width: 325px;
-height: 118px;
-/* place the bg image */
-background: url('../images/servicename.png') no-repeat 0px 0px;
-background-color: #fff;
-}
-div#site-info dl dd#institution 
-{
-/* size the element to the  size of the bg image, plus appropriate margin */
-display: block;
-width: 291px;
-height: 118px;
-
-/* place the bg image */
-background-image: url('../images/crest.png');
-background-color: #fff;
-background-repeat: no-repeat;
-background-position: 20px 19px ;
-
-left: 0px;
-top: 0px;
+	height: 116px;
+	background: url(../images/header-bg.jpg) repeat-x 620px 0px ;
 }
 
 /* content element styling  begins */
 
-div#confirmBox 
-{
-text-align: center;
-}
-
-div#confirmBox table
-{
-margin-left: auto; 
-margin-right: auto;
-background-color: #fff;
-margin-bottom: 10px;
-}
-
 div.content
 {
-margin-left:auto;
-margin-right: auto;
-margin-top: 10px;
-max-width: 675px;
-}
-
-/* absolutely position the help link to the top right of the content div */
-span.help a
-{
-
-top:8px;
-
+	margin-left:auto;
+	margin-right: auto;
+	margin-top: 10px;
+	max-width: 675px;
 }
 
 div.content h1
@@ -94,48 +44,16 @@ div.content div, div.content h2, div.content h3, div.content p
 	padding-right: 1em;
 }
 
-input#password, input#username, input#otp {  
+form
+{
+	width: 300px;
+	padding: 0.2em;
+}
+
+input#password, input#username, input#otp 
+{  
 	width: 200px;
 	height: 2em;
 	padding: 0 8px;
 	margin: 5px auto;
  }
- 
-
-/* two col layout for security question setting */
-div.security-q-advice,
-#set_challenge_form ,
-#password_rules,
-#passwordForm{
-
-clear: none;
-float: left;
-width: 42%;
-}
-div.security-q-advice,
-#password_rules{
-
-width: 48%;
-
-}
-
-div.security-q-examples,
-#warning{
-clear: both;
-
-}
-
-/* two col layout for set mobile number page */
-.regMobile,
-.whatNext,
-.smsSent,
-.notReceived {
-    
-    width: 45%;
-    float: left;
-}
-
-.notifications,
-.clear {
-    clear: both;
-}

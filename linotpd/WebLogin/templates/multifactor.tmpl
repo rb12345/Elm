@@ -1,15 +1,32 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <http-equiv="pragma" content="no-cache">
-    <title>University of Oxford - Single Sign-On</title>
-	<link rel="icon" href="/elm/images/favicon.ico" type="image/x-icon" />
+	<head>
+  		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<link rel="icon" href="/elm/images/favicon.ico" type="image/x-icon" />
 
-	<link rel="shortcut icon" href="/elm/images/favicon.ico" type="image/x-icon" />
-	<link rel="stylesheet" type="text/css" href="/elm/css/webauth.css" media="all"/>
-	<link rel="stylesheet" type="text/css" href="/elm/css/webauth-handheld.css" media="screen and (max-width: 639px)"/>
-	<link rel="stylesheet" type="text/css" href="/elm/css/webauth-large.css" media="screen and (min-width: 640px)" />
-  </head>
+		<link rel="shortcut icon" href="/elm/images/favicon.ico" type="image/x-icon" />
+		<meta name="author" content="University of Oxford" />
+		<link rel="stylesheet" type="text/css" href="/elm/css/webauth.css?1.21" media="all"/>
+
+		<link rel="stylesheet" type="text/css" href="/elm/css/webauth-handheld.css?1.21" media="screen and (max-width: 639px)"/>
+		<link rel="stylesheet" type="text/css" href="/elm/css/webauth-large.css?1.21" media="screen and (min-width: 640px)" />
+
+		<!--[if (lt IE 9)&(!IEMobile)]>
+		<link rel="stylesheet" type="text/css" href="/css/webauth-large.css?1.21" media="screen"/>
+		<![endif]-->
+		
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+
+		<title>University of Oxford - Single Sign-On</title>
+		<script type="text/javascript">
+		 <!--
+		 function init() {
+		   if (self != top) top.location = self.location;
+		 }
+		 // -->
+		</script>
+		
+	</head>
 
   [% IF notdefined %]
 <!--
@@ -30,8 +47,8 @@ err_multifactor_invalid : could not validate a submitted OTP
   [% END %]
 
   <body onload="document.multifactor_login.otp.focus();">
-	<div class="content" id="loginpage">
-		<h1 id=pageTitle>University of Oxford - Single Sign On<span class="name"></span></h1>
+	<div class="content" id="loginPage">
+		<h1 id=pageTitle>University of Oxford - Single Sign On</h1>
 		[% IF error || user_message %]
 		  <div class="error" align="center">
 			<p>
@@ -52,7 +69,7 @@ err_multifactor_invalid : could not validate a submitted OTP
 		  </div>
 		[% END %]
 
-		<div id="loginForm" style="width: 70%;">
+		<div id="loginForm">
 
 			<form name="multifactor_login"	action="[% script_name FILTER html %]" method="post" autocomplete="OFF" enctype="application/x-www-form-urlencoded">
                 <img class="form-logo" src="/elm/images/crest.png" alt=""></img>
@@ -65,8 +82,8 @@ err_multifactor_invalid : could not validate a submitted OTP
 				<input type="hidden" name="factor_type" value="[% factor_type FILTER html %]">
 
 				<!--[if lte IE 9]>
-						<label class="ie-label" for="otp">Access Code</label>
-					<![endif]-->
+					<label class="ie-label" for="otp">Access Code</label>
+				<![endif]-->
 				<input id="otp" type="password" name="otp" value="" placeholder="Access Code" size="10" maxlength="10" tabindex="1"/>
 				
 				<div class="formsubmit">

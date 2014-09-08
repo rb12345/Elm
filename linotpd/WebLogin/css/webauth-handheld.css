@@ -10,22 +10,34 @@ body
 {
 }
 
+/* position the site-info div at the top of the page */
+#site-info
+{
+	height:60px;
+	background: url(../images/header-bg.jpg) repeat-x;
+	background-size: 100%;
+	background-position-x: 5px;
+}
+
 div.content
 {
-margin: 0 0 0 0 ;
+	margin-left:auto;
+	margin-right: auto;
+	margin-top: 10px;
+	max-width: 675px;
 }
 
 div.content h1
 {
-        font-family: Helvetica, Verdana;
-        font-size: 20pt;
-        font-weight: 300;
+    font-family: Helvetica, Verdana;
+    font-size: 20pt;
+    font-weight: 300;
 
-        padding: 10px 0 ;
-        margin: 0px;
-        margin-bottom: 1em;
+    padding: 10px 0 ;
+    margin: 0px;
+    margin-bottom: 1em;
 
-        color: #222;
+    color: #222;
 }
 
 
@@ -43,62 +55,49 @@ div.content div, div.content h2, div.content h3, div.content p
 	text-align: center;
 }
 
-
-div#confirmBox 
+input#password, input#username, input#otp 
 {
-text-align: left;
-}
-
-div#confirmBox table
-{
-padding: 1px;
-background-image: none;
-}
-
-
-div#confirmBox table th
-{
-padding-left: 1px;
-padding-right: 2px;
-text-align: right;
-}
-
+	font-size: 1.5em;  
+	height: 1.5em;
+	width: 65%;  	
+	padding: 0 8px;
+	margin: 5px auto;	
+ }
+ 
 form
 {
-padding: 5px;
-display: block;
-margin-bottom: 10px;
+	padding: 5px;
+	display: block;
+	margin-bottom: 10px;
+	width: auto;
 }
 
 form div
 {
-padding: 1px;
+	padding: 1px;
 }
-
 
 div#logoutBox form
 {
-padding-top: 1px;
+	padding-top: 1px;
 }
 
-div.formfield input {
-
+div.formfield input 
+{
 	padding: 4px;
 }
 
 
-div#errorBox, div#error,  div#remuserError, div#failures
+div#errorBox, div#error, div#remuserError, div#failures
 {
-margin: 1px;
-
-background: url("../images/cross-small.png") no-repeat 1px 1px ;
-
-padding-left: 1px;
+	margin: 1px;
+	background: url("../images/cross-small.png") no-repeat 1px 1px ;
+	padding-left: 1px;
 }
 
 div#errorBox ul ul , div#error ul ul , div#remuserError ul ul
 {
-padding-left: 1px;
+	
 }
 
 div#logoutBox dl dd
@@ -106,34 +105,5 @@ div#logoutBox dl dd
 margin-top: 1px;
 margin-bottom: 1px;
 margin-left: 0px;
-}
-
-span.help 
-{
-margin-top: 8px;
-display: block;
-clear: both;
-}
-
-input[type="text"], input[type="password"] {
-	font-size: 2em;  
-	height: 1.5em;
-	width: 95%;     
- }
-
-/* make the month field a bit wider */
-
-select#dob_mm {
-  min-height: 3em;
-  min-width: 7em;
-}
-
-/* position the site-info div at the top of the page */
-#site-info
-{
-	height:60px;
-	background: url(../images/header-bg.jpg) repeat-x;
-	background-size: 100%;
-	background-position-x: 5px;
 }
 
