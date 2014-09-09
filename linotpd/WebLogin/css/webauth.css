@@ -176,16 +176,10 @@ a.cancel {
 }
 
 /* colour for emphasized text, strong, error messages, etc...*/
-.error, ul.failures li
-{
-	color: #ff0000;
-	font-size: 1.2em;
-}
-
 ul.failures li
 {
+	color: #ff0000;
 	list-style: none;
-	font-weight: bold;
 }   
 
 /* general form styling stuff */

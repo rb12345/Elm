@@ -147,7 +147,7 @@
 		<li><a href="/selfservice/unassign"><span>${_("unassign Token")}</span></a></li>
 		%endif
 		%if 'delete' in c.actions:
-		<li><a href="/selfservice/delete"><span>${_("delete Token")}</span></a></li>
+		<li><a href="/selfservice/delete"><span>${_("Delete Token")}</span></a></li>
 		%endif
 		%if 'history' in c.actions:
 		<li><a href="/selfservice/history"><span>${_("History")}</span></a></li>
