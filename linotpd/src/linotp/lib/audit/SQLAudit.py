@@ -271,7 +271,7 @@ class Audit(AuditBase):
             column.create(audit_table)
         except Exception as exx:
             # Obviously we already migrated the database.
-            log.info("[__init__] Error during database migration: %r" % exx)
+            log.info("[__init__] Assuming database migration is complete: %r" % exx)
 
 
     def _attr_to_dict(self, audit_line):

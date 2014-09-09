@@ -779,8 +779,6 @@ def getAdminRealms(username):
 
     from linotp.lib.policy import checkPolicyPre
 
-    log.error("checking for %s" % username)
-
     try:
         res = checkPolicyPre('admin', 'show', {}, user = User(username, '', ""))
         results = res['realms']

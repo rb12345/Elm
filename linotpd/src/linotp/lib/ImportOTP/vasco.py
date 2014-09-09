@@ -40,7 +40,7 @@ try:
     vasco_lib = config.get("linotpImport.vasco_dll")
     #/opt/vasco/Vacman_Controller-3.10.1/lib/libaal2sdk-3.10.1.so
     if None == vasco_lib:
-        log.warning("Missing linotpImport.vasco_dll in config file")
+        log.info("Missing linotpImport.vasco_dll parameter in config file.")
     else:
         log.info("loading vasco lib %s" % vasco_lib)
         vasco_dll = CDLL(vasco_lib)
@@ -56,7 +56,7 @@ def check_vasco(fn):
     '''
     def new(*args, **kw):
         if None == vasco_dll:
-            log.error("[check_vasco] No vasco dll available!")
+            log.warning("[check_vasco] No vasco dll found. Vasco functions will not be available.")
             return None
         else:
             return fn(*args, **kw)

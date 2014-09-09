@@ -668,8 +668,7 @@ def getAdminPolicies(action, lowerRealms=False):
 
     # We may change this later to other authetnication schemes
     admin_user = getUserFromRequest(request)
-    log.info("[getAdminPolicies] Evaluating policies for the "
-             "user: %s" % admin_user['login'])
+    log.info("[getAdminPolicies] Evaluating policies for user %s" % admin_user['login'])
     pol_request = {'user': admin_user['login'], 'scope': 'admin'}
     if '' != action:
         pol_request['action'] = action
