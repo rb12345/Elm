@@ -47,7 +47,6 @@ def get_imprint(realm):
         res = f.read()
         f.close()
     except Exception as e:
-        log.info("[get_imprint] can not read imprint file: %s. (%r)"
-                 % (filename, e))
+        log.debug("[get_imprint] can not read imprint file: %s. (%r)" % (filename, e))
 
     return res
