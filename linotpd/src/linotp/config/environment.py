@@ -347,6 +347,7 @@ def get_resolver_list():
     module_list.add("useridresolver.PasswdIdResolver")
     module_list.add("useridresolver.LDAPIdResolver")
     module_list.add("useridresolver.SQLIdResolver")
+    # Load the Oak ID resolver.
     module_list.add("useridresolver.OakIdResolver")
 
     config_modules = config.get("linotpResolverModules", '')

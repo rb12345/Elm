@@ -246,7 +246,7 @@ class ValidateController(BaseController):
                 if (not ok):
                     if opt == None:
                         opt = {}
-
+                    # More helpful error logging.
                     opt['error'] = c.audit.get('info')
                     log.error("[check] authorization failed for validate/check: %s" % opt['error'])
 
@@ -781,7 +781,12 @@ class ValidateController(BaseController):
             Session.close()
             log.debug("[smspin] done")
 
+
     def webkdc_userinfo(self):
+        # Called by WebAuth via the Elm remctld scripts.
+        # Returns information about whether the user owns any tokens.
+
+        # TODO: Require some sort of session token.
         param = {}
 
         try:
@@ -813,6 +818,10 @@ class ValidateController(BaseController):
             Session.close()
 
     def webkdc_validate(self):
+        # Called by WebAuth via the Elm remctld scripts.
+        # Verifies a one-time passcode and indicates how long
+        # the token should be considered valid.
+
         param = {}
 
         try:

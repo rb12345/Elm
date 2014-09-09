@@ -185,6 +185,7 @@ def check_selfservice_session():
     if request.path.lower()[:17] != "/selfservice/user":
         log.debug('[check_selfservice_session] nothing to check')
     else:
+        # Check the WebAuth token instead of LinOTP internal auth.
         expiry = request.environ.get('WEBAUTH_TOKEN_EXPIRATION')
         if expiry is not None:
             log.debug("[check_selfservice_session] Got header!")

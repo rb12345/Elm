@@ -145,6 +145,8 @@ class ManageController(BaseController):
             c.title = "LinOTP Management"
             admin_user = getUserFromRequest(request)
             if admin_user.has_key('login'):
+                # Get a list of their allowed admin realms.
+                # Set their current realm to the first one in the list.
                 c.login = admin_user['login']
                 realms = getAdminRealms(c.login)
                 if (realms):
@@ -209,6 +211,7 @@ class ManageController(BaseController):
 
             http_host = request.environ.get("HTTP_HOST")
             url_scheme = request.environ.get("wsgi.url_scheme")
+            # Use WebAuth to logout instead of Apache.
             c.logout_url = "%s://%s/account/logout" % (url_scheme, http_host)
 
             Session.commit()
@@ -369,6 +372,7 @@ class ManageController(BaseController):
             # If we have chosen a page to big!
             lines = []
             for tok in c.tokenArray:
+                # Arrange the table more helpfully.
                 lines.append(
                     { 'id' : tok['LinOtp.TokenSerialnumber'],
                         'cell': [
@@ -467,6 +471,7 @@ class ManageController(BaseController):
                         resolver_display = u['useridresolver'].split(".")[3] + " (" + u['useridresolver'].split(".")[1] + ")"
                     else:
                         resolver_display = u['useridresolver']
+                # Arrange the table more helpfully.
                 lines.append(
                     { 'id' : u['username'],
                         'cell': [

@@ -2142,6 +2142,7 @@ class AdminController(BaseController):
                 res['rows'] = num
                 res['err_string'] = err_str
 
+            # Add support for configuring Oak resolvers.
             elif type == "oak":
                 import useridresolver.OakIdResolver
 

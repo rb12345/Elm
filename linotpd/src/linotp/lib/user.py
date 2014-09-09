@@ -489,8 +489,8 @@ def getResolversOfUser(user):
                 log.debug("[getResolversOfUser] type of realm_resolver: %s" % type(realm_resolver))
                 log.debug("[getResolversOfUser] type of login: %s" % type(login))
                 if uid not in ["", None]:
-                    log.info("[getResolversOfUser] user %r found in resolver %r" % (login, realm_resolver))
-                    log.info("[getResolversOfUser] userid resolved to %r " % uid)
+                    log.debug("[getResolversOfUser] user %r found in resolver %r" % (login, realm_resolver))
+                    log.debug("[getResolversOfUser] userid resolved to %r " % uid)
 
                     ## Unicode Madness:
                     ## This will break as soon as the unicode "uid" is put into a tuple

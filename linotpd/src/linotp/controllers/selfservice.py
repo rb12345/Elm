@@ -178,10 +178,13 @@ class SelfserviceController(BaseController):
                 self.authUser = User(c.user, c.realm, '')
                 log.debug("[__before__] authenticating as %s in realm %s!" % (c.user, c.realm))
             else:
+                # Use WebAuth instead of LinOTP auth.
                 identity = request.environ.get('REMOTE_USER')
                 if identity is None:
 					abort(401, "You are not authenticated")
 
+                # Put their current realm as the first one we find them in.
+                # Doesn't really matter since tokens are realm-independent.
                 realms = getAllUserRealms(User(identity, "", ""))
                 if (realms):
                     c.user = identity
@@ -189,6 +192,7 @@ class SelfserviceController(BaseController):
 
                 self.authUser = User(c.user, c.realm, '')
 
+                # Check token expiry.
             	age = int(request.environ.get('WEBAUTH_TOKEN_EXPIRATION')) - time.time()
             	response.set_cookie('linotp_selfservice', 'REMOTE_USER', max_age = int(age))
 
@@ -278,7 +282,7 @@ class SelfserviceController(BaseController):
                                     'selfservice/userwebprovision',
                                     'selfservice/usergetmultiotp',
                                     'selfservice/userhistory',
-                                    'selfservice/userelmfinal',
+                                    'selfservice/userelmfinal', # Elm token activation
                                     'selfservice/index']:
                 if isSelfTest():
                     log.debug("[__after__] Doing selftest!")
@@ -1481,6 +1485,9 @@ class SelfserviceController(BaseController):
                             'digits':   6,
                         }
             elif type.lower() == "elm_totp":
+                # Elm tokens are Google Authenticator TOTP tokens,
+                # but they are deactivated until the user confirms
+                # his token is working.
                 desc	 = "Google Authenticator web prov"
 
                 # ideal: 32 byte.
@@ -1505,6 +1512,7 @@ class SelfserviceController(BaseController):
                                 'hashlib' : "sha1"
                                 }, self.authUser)
 
+                # We also set the PIN straight away for Elm tokens.
                 userPin = getParam(param, "userpin", required)
 
                 check_res = checkOTPPINPolicy(userPin, self.authUser)
@@ -1533,7 +1541,7 @@ class SelfserviceController(BaseController):
                         }
 
             else:
-                return sendError(response, "Valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time' and 'elm_totp'. You provided %s" % type)
+                return sendError(response, "valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time' and 'elm_totp'. You provided %s" % type)
 
             logTokenNum()
             c.audit['serial'] = serial
@@ -1778,10 +1786,8 @@ class SelfserviceController(BaseController):
             log.debug('[userfinshocra2token] done')
 
     def userelmfinal(self):
-        '''
-        This is the internal disable function that is called from within
-        the self service portal to enable a token
-        '''
+        # Called to confirm Elm token setup.
+        # Verifies the code given and activates the token if it's correct.
         param = request.params
 
         serial = getParam(param, "serial", required)

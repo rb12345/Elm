@@ -102,6 +102,7 @@ class AccountController(BaseController):
         finally:
             log.debug("[__before__::%r] done" % (action))
 
+    # Use the WebAuth user identity instead of internal LinOTP auth.
     def login(self):
         log.debug("[login] selfservice login screen")
         identity = request.environ.get('REMOTE_USER')
@@ -111,7 +112,7 @@ class AccountController(BaseController):
 
         Session.close()
 
-
+    # Log out of WebAuth.
     def logout(self):
         identity = request.environ.get('REMOTE_USER')
         if identity is None:

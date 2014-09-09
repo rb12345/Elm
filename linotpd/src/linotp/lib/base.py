@@ -332,6 +332,7 @@ class BaseController(WSGIController):
         for language in languages:
             for lang in language.split(','):
                 try:
+                    # Fix borked language detection on some browsers.
                     if lang == "en" or lang == "en-gb" or lang == "en-GB":
                         found_lang = True
                         break

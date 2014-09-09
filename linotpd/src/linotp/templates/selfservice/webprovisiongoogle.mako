@@ -31,22 +31,22 @@
 	<form class="cmxform" name='myForm'> 
 		<fieldset>
 		<p>
-		${_("1. First,  install the Google Authenticator application on your Android or iOS device.")}
+		${_("1. You first need to install the google authenticator to your Android or iPhone.")}
 		<ul>
-		<li><a href='https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2' target='extern'>${_("Android")}</a></li>
-		<li><a href='http://itunes.apple.com/uk/app/google-authenticator/id388497605?mt=8' target='extern'>${_("iOS")}</a><br>
-			${_("If you are using an iOS device, you can scan the following QR code instead.")}     
+		<li><a href='https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2' target='extern'>${_("link for Android")}</a></li>
+		<li><a href='http://itunes.apple.com/de/app/google-authenticator/id388497605?mt=8' target='extern'>${_("link for iPhone")}</a><br>
+			${_("Using the QR code you can directly go to install the google authenticator on your iPhone.")}     
 		     <span id=qr_code_iphone_download></span>
 			</li>
 		</ul>
-		<p>${_("2. Select a token type:")}<br>
-			<label for=google_type>Token:</label> 
+		<p>${_("2. Then you may create a profile.")}<br>
+			<label for=google_type>Choose a profile type:</label> 
 			<select id=google_type>
 				% if 'webprovisionGOOGLE' in c.actions:
-				<option value=hotp>${_("event based (HOTP)")}</option>
+				<option value=hotp>${_("event based")}</option>
 				%endif
 				% if 'webprovisionGOOGLEtime' in c.actions:
-				<option value=totp>${_("time based (TOTP)")}</option>
+				<option value=totp>${_("time based")}</option>
 				%endif
 			</select>
 		<button class='action-button' id='button_provisionGoogle' onclick="provisionGoogle(); return false;">
@@ -55,10 +55,10 @@
 		</p>
 		<div id="provisionGoogleResultDiv">
 			<p>${_("3.")} <b>${_("Google Authenticator")}</b> ${_("successfully created!")}</p>
-			<p>${_("If you are viewing this site on the same device as your Google Authenticator app, click the link below to activate your code:")}
-				 <a id=google_link>${_("Activate key")}</a>
+			<p>${_("Click on this link to install the profile to your Android or iPhone:")}
+				 <a id=google_link>${_("install profile")}</a>
 			</p>
-			<p>${_("Alternatively, scan the QR code below with your authenticator device.")}</p>
+			<p>${_("Or you can scan the QR code below with your Android phone to import the secret.")}</p>
 			<p><span id=google_qr_code></span></p>
 		</div>
 		</fieldset>
@@ -68,5 +68,5 @@
 <script>
 	   	$('#provisionGoogleResultDiv').hide();
 	   	$('#qr_code_iphone_download').show();
-	   	$('#qr_code_iphone_download').html(generate_qrcode(10,"http://itunes.apple.com/uk/app/google-authenticator/id388497605?mt=8"));
+	   	$('#qr_code_iphone_download').html(generate_qrcode(10,"http://itunes.apple.com/de/app/google-authenticator/id388497605?mt=8"));
 </script>

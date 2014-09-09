@@ -2017,6 +2017,7 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
         elif 'userwebprovision' == method:
             user_selfservice_actions = getSelfserviceActions(authUser)
             typ = param.get('type').lower()
+            # Allow Elm provisioning.
             if ((typ == 'oathtoken'
                     and 'webprovisionOATH' not in user_selfservice_actions)
                 or (typ == 'googleauthenticator_time'and

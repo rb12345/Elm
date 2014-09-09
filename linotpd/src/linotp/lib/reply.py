@@ -206,6 +206,8 @@ def sendResult(response, obj, id=1, opt=None):
            "version": get_version(),
            "id": id }
 
+    # Add the additional data in a more helpful way rather than
+    # dumping it in as a top-level node.
     if opt is not None and len(opt) > 0:
         res["result"].update(opt)
 

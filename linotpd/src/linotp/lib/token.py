@@ -1310,6 +1310,9 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
             #any valid otp increments, independend of the tokens state !!
             token.incOtpCounter(matchinCounter)
 
+            # If the allow_inactive option is present, ignore whether the token is marked as active.
+            # This is used when completing Elm selfservice provisioning, to validate the code
+            # for the not-yet-activated token.
             if ("allow_inactive" in options or token.isActive() == True):
                 if token.getFailCount() < token.getMaxFailCount():
                     if token.check_auth_counter():

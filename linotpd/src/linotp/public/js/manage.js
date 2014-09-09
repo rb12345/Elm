@@ -4633,6 +4633,7 @@ function view_policy() {
             searchbutton: true
     });
 
+	// Pretty buttons instead of the default ones.
     $('#policy_import').button({
         icons: {
             primary: 'ui-icon-arrowthick-1-n'
@@ -4719,6 +4720,7 @@ function view_token() {
             method: 'GET',
             dataType : 'json',
             colModel : [
+							// Rearrange table into something more helpful.
 							{display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
                             {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
 							{display: 'description', name : 'TokenDesc', width : 200, sortable : true, align: 'center'},
@@ -4766,6 +4768,7 @@ function view_user() {
             method: 'GET',
             dataType : 'json',
             colModel : [
+				// Rearrange table into something more helpful.
 				{display: 'username', name : 'username', width : 100, sortable : true, align:"left"},
 				{display: 'givenname', name : 'givenname', width : 150, sortable : true, align:"left"},
 				{display: 'surname', name : 'surname', width : 150, sortable : true, align:"left"},
