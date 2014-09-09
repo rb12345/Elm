@@ -799,7 +799,6 @@ $(document).ready(function() {
                 }
             }
         },
-        collapsible : true,
         spinner : 'Retrieving data...',
         cache : true
     });
