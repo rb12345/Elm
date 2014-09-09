@@ -30,16 +30,18 @@
 <div id='deleteform'>
 	<form class="cmxform" name='myForm'>
 		<fieldset>
+			<p>This page allows you to delete a token. Your authenticator app will continue to generate codes, but they will no longer be accepted by the Single Sign On service.</p>
+			<p>If all of your tokens are deleted, the Single Sign On service will no longer ask for an access code when you login. You will also be unable to access secure resources that require two-factor authentication: to retain access to these services, you should create a new token.</p>
 			<table>
 				<tr>
 					<!--[if lte IE 9]>
 						<td><label class="ie-label" for="selectedToken">Token</label></td>
 					<![endif]-->
 					<td><input id="selectedToken" type='text' class='selectedToken' class="text ui-widget-content ui-corner-all" disabled value='' placeholder="Token"/>
-					<td><p>Click a token on the left to select it.</p></td>
+					<td><span class="form-help">Click a token on the left to select it.</span></td>
 				</tr>
 			</table>
-			<button class='action-button' id='button_delete' onclick="token_delete(); return false;">${_("delete Token")}</button>
+			<button class='action-button' id='button_delete' onclick="token_delete(); return false;">${_("Delete Token")}</button>
 		</fieldset>
 	</form>
 </div>

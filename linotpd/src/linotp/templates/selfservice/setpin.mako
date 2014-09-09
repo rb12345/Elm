@@ -30,13 +30,15 @@
 <div id='passwordform'>
 	<form class="cmxform" name='myForm'>
 		<fieldset>
+			<p>This page allows you to change the PIN associated with a token. Once you update your PIN, you should use the new PIN when logging in to Single Sign On services.</p>
+			<p>Note that the PIN for each token is independent. If you have multiple tokens, this page will only update the PIN for the selected token - you should repeat the process for your other tokens if you wish to change their PINs as well.</p>
 			<table>
 				<tr>
 					<!--[if lte IE 9]>
 						<td><label class="ie-label" for="selectedToken">Token</label></td>
 					<![endif]-->
 					<td><input id="selectedToken" type='text' class='selectedToken' class="text ui-widget-content ui-corner-all" disabled value='' placeholder="Token"/>
-					<td><p>Click a token on the left to select it.</p></td>
+					<td><span class="form-help">Click a token on the left to select it.</span></td>
 				</tr>
 				<tr>
 					<!--[if lte IE 9]>

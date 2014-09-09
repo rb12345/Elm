@@ -15,6 +15,11 @@ a.activeToken {
 	text-decoration: underline;
 }
 
+.form-help {
+	color: #777777;
+	font-style: italic;
+}
+
 #main {
 	background: #eeeeee;
 	border: 1px solid #aeaeae;
