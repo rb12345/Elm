@@ -15,7 +15,7 @@
 		Order allow,deny
 		allow from all
 	</Directory>
-	
+
 	<Directory "/usr/share/weblogin">
         	AllowOverride None
 	        Options +ExecCGI
@@ -23,7 +23,7 @@
         	Order allow,deny
 	        Allow from all
 	</Directory>
-    
+
 	ScriptAlias /elm/login "/usr/share/weblogin/login.fcgi"
 	ScriptAlias /elm/logout "/usr/share/weblogin/logout.fcgi"
     ScriptAlias /elm/pwchange "/usr/share/weblogin/pwchange.fcgi"
@@ -135,7 +135,7 @@
         AuthType WebAuth
         require valid-user
     </Location>
-	
+
 	<Location /account/logout>
 		WebAuthDoLogout on
 	</Location>

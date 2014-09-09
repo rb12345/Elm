@@ -63,8 +63,11 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      log.debug("[get_resolver_module_list] %s " % config_modules)
 --- a/linotp/controllers/account.py
 +++ b/linotp/controllers/account.py
-@@ -104,57 +104,26 @@
+@@ -102,59 +102,29 @@
+         finally:
+             log.debug("[__before__::%r] done" % (action))
  
++    # Use the WebAuth user identity instead of internal LinOTP auth.
      def login(self):
          log.debug("[login] selfservice login screen")
 -        identity = request.environ.get('repoze.who.identity')
@@ -95,15 +98,16 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -            log.error('[login] %s' % traceback.format_exc())
 -            Session.rollback()
 -            return sendError(response, e)
-+            redirect("/selfservice")
- 
+-
 -        finally:
 -            Session.close()
-+        Session.close()
++            redirect("/selfservice")
  
++        Session.close()
  
 -    def test(self):
 -        identity = request.environ.get('repoze.who.identity')
++    # Log out of WebAuth.
 +    def logout(self):
 +        identity = request.environ.get('REMOTE_USER')
          if identity is None:
@@ -138,10 +142,11 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 \ No newline at end of file
 --- a/linotp/controllers/admin.py
 +++ b/linotp/controllers/admin.py
-@@ -2142,6 +2142,16 @@
+@@ -2142,6 +2142,17 @@
                  res['rows'] = num
                  res['err_string'] = err_str
  
++            # Add support for configuring Oak resolvers.
 +            elif type == "oak":
 +                import useridresolver.OakIdResolver
 +
@@ -166,11 +171,13 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  from linotp.lib.user    import getUserList, User
  
  from linotp.lib.util    import getParam
-@@ -145,7 +145,14 @@
+@@ -145,7 +145,16 @@
              c.title = "LinOTP Management"
              admin_user = getUserFromRequest(request)
              if admin_user.has_key('login'):
 -                c.admin = admin_user['login']
++                # Get a list of their allowed admin realms.
++                # Set their current realm to the first one in the list.
 +                c.login = admin_user['login']
 +                realms = getAdminRealms(c.login)
 +                if (realms):
@@ -182,16 +189,22 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
              log.debug("[index] importers: %s" % IMPORT_TEXT)
              c.importers = IMPORT_TEXT
-@@ -202,7 +209,7 @@
+@@ -202,7 +211,8 @@
  
              http_host = request.environ.get("HTTP_HOST")
              url_scheme = request.environ.get("wsgi.url_scheme")
 -            c.logout_url = "%s://log-me-out:fake@%s/manage/logout" % (url_scheme, http_host)
++            # Use WebAuth to logout instead of Apache.
 +            c.logout_url = "%s://%s/account/logout" % (url_scheme, http_host)
  
              Session.commit()
              ren = render('/manage/manage-base.mako')
-@@ -366,18 +373,22 @@
+@@ -362,22 +372,27 @@
+             # If we have chosen a page to big!
+             lines = []
+             for tok in c.tokenArray:
++                # Arrange the table more helpfully.
+                 lines.append(
                      { 'id' : tok['LinOtp.TokenSerialnumber'],
                          'cell': [
                              tok['LinOtp.TokenSerialnumber'],
@@ -218,7 +231,12 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                      }
                      )
  
-@@ -460,13 +471,11 @@
+@@ -456,17 +471,16 @@
+                         resolver_display = u['useridresolver'].split(".")[3] + " (" + u['useridresolver'].split(".")[1] + ")"
+                     else:
+                         resolver_display = u['useridresolver']
++                # Arrange the table more helpfully.
+                 lines.append(
                      { 'id' : u['username'],
                          'cell': [
                              (u['username']) if u.has_key('username') else (""),
@@ -254,11 +272,12 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
  from linotp.lib.error import SelfserviceException
  
-@@ -178,21 +178,21 @@
+@@ -178,21 +178,25 @@
                  self.authUser = User(c.user, c.realm, '')
                  log.debug("[__before__] authenticating as %s in realm %s!" % (c.user, c.realm))
              else:
 -                identity = request.environ.get('repoze.who.identity')
++                # Use WebAuth instead of LinOTP auth.
 +                identity = request.environ.get('REMOTE_USER')
                  if identity is None:
 -                    abort(401, "You are not authenticated")
@@ -271,6 +290,8 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -                    user_id = user_id.encode(ENCODING)
 -                identity = user_id.decode(ENCODING)
 -                log.debug("[__before__] getting identity from repoze.who: %r" % identity)
++                # Put their current realm as the first one we find them in.
++                # Doesn't really matter since tokens are realm-independent.
 +                realms = getAllUserRealms(User(identity, "", ""))
 +                if (realms):
 +                    c.user = identity
@@ -279,6 +300,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -                (c.user, _foo, c.realm) = identity.rpartition('@')
                  self.authUser = User(c.user, c.realm, '')
  
++                # Check token expiry.
 +            	age = int(request.environ.get('WEBAUTH_TOKEN_EXPIRATION')) - time.time()
 +            	response.set_cookie('linotp_selfservice', 'REMOTE_USER', max_age = int(age))
 +
@@ -286,15 +308,15 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  log.debug("[__before__] set the self.authUser to: %s, %s " % (self.authUser.login, self.authUser.realm))
                  log.debug('[__before__] param for action %s: %s' % (action, param))
  
-@@ -278,6 +278,7 @@
+@@ -278,6 +282,7 @@
                                      'selfservice/userwebprovision',
                                      'selfservice/usergetmultiotp',
                                      'selfservice/userhistory',
-+                                    'selfservice/userelmfinal',
++                                    'selfservice/userelmfinal', # Elm token activation
                                      'selfservice/index']:
                  if isSelfTest():
                      log.debug("[__after__] Doing selftest!")
-@@ -289,9 +290,10 @@
+@@ -289,9 +294,10 @@
                          c.user = "--ua--"
                          env = request.environ
                          uuser = env.get('REMOTE_USER')
@@ -308,7 +330,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      ### This makes no sense...
      #                c.audit['user'] = c.user
      #                c.audit['realm'] =  c.realm
-@@ -526,6 +528,12 @@
+@@ -526,6 +532,12 @@
              Session.close()
              log.debug('[webprovisiongoogletoken] done')
  
@@ -321,7 +343,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  ###### API functions
      def userhistory(self):
          '''
-@@ -1377,6 +1385,7 @@
+@@ -1377,6 +1389,7 @@
              ret = {}
              ret1 = False
              ret2 = False
@@ -329,7 +351,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              param.update(request.params)
  
              # check selfservice authorization
-@@ -1442,12 +1451,50 @@
+@@ -1442,12 +1455,53 @@
                      t_type = "totp"
  
                  if prefix is None:
@@ -364,6 +386,9 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +                            'digits':   6,
 +                        }
 +            elif type.lower() == "elm_totp":
++                # Elm tokens are Google Authenticator TOTP tokens,
++                # but they are deactivated until the user confirms
++                # his token is working.
 +                desc	 = "Google Authenticator web prov"
 +
 +                # ideal: 32 byte.
@@ -381,10 +406,11 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  (ret1, tokenObj) = initToken({ 'type': t_type,
                                  'serial': serial,
                                  'otplen': 6,
-@@ -1458,6 +1505,20 @@
+@@ -1458,6 +1512,21 @@
                                  'hashlib' : "sha1"
                                  }, self.authUser)
  
++                # We also set the PIN straight away for Elm tokens.
 +                userPin = getParam(param, "userpin", required)
 +
 +                check_res = checkOTPPINPolicy(userPin, self.authUser)
@@ -402,18 +428,18 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  if ret1:
                          url = create_google_authenticator_url(self.authUser.login, self.authUser.realm, otpkey, serial=serial, type=t_type)
                          label = "%s@%s" % (self.authUser.login, self.authUser.realm)
-@@ -1470,8 +1531,9 @@
+@@ -1470,8 +1539,9 @@
                              'counter' : 0,
                              'digits':   6,
                          }
 +
              else:
 -                return sendError(response, "valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time'. You provided %s" % type)
-+                return sendError(response, "Valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time' and 'elm_totp'. You provided %s" % type)
++                return sendError(response, "valid types are 'oathtoken' and 'googleauthenticator' and 'googleauthenticator_time' and 'elm_totp'. You provided %s" % type)
  
              logTokenNum()
              c.audit['serial'] = serial
-@@ -1488,7 +1550,7 @@
+@@ -1488,7 +1558,7 @@
                  # TODO: This random PIN could be processed.
  
              Session.commit()
@@ -422,15 +448,13 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
          except PolicyException as pe:
              log.error("[userwebprovision] policy failed: %r" % pe)
-@@ -1715,6 +1777,56 @@
+@@ -1715,6 +1785,54 @@
              Session.close()
              log.debug('[userfinshocra2token] done')
  
 +    def userelmfinal(self):
-+        '''
-+        This is the internal disable function that is called from within
-+        the self service portal to enable a token
-+        '''
++        # Called to confirm Elm token setup.
++        # Verifies the code given and activates the token if it's correct.
 +        param = request.params
 +
 +        serial = getParam(param, "serial", required)
@@ -479,7 +503,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
      def useractivateocratoken(self):
          '''
-@@ -1811,6 +1923,7 @@
+@@ -1811,6 +1929,7 @@
              log.debug('[useractivateocratoken] done')
  
  
@@ -487,7 +511,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  def add_dynamic_selfservice_enrollment(actions):
      '''
          add_dynamic_actions - load the html of the dynamic tokens
-@@ -1822,7 +1935,7 @@
+@@ -1822,7 +1941,7 @@
          :return: hash of {tokentype : html for tab}
      '''
  
@@ -496,7 +520,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      g = config['pylons.app_globals']
      tokenclasses = g.tokenclasses
  
-@@ -1843,7 +1956,7 @@
+@@ -1843,7 +1962,7 @@
                      ''' remove empty lines '''
                      t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
                      e_name = "%s.%s.%s" % (tok, 'selfservice', 'enroll')
@@ -505,7 +529,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
                  ## check if there are other selfserive policy actions
                  policy = tclass_object.getClassInfo('policy', ret=None)
-@@ -1861,14 +1974,14 @@
+@@ -1861,14 +1980,14 @@
                              ''' remove empty lines '''
                              t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
                              e_name = "%s.%s.%s" % (tok, 'selfservice', action)
@@ -565,7 +589,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +                if (not ok):
 +                    if opt == None:
 +                        opt = {}
-+
++                    # More helpful error logging.
 +                    opt['error'] = c.audit.get('info')
 +                    log.error("[check] authorization failed for validate/check: %s" % opt['error'])
 +
@@ -590,11 +614,16 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              if (message in ['sms with otp already submitted',
                              'sms submitted']
                  and len(state) > 0):
-@@ -768,5 +781,79 @@
+@@ -768,5 +781,88 @@
              Session.close()
              log.debug("[smspin] done")
  
++
 +    def webkdc_userinfo(self):
++        # Called by WebAuth via the Elm remctld scripts.
++        # Returns information about whether the user owns any tokens.
++
++        # TODO: Require some sort of session token.
 +        param = {}
 +
 +        try:
@@ -626,6 +655,10 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +            Session.close()
 +
 +    def webkdc_validate(self):
++        # Called by WebAuth via the Elm remctld scripts.
++        # Verifies a one-time passcode and indicates how long
++        # the token should be considered valid.
++
 +        param = {}
 +
 +        try:
@@ -672,20 +705,24 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
 --- a/linotp/lib/base.py
 +++ b/linotp/lib/base.py
-@@ -332,7 +332,7 @@
+@@ -332,7 +332,8 @@
          for language in languages:
              for lang in language.split(','):
                  try:
 -                    if lang == "en":
++                    # Fix borked language detection on some browsers.
 +                    if lang == "en" or lang == "en-gb" or lang == "en-GB":
                          found_lang = True
                          break
                      set_lang(lang)
 --- a/linotp/lib/reply.py
 +++ b/linotp/lib/reply.py
-@@ -207,7 +207,7 @@
+@@ -206,8 +206,10 @@
+            "version": get_version(),
             "id": id }
  
++    # Add the additional data in a more helpful way rather than
++    # dumping it in as a top-level node.
      if opt is not None and len(opt) > 0:
 -        res["detail"] = opt
 +        res["result"].update(opt)
@@ -728,16 +765,19 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
          tok_va = linotp.lib.validate.ValidateToken(token, context=c)
          ## in case of a failure during checking token, we log the error and
-@@ -1310,7 +1310,7 @@
+@@ -1310,7 +1310,10 @@
              #any valid otp increments, independend of the tokens state !!
              token.incOtpCounter(matchinCounter)
  
 -            if (token.isActive() == True):
++            # If the allow_inactive option is present, ignore whether the token is marked as active.
++            # This is used when completing Elm selfservice provisioning, to validate the code
++            # for the not-yet-activated token.
 +            if ("allow_inactive" in options or token.isActive() == True):
                  if token.getFailCount() < token.getMaxFailCount():
                      if token.check_auth_counter():
                          if token.check_validity_period():
-@@ -1335,6 +1335,7 @@
+@@ -1335,6 +1338,7 @@
          sortedAuditList = sorted(auditList, key=lambda audit_entry: audit_entry.get("weight", 0))
          highest_audit = sortedAuditList[-1]
          c.audit['action_detail'] = highest_audit.get('action_detail', '')
@@ -766,6 +806,17 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  def getResolversOfUser(user):
      '''
      This returns the list of the Resolvers of a user in a given realm.
+@@ -477,8 +489,8 @@
+                 log.debug("[getResolversOfUser] type of realm_resolver: %s" % type(realm_resolver))
+                 log.debug("[getResolversOfUser] type of login: %s" % type(login))
+                 if uid not in ["", None]:
+-                    log.info("[getResolversOfUser] user %r found in resolver %r" % (login, realm_resolver))
+-                    log.info("[getResolversOfUser] userid resolved to %r " % uid)
++                    log.debug("[getResolversOfUser] user %r found in resolver %r" % (login, realm_resolver))
++                    log.debug("[getResolversOfUser] userid resolved to %r " % uid)
+ 
+                     ## Unicode Madness:
+                     ## This will break as soon as the unicode "uid" is put into a tuple
 @@ -512,7 +524,15 @@
      loginUser = u''
      loginUser = user.login;
@@ -816,7 +867,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
  import string
  from linotp.lib.crypt import urandom
-@@ -182,18 +183,16 @@
+@@ -182,18 +183,17 @@
      # All functions starting with /selfservice/user are data functions and protected
      # by the session key
      if request.path.lower()[:17] != "/selfservice/user":
@@ -833,6 +884,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -        log.info("[check_selfservice_session]: cookie:  %s" % cookie)
 -        if session is None or session != cookie:
 -            log.error("[check_selfservice_session] The request %s did not pass a valid session!" % request.url)
++        # Check the WebAuth token instead of LinOTP internal auth.
 +        expiry = request.environ.get('WEBAUTH_TOKEN_EXPIRATION')
 +        if expiry is not None:
 +            log.debug("[check_selfservice_session] Got header!")
@@ -1089,11 +1141,12 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
  function resolver_set_sql(obj) {
  
-@@ -4459,7 +4633,21 @@
+@@ -4459,7 +4633,22 @@
              searchbutton: true
      });
  
 -    $('#policy_export').attr("href", '/system/getPolicy/policy.cfg?session=' + getsession());
++	// Pretty buttons instead of the default ones.
 +    $('#policy_import').button({
 +        icons: {
 +            primary: 'ui-icon-arrowthick-1-n'
@@ -1112,13 +1165,14 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
      $('#policy_import').click(function(){
          $dialog_import_policy.dialog("open");
-@@ -4530,20 +4718,23 @@
+@@ -4530,20 +4719,24 @@
              url : '/manage/tokenview_flexi?session='+getsession(),
              method: 'GET',
              dataType : 'json',
 -            colModel : [ {display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
 -                            {display: 'active', name : 'Isactive', width : 30, sortable : true, align: 'center'},
 +            colModel : [
++							// Rearrange table into something more helpful.
 +							{display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
 +                            {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
 +							{display: 'description', name : 'TokenDesc', width : 200, sortable : true, align: 'center'},
@@ -1146,7 +1200,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              height: 400,
              searchitems : [
                  {display: 'in loginname', name: 'loginname', isdefault: true },
-@@ -4574,26 +4765,22 @@
+@@ -4574,26 +4767,23 @@
              url : '/manage/userview_flexi?session='+getsession(),
              method: 'GET',
              dataType : 'json',
@@ -1159,6 +1213,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -            {display: 'phone', name : 'phone', width : 50, sortable : false, align:"left"},
 -                        {display: 'userid', name : 'userid', width : 200, sortable : true, align:"left"}
 +            colModel : [
++				// Rearrange table into something more helpful.
 +				{display: 'username', name : 'username', width : 100, sortable : true, align:"left"},
 +				{display: 'givenname', name : 'givenname', width : 150, sortable : true, align:"left"},
 +				{display: 'surname', name : 'surname', width : 150, sortable : true, align:"left"},
@@ -1433,7 +1488,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 \ No newline at end of file
 --- /dev/null
 +++ b/linotp/public/selfservice/custom-style.css
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,77 @@
 +a {
 + 	color: #3277AE;
 +}
@@ -1449,6 +1504,11 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +a.activeToken {
 +	color: #3277AE;
 +	text-decoration: underline;
++}
++
++.form-help {
++	color: #777777;
++	font-style: italic;
 +}
 +
 +#main {
@@ -1661,6 +1721,15 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  		%endif
  		%if 'setMOTPPIN' in c.actions:
  		<li><a href="/selfservice/setmpin"><span>${_("set mOTP PIN")}</span></a></li>
+@@ -143,7 +147,7 @@
+ 		<li><a href="/selfservice/unassign"><span>${_("unassign Token")}</span></a></li>
+ 		%endif
+ 		%if 'delete' in c.actions:
+-		<li><a href="/selfservice/delete"><span>${_("delete Token")}</span></a></li>
++		<li><a href="/selfservice/delete"><span>${_("Delete Token")}</span></a></li>
+ 		%endif
+ 		%if 'history' in c.actions:
+ 		<li><a href="/selfservice/history"><span>${_("History")}</span></a></li>
 --- a/linotp/lib/policy.py
 +++ b/linotp/lib/policy.py
 @@ -152,6 +152,7 @@
@@ -1671,7 +1740,13 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              'max_count_dpw': {'type': 'int'},
              'max_count_hotp': {'type': 'int'},
              'max_count_totp': {'type': 'int'},
-@@ -2021,7 +2022,9 @@
+@@ -2016,12 +2017,15 @@
+         elif 'userwebprovision' == method:
+             user_selfservice_actions = getSelfserviceActions(authUser)
+             typ = param.get('type').lower()
++            # Allow Elm provisioning.
+             if ((typ == 'oathtoken'
+                     and 'webprovisionOATH' not in user_selfservice_actions)
                  or (typ == 'googleauthenticator_time'and
                      'webprovisionGOOGLEtime' not in user_selfservice_actions)
                  or (typ == 'googleauthenticator'
@@ -1768,5 +1843,101 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  		});
 +
  </script>
+--- a/linotp/templates/selfservice/delete.mako
++++ b/linotp/templates/selfservice/delete.mako
+@@ -25,18 +25,23 @@
+  *    Support: www.lsexperts.de
+  *
+ -->
+-<h1>${_("Delete OTP Token")}</h1>
++<h1>${_("Delete Token")}</h1>
+ 
+ <div id='deleteform'>
+ 	<form class="cmxform" name='myForm'>
+ 		<fieldset>
+-		<table>
+-		<tr>
+-		<td>${_("selected Token")}</td>
+-		<td><input type='text' class='selectedToken'  class="text ui-widget-content ui-corner-all" disabled value='' /></td>
+-		</tr>
+-		</table>
+-		<button class='action-button' id='button_delete' onclick="token_delete(); return false;">${_("delete Token")}</button>
++			<p>This page allows you to delete a token. Your authenticator app will continue to generate codes, but they will no longer be accepted by the Single Sign On service.</p>
++			<p>If all of your tokens are deleted, the Single Sign On service will no longer ask for an access code when you login. You will also be unable to access secure resources that require two-factor authentication: to retain access to these services, you should create a new token.</p>
++			<table>
++				<tr>
++					<!--[if lte IE 9]>
++						<td><label class="ie-label" for="selectedToken">Token</label></td>
++					<![endif]-->
++					<td><input id="selectedToken" type='text' class='selectedToken' class="text ui-widget-content ui-corner-all" disabled value='' placeholder="Token"/>
++					<td><span class="form-help">Click a token on the left to select it.</span></td>
++				</tr>
++			</table>
++			<button class='action-button' id='button_delete' onclick="token_delete(); return false;">${_("Delete Token")}</button>
+ 		</fieldset>
+ 	</form>
+ </div>
+--- a/linotp/templates/selfservice/setpin.mako
++++ b/linotp/templates/selfservice/setpin.mako
+@@ -25,30 +25,39 @@
+  *    Support: www.lsexperts.de
+  *
+ -->
+-<h1>${_("Reset OTP PIN")}</h1>
++<h1>${_("Change Token PIN")}</h1>
+ 
+ <div id='passwordform'>
+ 	<form class="cmxform" name='myForm'>
+ 		<fieldset>
+-	
+-		<table>
+-		<tr>
+-		<td>${_("selected Token")}</td>
+-		<td><input type='text' class='selectedToken' class="text ui-widget-content ui-corner-all" disabled value='' /></td>
+-		</tr>
+-		<tr>
+-		<td><label for=pin1>PIN</label></td>
+-		<td><input autocomplete="off" type='password' onkeyup="checkpins('pin1', 'pin2');" id='pin1' class="text ui-widget-content ui-corner-all" value='' /></td>
+-		</tr>
+-		<tr>
+-		<td><label for=pin2>${_("repeat PIN")}</label></td>
+-		<td><input autocomplete="off" type='password' onkeyup="checkpins('pin1', 'pin2');" id='pin2' class="text ui-widget-content ui-corner-all" value=''/></td>
+-  		</tr>
+-		</table>
+-		<button class='action-button' id='button_setpin' onclick="setpin(); return false;">${_("set PIN")}</button>
+-	<input type='hidden' value='${_("The passwords do not match!")}' 		id='setpin_fail'/>
+-		<input type='hidden' value='${_("Error setting PIN: ")}' 			id='setpin_error'/>
+-		<input type='hidden' value='${_("PIN set successfully")}'			id='setpin_ok'/>
++			<p>This page allows you to change the PIN associated with a token. Once you update your PIN, you should use the new PIN when logging in to Single Sign On services.</p>
++			<p>Note that the PIN for each token is independent. If you have multiple tokens, this page will only update the PIN for the selected token - you should repeat the process for your other tokens if you wish to change their PINs as well.</p>
++			<table>
++				<tr>
++					<!--[if lte IE 9]>
++						<td><label class="ie-label" for="selectedToken">Token</label></td>
++					<![endif]-->
++					<td><input id="selectedToken" type='text' class='selectedToken' class="text ui-widget-content ui-corner-all" disabled value='' placeholder="Token"/>
++					<td><span class="form-help">Click a token on the left to select it.</span></td>
++				</tr>
++				<tr>
++					<!--[if lte IE 9]>
++						<td><label class="ie-label" for="pin1">New PIN</label></td>
++					<![endif]-->
++					<td><input autocomplete="off" type='password' id='pin1' class="text ui-widget-content ui-corner-all" value='' placeholder="New PIN"/></td>
++				</tr>
++				<tr>
++					<!--[if lte IE 9]>
++						<td><label class="ie-label" for="pin1">Confirm new PIN</label></td>
++					<![endif]-->
++
++					<td><input autocomplete="off" type='password' onkeyup="checkpins('pin1', 'pin2');" id='pin2' class="text ui-widget-content ui-corner-all" value='' placeholder="Confirm new PIN"/></td>
++				</tr>
++			</table>
++			<button class='action-button' id='button_setpin' onclick="setpin(); return false;">${_("set PIN")}</button>
++			<input type='hidden' value='${_("The passwords do not match!")}' 		id='setpin_fail'/>
++			<input type='hidden' value='${_("Error setting PIN: ")}' 			id='setpin_error'/>
++			<input type='hidden' value='${_("PIN set successfully")}'			id='setpin_ok'/>
+ 		</fieldset>
+ 	</form>
+ </div>
 Binary files a/linotp/public/favicon.ico and b/linotp/public/favicon.ico differ
 Binary files /dev/null and b/linotp/public/images/crest.png differ
