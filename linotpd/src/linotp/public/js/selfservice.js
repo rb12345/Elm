@@ -525,12 +525,12 @@ function token_delete() {
     }, function(data, textStatus, XMLHttpRequest) {
         hide_waiting();
         if (data.result.status == false) {
-            $('#error').show();
-			$('#success').hide();
+            $('#del_error').show();
+			$('#del_success').hide();
         };
         if (data.result.status == true) {
-            $('#error').hide();
-			$('#success').show();
+            $('#del_error').hide();
+			$('#del_success').show();
             showTokenlist();
             $('.selectedToken').val("");
         };
@@ -681,9 +681,9 @@ function setpin() {
     var serial = $('.selectedToken').val();
 
     if (pin1 != pin2) {
-		$('#error').show();
-		$('#success').hide();
-		$('#error').text("Your PIN codes msut match.");
+		$('#setpin_error').show();
+		$('#setpin_success').hide();
+		$('#setpin_error').text("Your PIN codes msut match.");
 
         hide_waiting();
     } else {
@@ -694,13 +694,13 @@ function setpin() {
         }, function(data, textStatus, XMLHttpRequest) {
             hide_waiting();
             if (data.result.status == false) {
-				$('#success').hide();
-				$('#error').show();
-				$('#error').text("There was an error updating your PIN: '" + data.result.error.message + "'. Please refresh the page and try again.");
+				$('#setpin_success').hide();
+				$('#setpin_error').show();
+				$('#setpin_error').text("There was an error updating your PIN: '" + data.result.error.message + "'. Please refresh the page and try again.");
             };
             if (data.result.status == true) {
-                $('#success').show();
-				$('#error').hide();
+                $('#setpin_success').show();
+				$('#setpin_error').hide();
                 $('#pin1').val("");
                 $('#pin2').val("");
             };

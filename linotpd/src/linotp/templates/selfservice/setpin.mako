@@ -30,8 +30,8 @@
 <div id='passwordform'>
 	<form class="cmxform" name='myForm'>
 		<fieldset>
-			<span id=error></span>
-			<span id=success>Your PIN was updated successfully.</span>
+			<span id=setpin_error></span>
+			<span id=setpin_success>Your PIN was updated successfully.</span>
 
 			<p>This page allows you to change the PIN associated with a token. Once you update your PIN, you should use the new PIN when logging in to Single Sign On services.</p>
 			<p>Note that the PIN for each token is independent. If you have multiple tokens, this page will only update the PIN for the selected token - you should repeat the process for your other tokens if you wish to change their PINs as well.</p>
@@ -65,6 +65,6 @@
 
 <script>
 		// Initial display.
-	   	$('#success').hide();
-		$('#error').hide();
+	   	$('#setpin_success').hide();
+		$('#setpin_error').hide();
 </script>
