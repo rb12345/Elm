@@ -51,7 +51,7 @@ a.activeToken {
 	color: #3277AE;
  }
  
- #error_pin, #error_otp {
+ #error_pin, #error_otp, #error {
 	color: #FF0000;
  }
  

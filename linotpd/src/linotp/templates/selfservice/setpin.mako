@@ -30,6 +30,9 @@
 <div id='passwordform'>
 	<form class="cmxform" name='myForm'>
 		<fieldset>
+			<span id=error></span>
+			<span id=success>Your PIN was updated successfully.</span>
+
 			<p>This page allows you to change the PIN associated with a token. Once you update your PIN, you should use the new PIN when logging in to Single Sign On services.</p>
 			<p>Note that the PIN for each token is independent. If you have multiple tokens, this page will only update the PIN for the selected token - you should repeat the process for your other tokens if you wish to change their PINs as well.</p>
 			<table>
@@ -44,20 +47,24 @@
 					<!--[if lte IE 9]>
 						<td><label class="ie-label" for="pin1">New PIN</label></td>
 					<![endif]-->
-					<td><input autocomplete="off" type='password' id='pin1' class="text ui-widget-content ui-corner-all" value='' placeholder="New PIN"/></td>
+					<td><input autocomplete="off" type='password' id="pin1" class="text ui-widget-content ui-corner-all" value='' placeholder="New PIN"/></td>
 				</tr>
 				<tr>
 					<!--[if lte IE 9]>
 						<td><label class="ie-label" for="pin1">Confirm new PIN</label></td>
 					<![endif]-->
 
-					<td><input autocomplete="off" type='password' onkeyup="checkpins('pin1', 'pin2');" id='pin2' class="text ui-widget-content ui-corner-all" value='' placeholder="Confirm new PIN"/></td>
+					<td><input autocomplete="off" type='password' onkeyup="checkpins('pin1', 'pin2');" id="pin2" class="text ui-widget-content ui-corner-all" value='' placeholder="Confirm new PIN"/></td>
 				</tr>
 			</table>
 			<button class='action-button' id='button_setpin' onclick="setpin(); return false;">${_("set PIN")}</button>
-			<input type='hidden' value='${_("The passwords do not match!")}' 		id='setpin_fail'/>
-			<input type='hidden' value='${_("Error setting PIN: ")}' 			id='setpin_error'/>
-			<input type='hidden' value='${_("PIN set successfully")}'			id='setpin_ok'/>
+
 		</fieldset>
 	</form>
 </div>
+
+<script>
+		// Initial display.
+	   	$('#success').hide();
+		$('#error').hide();
+</script>

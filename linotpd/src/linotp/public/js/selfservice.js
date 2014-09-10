@@ -525,10 +525,12 @@ function token_delete() {
     }, function(data, textStatus, XMLHttpRequest) {
         hide_waiting();
         if (data.result.status == false) {
-            alert("Error deleting Token");
+            $('#error').show();
+			$('#success').hide();
         };
         if (data.result.status == true) {
-            alert("Token deleted successfully");
+            $('#error').hide();
+			$('#success').show();
             showTokenlist();
             $('.selectedToken').val("");
         };
@@ -677,12 +679,12 @@ function setpin() {
     var pin1 = $('#pin1').val();
     var pin2 = $('#pin2').val();
     var serial = $('.selectedToken').val();
-    var setpin_failed = $('#setpin_fail').val();
-    var setpin_error = $('#setpin_error').val();
-    var setpin_ok = $('#setpin_ok').val();
 
     if (pin1 != pin2) {
-        alert(setpin_failed);
+		$('#error').show();
+		$('#success').hide();
+		$('#error').text("Your PIN codes msut match.");
+
         hide_waiting();
     } else {
         $.post('/selfservice/usersetpin', {
@@ -692,10 +694,13 @@ function setpin() {
         }, function(data, textStatus, XMLHttpRequest) {
             hide_waiting();
             if (data.result.status == false) {
-                alert(setpin_error + data.result.error.message);
+				$('#success').hide();
+				$('#error').show();
+				$('#error').text("There was an error updating your PIN: '" + data.result.error.message + "'. Please refresh the page and try again.");
             };
             if (data.result.status == true) {
-                alert(setpin_ok);
+                $('#success').show();
+				$('#error').hide();
                 $('#pin1').val("");
                 $('#pin2').val("");
             };
@@ -897,8 +902,8 @@ function view_audit_selfservice() {
 function elmProvision() {
     show_waiting();
 
-	var pin1 = $('#pin1').val();
-    var pin2 = $('#pin2').val();
+	var pin1 = $('#elm_pin1').val();
+    var pin2 = $('#elm_pin2').val();
 
     if (pin1 != pin2) {
 		$('#error_pin').text("PIN codes must match.");
