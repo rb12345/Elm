@@ -33,17 +33,10 @@
 			<ol id="provisionElmInstall">
 				<li>Install the appropriate authenticator application on your mobile device:
 					<ul>
-						<li>Android, iOS or Blackberry OS 7 and earlier: <a href='m.google.com/authenticator' target='extern'>Google Authenticator</a></li>
+						<li>Android, iOS or Blackberry OS 7 and earlier: <a href='http://m.google.com/authenticator' target='extern'>Google Authenticator</a></li>
 						<li>Blackberry OS 10: <a href='http://appworld.blackberry.com/webstore/content/76023/?lang=en' target='extern'>Duo Mobile</a></li>
-						<li>Windows Phone: <a href='go.microsoft.com/fwlink/?LinkId=279710' target='extern'>Microsoft Authenticator</a></li>
+						<li>Windows Phone: <a href='http://go.microsoft.com/fwlink/?LinkId=279710' target='extern'>Microsoft Authenticator</a></li>
 					</ul>
-					Alternatively, if you are viewing this page on your desktop, you can scan the following QR code with your mobile device:
-					<div id="accordion">
-						<h3>QR Code</h3>
-						<div>
-							<span id=qr_code_download></span>
-						</div>
-					</div>
 				</li>
 				<li>Choose a four-digit PIN code for the new token. Your PIN is required whenever you are asked for an access code - for example, if your PIN
 					is 1234 and your one-time-password is 000000, you would enter '1234000000'.
@@ -74,7 +67,7 @@
 						 <a id=google_link>${_("Install token")}</a>
 					</p>
 					<p>${_("Alternatively, scan the QR code below with your authenticator device.")}</p>
-					<div id="accordion2">
+					<div id="accordion">
 						<h3>QR Code</h3>
 						<div>
 							<span id=google_qr_code></span>
@@ -113,17 +106,10 @@
 		$('#provisionElmInstall').show();
 	   	$('#provisionElmResultDiv').hide();
 		$('#provisionElmComplete').hide();
-	   	$('#qr_code_download').show();
-	   	$('#qr_code_download').html(generate_qrcode(10,"https://mfa-test.bsp.ox.ac.uk/selfservice/authenticator.html"));
-		// Set up the accordion drop-downs for the QR codes.
+
+		// Set up the accordion drop-down for the QR codes.
 		$(function() {
 			$("#accordion").accordion({
-				'collapsible' : true,
-				'active' : false
-			});
-		});
-		$(function() {
-			$("#accordion2").accordion({
 				'collapsible' : true,
 				'active' : false
 			});

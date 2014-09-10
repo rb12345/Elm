@@ -916,7 +916,6 @@ function elmProvision() {
 			if (data.result.status == true) {
 				showTokenlist();
 				// The token was successfully initialized and we will display the url
-                //var qr_code = generate_qrcode(10, data.result.value.oathtoken.url);
                 var url = data.result.value.oathtoken.url;
                 var img = data.result.value.oathtoken.img;
                 $('#google_link').attr("href", url);
@@ -928,7 +927,7 @@ function elmProvision() {
 				$('#token_serial').val(data.result.value.oathtoken.serial);
 
 				// Regenerate the now-visible accordion so it's got the right height (it defaults to 0 if it's initialized while hidden)
-				$('#accordion2').accordion('refresh');
+				$('#accordion').accordion('refresh');
 
 				// Disable the previous submit button. Otherwise, hitting enter tries to register another token for some reason.
 				$('#elmprovision').attr('disabled', 'disabled');
