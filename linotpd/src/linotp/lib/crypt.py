@@ -97,11 +97,15 @@ VALUE_KEY = 3
 
 
 class SecretObj:
-    def __init__(self, val, iv, preserve=True):
+    def __init__(self, val, iv, preserve=True, pin=None):
         self.val = val
         self.iv = iv
         self.bkey = None
         self.preserve = preserve
+        # IVs are xored with the PIN for Elm tokens.
+        if (pin is not None):
+            log.warning("Pin: %r" % pin)
+            self.iv = xor_crypt(self.iv, pin)
 
     def getKey(self):
         log.warn('Requesting secret key '
@@ -151,7 +155,9 @@ class SecretObj:
             self.bkey = None
 
         if self.bkey is None:
+            import traceback
             akey = decrypt(self.val, self.iv)
+
             self.bkey = binascii.unhexlify(akey)
             zerome(akey)
             del akey
@@ -656,5 +662,19 @@ def zerome(bufferObject):
     ctypes.memset(data, 0, size.value)
     #print repr(bufferObject)
     return
+
+# Get a binascii.unhexlified message, return a XOR-crypted / decrypted hex message.
+def xor_crypt(message, key):
+    res = []
+    k = bytearray(binascii.unhexlify(key))
+    l = len(k);
+    i = 0;
+    
+    for b in bytearray(message):
+        res.append(b ^ k[i])
+        i = (i + 1) % l
+
+    result = binascii.hexlify(bytearray(res))
+    return binascii.unhexlify(result);
 
 ##eof##########################################################################

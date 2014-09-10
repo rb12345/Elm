@@ -57,6 +57,7 @@ from linotp.lib.crypt import encrypt, hash, SecretObj
 from linotp.lib.crypt import encryptPin
 from linotp.lib.crypt import decryptPin
 from linotp.lib.crypt import get_rand_digit_str
+from linotp.lib.crypt import xor_crypt
 
 
 from pylons import config
@@ -228,11 +229,11 @@ class Token(object):
         self.LinOtpTokenPinUserIV = unicode(binascii.hexlify(iv))
 
 
-    def getHOtpKey(self):
-        log.debug('getHOtpKey()')
+    def getHOtpKey(self, pin=None):
+        log.warning('getHOtpKey()')
         key = binascii.unhexlify(self.LinOtpKeyEnc or '')
         iv = binascii.unhexlify(self.LinOtpKeyIV or '')
-        secret = SecretObj(key, iv)
+        secret = SecretObj(key, iv, pin=pin)
         return secret
 
     def getOtpCounter(self):
@@ -247,11 +248,19 @@ class Token(object):
         secret = SecretObj(key, iv)
         return secret
 
-    def setHashedPin(self, pin):
+    def setHashedPin(self, pin, oldpin = None):
         log.debug('setHashedPin()')
         seed = geturandom(16)
         self.LinOtpSeed = unicode(binascii.hexlify(seed))
         self.LinOtpPinHash = unicode(binascii.hexlify(hash(pin, seed)))
+        # For Elm, we crypt the IV with the PIN.
+        if (self.LinOtpKeyIV and oldpin):
+            # Decrypt the IV with the old PIN
+            iv = xor_crypt(binascii.unhexlify(self.LinOtpKeyIV, oldpin))
+            # Encrypt the IV with the new PIN
+            self.LinOtpKeyIV = xor_crypt(iv, pin)
+
+
         return self.LinOtpPinHash
 
     def getHashedPin(self, pin):
@@ -279,7 +288,7 @@ class Token(object):
         log.debug('setOtpLen %i' % int(otplen))
         self.LinOtpOtpLen = int(otplen)
 
-    def setPin(self, pin, hashed=True):
+    def setPin(self, pin, hashed=True, oldpin = None):
         # TODO: we could log the PIN here
         log.debug("setPin()")
 
@@ -287,7 +296,7 @@ class Token(object):
         if pin != "" and pin is not None:
             upin = pin
         if hashed == True:
-            self.setHashedPin(upin)
+            self.setHashedPin(upin, oldpin)
             log.debug("setPin(HASH:%r)" % self.LinOtpPinHash)
         elif hashed == False:
             self.LinOtpPinHash = "@@" + encryptPin(upin)

@@ -760,6 +760,7 @@ class SelfserviceController(BaseController):
             checkPolicyPre('selfservice', 'usersetpin', param, self.authUser)
 
             userPin = getParam(param, "userpin", required)
+            oldPin = getParam(param, "oldpin", required)
             serial = getParam(param, "serial", required)
 
             if (True == isTokenOwner(serial, self.authUser)):

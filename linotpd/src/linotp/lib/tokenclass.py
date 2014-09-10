@@ -223,7 +223,7 @@ class TokenClass(object):
         if res != -1:
             pin_match = check_pin(self, pin, user=user, options=options)
             if pin_match is True:
-                otp_counter = check_otp(self, otpval, options=options)
+                otp_counter = check_otp(self, otpval, options=options, pin=pin)
 
         return (pin_match, otp_counter, reply)
 
@@ -689,8 +689,10 @@ class TokenClass(object):
         enc = getParam(param, "encryptpin", optional)
         if enc is not None and "true" == enc.lower():
             storeHashed = False
-
-        self.token.setPin(pin, storeHashed)
+            
+        oldpin = getParam(param, "oldpin", optional)
+        
+        self.token.setPin(pin, storeHashed, oldpin)
 
     def getPinHashSeed(self):
         return self.token.LinOtpPinHash, self.token.LinOtpSeed
@@ -1681,7 +1683,7 @@ class OcraTokenClass(TokenClass):
         return (transid, challenge, True, url)
 
 
-    def checkOtp(self, passw , counter , window , options=None):
+    def checkOtp(self, passw , counter , window , options=None, pin=None):
         '''
         checkOtp - standard callback of linotp to verify the token
 
@@ -1703,7 +1705,8 @@ class OcraTokenClass(TokenClass):
 
         ret = -1
 
-        secretHOtp = self.token.getHOtpKey()
+        # Pass any PIN we might have got onwards.
+        secretHOtp = self.token.getHOtpKey(pin=pin)
         ocraSuite = OcraSuite(self.getOcraSuiteSuite(), secretHOtp)
 
         ## if we have no transactionid given through the options,

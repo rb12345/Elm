@@ -376,7 +376,7 @@ class TimeHmacTokenClass(HmacTokenClass):
 
 
 
-    def checkOtp(self, anOtpVal, counter, window, options=None):
+    def checkOtp(self, anOtpVal, counter, window, options=None, pin=None):
         '''
         checkOtp - validate the token otp against a given otpvalue
 
@@ -398,7 +398,7 @@ class TimeHmacTokenClass(HmacTokenClass):
         '''
 
         log.debug("[checkOtp] begin. Validate the token otp: anOtpVal: %r ,\
-                    counter: %r,window: %r, options: %r " %
+                    counter: %r,window: %r, options: %r" %
                     (anOtpVal, counter, window, options))
 
         try:
@@ -406,7 +406,7 @@ class TimeHmacTokenClass(HmacTokenClass):
         except ValueError as e:
             raise e
 
-        secretHOtp = self.token.getHOtpKey()
+        secretHOtp = self.token.getHOtpKey(pin)
         self.hashlibStr = self.getFromTokenInfo("hashlib", self.hashlibStr)
 
         timeStepping = int(self.getFromTokenInfo("timeStep", self.timeStep))
@@ -444,9 +444,11 @@ class TimeHmacTokenClass(HmacTokenClass):
         log.debug("[checkOTP] shift   : %r " % (shift))
 
         hmac2Otp = HmacOtp(secretHOtp, counter, otplen, self.getHashlib(self.hashlibStr))
+
+        log.debug("got hmac")
         res = hmac2Otp.checkOtp(anOtpVal, int (window / timeStepping), symetric=True)
 
-        log.debug("[checkOTP] comparing the result %i to the old counter %i." % (res, oCount))
+        log.warning("[checkOTP] comparing the result %i to the old counter %i." % (res, oCount))
         if res != -1 and oCount != 0 and res <= oCount:
             if initTime == -1:
                 log.warning("[checkOTP] a previous OTP value was used again!\n former tokencounter: %i, presented counter %i" %

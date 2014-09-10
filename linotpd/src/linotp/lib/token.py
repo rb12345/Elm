@@ -1270,6 +1270,7 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
         except Exception as exx:
             log.error("checking token %r failed: %r" % (token, exx))
             ret = -1
+            raise
 
         (cToken, pToken, iToken, vToken) = tok_va.get_verification_result()
 

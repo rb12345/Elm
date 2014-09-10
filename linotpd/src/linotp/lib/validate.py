@@ -248,7 +248,7 @@ def check_pin(token, passw, user=None, options=None):
 
     return res
 
-def check_otp(token, otpval, options=None):
+def check_otp(token, otpval, options=None, pin=None):
     '''
     check the otp value
 
@@ -269,7 +269,7 @@ def check_otp(token, otpval, options=None):
     counter = token.getOtpCount()
     window = token.getOtpCountWindow()
 
-    res = token.checkOtp(otpval, counter, window, options=options)
+    res = token.checkOtp(otpval, counter, window, options=options, pin=pin)
     return res
 
 def split_pin_otp(token, passw, user=None, options=None):
