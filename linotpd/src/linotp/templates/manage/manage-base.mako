@@ -410,12 +410,19 @@ ${c.version} --- ${c.licenseinfo}
 	    		<option value="ocra">OCRA PIN</option>
 	    		<option selected value="otp">OTP PIN</option>
 	    		</select>
-	    		</td></tr><tr><td>
+	    		</td></tr>
+				<tr><td>
+	    		<label for="pin0">Old PIN (if any)</label>
+	    		</td><td>
+	    		<input type="password" autocomplete="off" name="pin0" id="pin0" class="text ui-widget-content ui-corner-all"/>
+	    		</td></tr>
+				<tr><td>
+				<tr><td>
 	    		<label for="pin1">PIN</label>
 	    		</td><td>
-	    		<input type="password" autocomplete="off" onkeyup="checkpins('pin1','pin2');" name="pin1" id="pin1"
-	    			class="text ui-widget-content ui-corner-all" />
-	    		</td></tr><tr><td>
+	    		<input type="password" autocomplete="off" name="pin1" id="pin1" class="text ui-widget-content ui-corner-all" />
+	    		</td></tr>
+				<tr><td>
 	    		<label for="pin2">${_("PIN (again)")}</label>
 	    		</td><td>
 	    		<input type="password" autocomplete="off" onkeyup="checkpins('pin1','pin2');" name="pin2" id="pin2" class="text ui-widget-content ui-corner-all" />

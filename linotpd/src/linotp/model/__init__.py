@@ -250,15 +250,27 @@ class Token(object):
 
     def setHashedPin(self, pin, oldpin = None):
         log.debug('setHashedPin()')
+
+        # For Elm, we crypt the IV with the PIN.
+        if (self.LinOtpKeyIV):
+            iv = binascii.unhexlify(self.LinOtpKeyIV)
+
+            # If we have an existing PIN hash, we need to
+            # re-encrypt the IV with the new PIN.
+            if (self.LinOtpPinHash):
+                if (oldpin):
+                    iv = xor_crypt(iv, oldpin)
+                else:
+                    # We *need* the old PIN. Otherwise, we have no way of finding the true IV
+                    # and thus we can't decrypt the token secret.
+                    raise Exception("Old PIN is required to change an existing PIN!")
+
+            # Encrypt the IV with the new PIN
+            self.LinOtpKeyIV = binascii.hexlify(xor_crypt(iv, pin))
+
         seed = geturandom(16)
         self.LinOtpSeed = unicode(binascii.hexlify(seed))
         self.LinOtpPinHash = unicode(binascii.hexlify(hash(pin, seed)))
-        # For Elm, we crypt the IV with the PIN.
-        if (self.LinOtpKeyIV and oldpin):
-            # Decrypt the IV with the old PIN
-            iv = xor_crypt(binascii.unhexlify(self.LinOtpKeyIV, oldpin))
-            # Encrypt the IV with the new PIN
-            self.LinOtpKeyIV = xor_crypt(iv, pin)
 
 
         return self.LinOtpPinHash
@@ -508,13 +520,6 @@ class Token(object):
             if secretObj.compare(otpKey) == False:
                 log.debug('update token OtpKey - counter reset')
                 self.setHKey(otpKey)
-
-    def updateToken(self, tokenDesc, otpKey, pin):
-        log.debug('updateToken()')
-
-        self.setDescription(tokenDesc)
-        self._setPin(pin)
-        self.updateOtpKey(otpKey)
 
     def getRealms(self):
         return self.realms or ''

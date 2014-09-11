@@ -102,6 +102,8 @@ from linotp.lib.user import getUserInfo, User, getAllUserRealms
 
 from linotp.lib.error import SelfserviceException
 
+from linotp.lib.validate import check_pin
+
 import traceback
 #import datetime, random
 import copy
@@ -762,6 +764,17 @@ class SelfserviceController(BaseController):
             userPin = getParam(param, "userpin", required)
             oldPin = getParam(param, "oldpin", required)
             serial = getParam(param, "serial", required)
+
+            # Check the old PIN is correct.
+            tokenList = getTokens4UserOrSerial(None, serial, forUpdate=True)
+            # Should only be one token with this serial.
+            token = tokenList[0]
+
+            pin_match = check_pin(token, oldPin, user=self.authUser)
+
+            if (not pin_match):
+                log.warning("[usersetpin] Incorrect previous PIN provided for token %s by user %s." % (serial, c.user))
+                return sendError(response, u"Your current PIN is incorrect. Please try again.")
 
             if (True == isTokenOwner(serial, self.authUser)):
                 log.info("[usersetpin] user %s@%s is setting the OTP PIN "

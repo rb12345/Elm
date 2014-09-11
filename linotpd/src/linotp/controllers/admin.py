@@ -65,6 +65,7 @@ from linotp.lib.audit.base import logTokenNum
 # for loading XML file
 from linotp.lib.ImportOTP import parseSafeNetXML, parseOATHcsv, ImportException, parseYubicoCSV
 
+from linotp.lib.validate import check_pin
 
 from tempfile import mkstemp
 import os
@@ -1081,6 +1082,7 @@ class AdminController(BaseController):
             * validityPeriodStart    - optional - set the start date of the validity period. The token can not be used before this date
             * validityPeriodEnd      - optional - set the end date of the validaity period. The token can not be used after this date
             * phone - set the phone number for an SMS token
+            * oldpin        - optional - the previous PIN code
 
         returns:
             a json result with a boolean
@@ -1112,6 +1114,7 @@ class AdminController(BaseController):
         validityPeriodEnd\
         description\
         phone\
+        oldpin\
         "
         log.debug('[set]')
         msg = ""
@@ -1132,6 +1135,20 @@ class AdminController(BaseController):
                 log.info("[set] setting pin for token with serial %r" % serial)
                 if 1 == getOTPPINEncrypt(serial=serial, user=user):
                     param['encryptpin'] = "True"
+
+                oldPin = getParam(param, "oldpin", optional)
+                if oldPin:
+                    # Check the old PIN is correct.
+                    tokenList = getTokens4UserOrSerial(None, serial, forUpdate=True)
+                    # Should only be one token with this serial.
+                    token = tokenList[0]
+
+                    pin_match = check_pin(token, oldPin, user=user)
+
+                    if (not pin_match):
+                        log.warning("[set] Incorrect previous PIN provided for token %s." % (serial))
+                        return sendError(response, u"The old PIN is incorrect. Please try again.")
+
                 ret = setPin(upin, user, serial, param)
                 res["set pin"] = ret
                 count = count + 1

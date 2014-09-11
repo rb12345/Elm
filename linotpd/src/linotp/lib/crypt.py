@@ -669,7 +669,7 @@ def xor_crypt(message, key):
     k = bytearray(binascii.unhexlify(key))
     l = len(k);
     i = 0;
-    
+
     for b in bytearray(message):
         res.append(b ^ k[i])
         i = (i + 1) % l

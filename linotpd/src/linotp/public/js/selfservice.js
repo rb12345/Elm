@@ -676,6 +676,7 @@ function provisionGoogle() {
 
 function setpin() {
     show_waiting();
+	var pin0 = $('#pin0').val();
     var pin1 = $('#pin1').val();
     var pin2 = $('#pin2').val();
     var serial = $('.selectedToken').val();
@@ -683,11 +684,12 @@ function setpin() {
     if (pin1 != pin2) {
 		$('#setpin_error').show();
 		$('#setpin_success').hide();
-		$('#setpin_error').text("Your PIN codes msut match.");
+		$('#setpin_error').text("Your PIN codes must match.");
 
         hide_waiting();
     } else {
         $.post('/selfservice/usersetpin', {
+			oldpin: pin0,
             userpin : pin1,
             serial : serial,
             session : get_selfservice_session()

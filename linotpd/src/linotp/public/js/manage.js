@@ -962,27 +962,37 @@ function setpin_callback(xhdr, textStatus) {
             else
                 alert_info_text("text_setpin_failed", obj.result.error.message, ERROR);
         }
+	else
+		alert_info_text("text_setpin_failed", obj.result.error.message, ERROR);
 }
 
 function token_setpin(){
     var token_string = $('#setpin_tokens').val();
     var tokens = token_string.split(",");
     var count = tokens.length;
-    var pin = $('#pin1').val();
+
+	var pin0 = $('#pin0').val();
+	var pin1 = $('#pin1').val();
+	var pin2 = $('#pin2').val();
+
     var pintype = $('#pintype').val();
 
-    for ( i = 0; i < count; i++) {
-        var serial = tokens[i];
-        if (pintype.toLowerCase() == "otp") {
-            clientUrlFetch("/admin/set", {"serial" : serial , "pin" : pin}, setpin_callback);
-        } else if ((pintype.toLowerCase() == "motp")) {
-            clientUrlFetch("/admin/setPin", {"serial" : serial, "userpin" : pin}, setpin_callback);
-        } else if ((pintype.toLowerCase() == "ocrapin")) {
-            clientUrlFetch("/admin/setPin", {"serial" : serial, "userpin" : pin}, setpin_callback);
-        } else
-            alert_info_text("text_unknown_pintype", pintype, ERROR);
-    }
-
+	if (pin1 != pin2)
+		alert_info_text("PINs must match!")
+	else
+	{
+		for ( i = 0; i < count; i++) {
+			var serial = tokens[i];
+			if (pintype.toLowerCase() == "otp") {
+				clientUrlFetch("/admin/set", {"serial" : serial , "pin" : pin1, "oldpin" : pin0}, setpin_callback);
+			} else if ((pintype.toLowerCase() == "motp")) {
+				clientUrlFetch("/admin/setPin", {"serial" : serial, "userpin" : pin1}, setpin_callback);
+			} else if ((pintype.toLowerCase() == "ocrapin")) {
+				clientUrlFetch("/admin/setPin", {"serial" : serial, "userpin" : pin1}, setpin_callback);
+			} else
+				alert_info_text("text_unknown_pintype", pintype, ERROR);
+		}
+	}
 }
 
 function view_setpin_dialog(tokens) {

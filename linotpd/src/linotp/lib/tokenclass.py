@@ -689,9 +689,9 @@ class TokenClass(object):
         enc = getParam(param, "encryptpin", optional)
         if enc is not None and "true" == enc.lower():
             storeHashed = False
-            
+
         oldpin = getParam(param, "oldpin", optional)
-        
+
         self.token.setPin(pin, storeHashed, oldpin)
 
     def getPinHashSeed(self):

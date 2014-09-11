@@ -44,13 +44,13 @@
 						<tr><td><span id=error_pin></span></td></tr>
 						<tr>
 							<!--[if lte IE 9]>
-								<td><label class="ie-label" for="pin1">PIN</label></td>
+								<td><label class="ie-label" for="elm_pin1">PIN</label></td>
 							<![endif]-->
 							<td><input id="elm_pin1" autocomplete="off" type="password" placeholder="PIN" size="10" maxlength="4" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
 						</tr>
 						<tr>
 							<!--[if lte IE 9]>
-								<td><label class="ie-label" for="pin2">Confirm PIN</label></td>
+								<td><label class="ie-label" for="elm_pin2">Confirm PIN</label></td>
 							<![endif]-->						
 							<td><input id="elm_pin2" autocomplete="off" type="password" placeholder="Confirm PIN" size="10" maxlength="4" tabindex="1" onkeyup="checkpins('elm_pin1', 'elm_pin2');" class="text ui-widget-content ui-corner-all"/></td>
 						</tr>
