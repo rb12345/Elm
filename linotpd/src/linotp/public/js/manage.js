@@ -1985,6 +1985,9 @@ function save_oak_config(){
         '#oak_realm': 'OAKREALM',
         '#oak_sizelimit': 'SIZELIMIT',
     };
+	if ($('#autorealm')[0].checked)
+		oak_map['#autorealm_name'] = 'realmname';
+
     var url = '/system/setResolver?name='+resolvername+'&type='+resolvertype+'&';
     for (var key in oak_map) {
         var data = $(key).serialize();
@@ -4385,7 +4388,10 @@ function resolver_ldap(name){
 function resolver_set_oak(obj) {
     $('#oak_realm').val(obj.result.value.data.OAKREALM);
     $('#oak_sizelimit').val(obj.result.value.data.SIZELIMIT);
-
+	// If we're editing, hide the 'auto create a realm?' box.
+	if (obj.result.value.data.OAKREALM)
+		$('#is_edit').val('yes');
+		$('#realm_hidden').hide();
 }
 
 function resolver_oak(name){
@@ -4431,7 +4437,7 @@ function resolver_oak(name){
 
 	jQuery.validator.addMethod("oak_realm", function(value, element, param){
         return value.match(/^[a-z0-9]+$/i);
-    }, "Please enter a valid Oak realm identifier. It may contain characters or numbers.");
+    }, "Please enter a valid Oak realm identifier. It may contain characters or numbers but not spaces or symbols.");
 
 	$("#form_oakconfig").validate({
         rules: {

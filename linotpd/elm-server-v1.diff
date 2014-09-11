@@ -12,7 +12,7 @@ Last-Update: <YYYY-MM-DD, last update of the meta-information, optional>
 This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 --- a/config/who.ini
 +++ b/config/who.ini
-@@ -1,38 +1 @@
+@@ -1,38 +1,3 @@
 -[plugin:form]
 -#use = repoze.who.plugins.form:make_redirecting_plugin
 -use = linotp.lib.repoze_identify:make_redirecting_plugin
@@ -20,6 +20,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -login_handler_path = /account/dologin
 -logout_handler_path = /account/logout
 -rememberer_name = auth_tkt
++# We don't want to use internal LinOTP authentication.
  
 -[plugin:auth_tkt]
 -use = repoze.who.plugins.auth_tkt:make_plugin
@@ -29,7 +30,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -secure = "true"
 -#include_ip = "true"
 -cookie_name = linotp_selfservice
--
+ 
 -[general]
 -request_classifier = repoze.who.classifiers:default_request_classifier
 -challenge_decider = repoze.who.classifiers:default_challenge_decider
@@ -142,7 +143,52 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 \ No newline at end of file
 --- a/linotp/controllers/admin.py
 +++ b/linotp/controllers/admin.py
-@@ -2142,6 +2142,17 @@
+@@ -65,6 +65,7 @@
+ # for loading XML file
+ from linotp.lib.ImportOTP import parseSafeNetXML, parseOATHcsv, ImportException, parseYubicoCSV
+ 
++from linotp.lib.validate import check_pin
+ 
+ from tempfile import mkstemp
+ import os
+@@ -1081,6 +1082,7 @@
+             * validityPeriodStart    - optional - set the start date of the validity period. The token can not be used before this date
+             * validityPeriodEnd      - optional - set the end date of the validaity period. The token can not be used after this date
+             * phone - set the phone number for an SMS token
++            * oldpin        - optional - the previous PIN code
+ 
+         returns:
+             a json result with a boolean
+@@ -1112,6 +1114,7 @@
+         validityPeriodEnd\
+         description\
+         phone\
++        oldpin\
+         "
+         log.debug('[set]')
+         msg = ""
+@@ -1132,6 +1135,20 @@
+                 log.info("[set] setting pin for token with serial %r" % serial)
+                 if 1 == getOTPPINEncrypt(serial=serial, user=user):
+                     param['encryptpin'] = "True"
++
++                oldPin = getParam(param, "oldpin", optional)
++                if oldPin:
++                    # Check the old PIN is correct.
++                    tokenList = getTokens4UserOrSerial(None, serial, forUpdate=True)
++                    # Should only be one token with this serial.
++                    token = tokenList[0]
++
++                    pin_match = check_pin(token, oldPin, user=user)
++
++                    if (not pin_match):
++                        log.warning("[set] Incorrect previous PIN provided for token %s." % (serial))
++                        return sendError(response, u"The old PIN is incorrect. Please try again.")
++
+                 ret = setPin(upin, user, serial, param)
+                 res["set pin"] = ret
+                 count = count + 1
+@@ -2142,6 +2159,17 @@
                  res['rows'] = num
                  res['err_string'] = err_str
  
@@ -263,7 +309,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
  from pylons import request, response, config, tmpl_context as c
  from pylons.controllers.util import abort
-@@ -98,7 +98,7 @@
+@@ -98,10 +98,12 @@
  from linotp.lib.reply import create_img
  
  from linotp.lib.selfservice import get_imprint
@@ -272,7 +318,12 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
  from linotp.lib.error import SelfserviceException
  
-@@ -178,21 +178,25 @@
++from linotp.lib.validate import check_pin
++
+ import traceback
+ #import datetime, random
+ import copy
+@@ -178,21 +180,25 @@
                  self.authUser = User(c.user, c.realm, '')
                  log.debug("[__before__] authenticating as %s in realm %s!" % (c.user, c.realm))
              else:
@@ -308,7 +359,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  log.debug("[__before__] set the self.authUser to: %s, %s " % (self.authUser.login, self.authUser.realm))
                  log.debug('[__before__] param for action %s: %s' % (action, param))
  
-@@ -278,6 +282,7 @@
+@@ -278,6 +284,7 @@
                                      'selfservice/userwebprovision',
                                      'selfservice/usergetmultiotp',
                                      'selfservice/userhistory',
@@ -316,7 +367,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                                      'selfservice/index']:
                  if isSelfTest():
                      log.debug("[__after__] Doing selftest!")
-@@ -289,9 +294,10 @@
+@@ -289,9 +296,10 @@
                          c.user = "--ua--"
                          env = request.environ
                          uuser = env.get('REMOTE_USER')
@@ -330,7 +381,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      ### This makes no sense...
      #                c.audit['user'] = c.user
      #                c.audit['realm'] =  c.realm
-@@ -526,6 +532,12 @@
+@@ -526,6 +534,12 @@
              Session.close()
              log.debug('[webprovisiongoogletoken] done')
  
@@ -343,7 +394,28 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  ###### API functions
      def userhistory(self):
          '''
-@@ -1377,6 +1389,7 @@
+@@ -748,8 +762,20 @@
+             checkPolicyPre('selfservice', 'usersetpin', param, self.authUser)
+ 
+             userPin = getParam(param, "userpin", required)
++            oldPin = getParam(param, "oldpin", required)
+             serial = getParam(param, "serial", required)
+ 
++            # Check the old PIN is correct.
++            tokenList = getTokens4UserOrSerial(None, serial, forUpdate=True)
++            # Should only be one token with this serial.
++            token = tokenList[0]
++
++            pin_match = check_pin(token, oldPin, user=self.authUser)
++
++            if (not pin_match):
++                log.warning("[usersetpin] Incorrect previous PIN provided for token %s by user %s." % (serial, c.user))
++                return sendError(response, u"Your current PIN is incorrect. Please try again.")
++
+             if (True == isTokenOwner(serial, self.authUser)):
+                 log.info("[usersetpin] user %s@%s is setting the OTP PIN "
+                          "for token with serial %s" %
+@@ -1377,6 +1403,7 @@
              ret = {}
              ret1 = False
              ret2 = False
@@ -351,7 +423,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              param.update(request.params)
  
              # check selfservice authorization
-@@ -1442,12 +1455,53 @@
+@@ -1442,12 +1469,53 @@
                      t_type = "totp"
  
                  if prefix is None:
@@ -406,7 +478,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  (ret1, tokenObj) = initToken({ 'type': t_type,
                                  'serial': serial,
                                  'otplen': 6,
-@@ -1458,6 +1512,21 @@
+@@ -1458,6 +1526,21 @@
                                  'hashlib' : "sha1"
                                  }, self.authUser)
  
@@ -428,7 +500,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  if ret1:
                          url = create_google_authenticator_url(self.authUser.login, self.authUser.realm, otpkey, serial=serial, type=t_type)
                          label = "%s@%s" % (self.authUser.login, self.authUser.realm)
-@@ -1470,8 +1539,9 @@
+@@ -1470,8 +1553,9 @@
                              'counter' : 0,
                              'digits':   6,
                          }
@@ -439,7 +511,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
              logTokenNum()
              c.audit['serial'] = serial
-@@ -1488,7 +1558,7 @@
+@@ -1488,7 +1572,7 @@
                  # TODO: This random PIN could be processed.
  
              Session.commit()
@@ -448,7 +520,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
          except PolicyException as pe:
              log.error("[userwebprovision] policy failed: %r" % pe)
-@@ -1715,6 +1785,54 @@
+@@ -1715,6 +1799,54 @@
              Session.close()
              log.debug('[userfinshocra2token] done')
  
@@ -503,7 +575,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
      def useractivateocratoken(self):
          '''
-@@ -1811,6 +1929,7 @@
+@@ -1811,6 +1943,7 @@
              log.debug('[useractivateocratoken] done')
  
  
@@ -511,7 +583,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  def add_dynamic_selfservice_enrollment(actions):
      '''
          add_dynamic_actions - load the html of the dynamic tokens
-@@ -1822,7 +1941,7 @@
+@@ -1822,7 +1955,7 @@
          :return: hash of {tokentype : html for tab}
      '''
  
@@ -520,7 +592,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      g = config['pylons.app_globals']
      tokenclasses = g.tokenclasses
  
-@@ -1843,7 +1962,7 @@
+@@ -1843,7 +1976,7 @@
                      ''' remove empty lines '''
                      t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
                      e_name = "%s.%s.%s" % (tok, 'selfservice', 'enroll')
@@ -529,7 +601,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
                  ## check if there are other selfserive policy actions
                  policy = tclass_object.getClassInfo('policy', ret=None)
-@@ -1861,14 +1980,14 @@
+@@ -1861,14 +1994,14 @@
                              ''' remove empty lines '''
                              t_html = '\n'.join([line for line in t_html.split('\n') if line.strip() != ''])
                              e_name = "%s.%s.%s" % (tok, 'selfservice', action)
@@ -765,7 +837,15 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
          tok_va = linotp.lib.validate.ValidateToken(token, context=c)
          ## in case of a failure during checking token, we log the error and
-@@ -1310,7 +1310,10 @@
+@@ -1270,6 +1270,7 @@
+         except Exception as exx:
+             log.error("checking token %r failed: %r" % (token, exx))
+             ret = -1
++            raise
+ 
+         (cToken, pToken, iToken, vToken) = tok_va.get_verification_result()
+ 
+@@ -1310,7 +1311,10 @@
              #any valid otp increments, independend of the tokens state !!
              token.incOtpCounter(matchinCounter)
  
@@ -777,7 +857,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  if token.getFailCount() < token.getMaxFailCount():
                      if token.check_auth_counter():
                          if token.check_validity_period():
-@@ -1335,6 +1338,7 @@
+@@ -1335,6 +1339,7 @@
          sortedAuditList = sorted(auditList, key=lambda audit_entry: audit_entry.get("weight", 0))
          highest_audit = sortedAuditList[-1]
          c.audit['action_detail'] = highest_audit.get('action_detail', '')
@@ -834,7 +914,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      for reso in resolvers:
          resId = ""
          resIdC = ""
-@@ -752,5 +772,22 @@
+@@ -752,5 +772,20 @@
  
      return success
  
@@ -844,8 +924,6 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +		return results
 +
 +    from linotp.lib.policy import checkPolicyPre
-+
-+    log.error("checking for %s" % username)
 +
 +    try:
 +        res = checkPolicyPre('admin', 'show', {}, user = User(username, '', ""))
@@ -916,7 +994,58 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  //
  
  function get_selected_tokens(){
-@@ -1965,6 +1967,36 @@
+@@ -960,27 +962,37 @@
+             else
+                 alert_info_text("text_setpin_failed", obj.result.error.message, ERROR);
+         }
++	else
++		alert_info_text("text_setpin_failed", obj.result.error.message, ERROR);
+ }
+ 
+ function token_setpin(){
+     var token_string = $('#setpin_tokens').val();
+     var tokens = token_string.split(",");
+     var count = tokens.length;
+-    var pin = $('#pin1').val();
+-    var pintype = $('#pintype').val();
+ 
+-    for ( i = 0; i < count; i++) {
+-        var serial = tokens[i];
+-        if (pintype.toLowerCase() == "otp") {
+-            clientUrlFetch("/admin/set", {"serial" : serial , "pin" : pin}, setpin_callback);
+-        } else if ((pintype.toLowerCase() == "motp")) {
+-            clientUrlFetch("/admin/setPin", {"serial" : serial, "userpin" : pin}, setpin_callback);
+-        } else if ((pintype.toLowerCase() == "ocrapin")) {
+-            clientUrlFetch("/admin/setPin", {"serial" : serial, "userpin" : pin}, setpin_callback);
+-        } else
+-            alert_info_text("text_unknown_pintype", pintype, ERROR);
+-    }
++	var pin0 = $('#pin0').val();
++	var pin1 = $('#pin1').val();
++	var pin2 = $('#pin2').val();
+ 
++    var pintype = $('#pintype').val();
++
++	if (pin1 != pin2)
++		alert_info_text("PINs must match!")
++	else
++	{
++		for ( i = 0; i < count; i++) {
++			var serial = tokens[i];
++			if (pintype.toLowerCase() == "otp") {
++				clientUrlFetch("/admin/set", {"serial" : serial , "pin" : pin1, "oldpin" : pin0}, setpin_callback);
++			} else if ((pintype.toLowerCase() == "motp")) {
++				clientUrlFetch("/admin/setPin", {"serial" : serial, "userpin" : pin1}, setpin_callback);
++			} else if ((pintype.toLowerCase() == "ocrapin")) {
++				clientUrlFetch("/admin/setPin", {"serial" : serial, "userpin" : pin1}, setpin_callback);
++			} else
++				alert_info_text("text_unknown_pintype", pintype, ERROR);
++		}
++	}
+ }
+ 
+ function view_setpin_dialog(tokens) {
+@@ -1965,6 +1977,36 @@
      return false;
  }
  
@@ -953,7 +1082,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  function save_realm_config(){
      var realm = $('#realm_name').val();
      show_waiting();
-@@ -2212,7 +2244,10 @@
+@@ -2212,7 +2254,10 @@
      var reso = g.resolver_to_edit.replace(/(\S+)\s+\S+/, "$1");
      var type = g.resolver_to_edit.replace(/\S+\s+\[(\S+)\]/, "$1");
      switch (type) {
@@ -965,7 +1094,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              resolver_ldap(reso);
              break;
          case "sqlresolver":
-@@ -2948,6 +2983,15 @@
+@@ -2948,6 +2993,15 @@
                      text: "LDAP"
  
              },
@@ -981,7 +1110,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              'SQL': { click: function(){
                      // calling with no parameter, creates a new resolver
                      resolver_sql("");
-@@ -3028,6 +3072,67 @@
+@@ -3028,6 +3082,67 @@
          }
      });
  
@@ -1049,7 +1178,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      $('#button_test_ldap').click(function(event){
          $('#progress_test_ldap').show();
  
-@@ -4098,6 +4203,9 @@
+@@ -4098,6 +4213,9 @@
                          alert_info_text("text_regexp_error", reso, ERROR);
                      }
                      switch (t) {
@@ -1059,7 +1188,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                          case 'ldapresolver':
                              g.resolvers_in_realm_to_edit += 'useridresolver.LDAPIdResolver.IdResolver.' + r;
                              break;
-@@ -4159,7 +4267,7 @@
+@@ -4159,7 +4277,7 @@
                      'LDAPURI': 'ldap://linotpserver1, ldap://linotpserver2',
                      'LDAPBASE': 'dc=yourdomain,dc=tld',
                      'TIMEOUT': '5',
@@ -1068,7 +1197,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                      'LOGINNAMEATTRIBUTE': 'sAMAccountName',
                      'LDAPSEARCHFILTER': '(sAMAccountName=*)(objectClass=user)',
                      'LDAPFILTER': '(&(sAMAccountName=%s)(objectClass=user))',
-@@ -4264,6 +4372,72 @@
+@@ -4264,6 +4382,72 @@
  
  }
  
@@ -1141,7 +1270,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
  function resolver_set_sql(obj) {
  
-@@ -4459,7 +4633,22 @@
+@@ -4459,7 +4643,22 @@
              searchbutton: true
      });
  
@@ -1165,7 +1294,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
      $('#policy_import').click(function(){
          $dialog_import_policy.dialog("open");
-@@ -4530,20 +4719,24 @@
+@@ -4530,20 +4729,24 @@
              url : '/manage/tokenview_flexi?session='+getsession(),
              method: 'GET',
              dataType : 'json',
@@ -1200,7 +1329,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              height: 400,
              searchitems : [
                  {display: 'in loginname', name: 'loginname', isdefault: true },
-@@ -4574,26 +4767,23 @@
+@@ -4574,26 +4777,23 @@
              url : '/manage/userview_flexi?session='+getsession(),
              method: 'GET',
              dataType : 'json',
@@ -1249,7 +1378,22 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  
      return false;
  
-@@ -643,11 +643,6 @@
+@@ -525,10 +525,12 @@
+     }, function(data, textStatus, XMLHttpRequest) {
+         hide_waiting();
+         if (data.result.status == false) {
+-            alert("Error deleting Token");
++            $('#del_error').show();
++			$('#del_success').hide();
+         };
+         if (data.result.status == true) {
+-            alert("Token deleted successfully");
++            $('#del_error').hide();
++			$('#del_success').show();
+             showTokenlist();
+             $('.selectedToken').val("");
+         };
+@@ -643,11 +645,6 @@
  
  }
  
@@ -1261,7 +1405,55 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  function provisionGoogle() {
      show_waiting();
      var type = "googleauthenticator";
-@@ -899,3 +894,73 @@
+@@ -679,28 +676,33 @@
+ 
+ function setpin() {
+     show_waiting();
++	var pin0 = $('#pin0').val();
+     var pin1 = $('#pin1').val();
+     var pin2 = $('#pin2').val();
+     var serial = $('.selectedToken').val();
+-    var setpin_failed = $('#setpin_fail').val();
+-    var setpin_error = $('#setpin_error').val();
+-    var setpin_ok = $('#setpin_ok').val();
+ 
+     if (pin1 != pin2) {
+-        alert(setpin_failed);
++		$('#setpin_error').show();
++		$('#setpin_success').hide();
++		$('#setpin_error').text("Your PIN codes must match.");
++
+         hide_waiting();
+     } else {
+         $.post('/selfservice/usersetpin', {
++			oldpin: pin0,
+             userpin : pin1,
+             serial : serial,
+             session : get_selfservice_session()
+         }, function(data, textStatus, XMLHttpRequest) {
+             hide_waiting();
+             if (data.result.status == false) {
+-                alert(setpin_error + data.result.error.message);
++				$('#setpin_success').hide();
++				$('#setpin_error').show();
++				$('#setpin_error').text("There was an error updating your PIN: '" + data.result.error.message + "'. Please refresh the page and try again.");
+             };
+             if (data.result.status == true) {
+-                alert(setpin_ok);
++                $('#setpin_success').show();
++				$('#setpin_error').hide();
+                 $('#pin1').val("");
+                 $('#pin2').val("");
+             };
+@@ -804,7 +806,6 @@
+                 }
+             }
+         },
+-        collapsible : true,
+         spinner : 'Retrieving data...',
+         cache : true
+     });
+@@ -899,3 +900,72 @@
              addTitleToCell: true
      });
  }
@@ -1269,8 +1461,8 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +function elmProvision() {
 +    show_waiting();
 +
-+	var pin1 = $('#pin1').val();
-+    var pin2 = $('#pin2').val();
++	var pin1 = $('#elm_pin1').val();
++    var pin2 = $('#elm_pin2').val();
 +
 +    if (pin1 != pin2) {
 +		$('#error_pin').text("PIN codes must match.");
@@ -1288,7 +1480,6 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +			if (data.result.status == true) {
 +				showTokenlist();
 +				// The token was successfully initialized and we will display the url
-+                //var qr_code = generate_qrcode(10, data.result.value.oathtoken.url);
 +                var url = data.result.value.oathtoken.url;
 +                var img = data.result.value.oathtoken.img;
 +                $('#google_link').attr("href", url);
@@ -1300,7 +1491,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +				$('#token_serial').val(data.result.value.oathtoken.serial);
 +
 +				// Regenerate the now-visible accordion so it's got the right height (it defaults to 0 if it's initialized while hidden)
-+				$('#accordion2').accordion('refresh');
++				$('#accordion').accordion('refresh');
 +
 +				// Disable the previous submit button. Otherwise, hitting enter tries to register another token for some reason.
 +				$('#elmprovision').attr('disabled', 'disabled');
@@ -1542,7 +1733,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +	color: #3277AE;
 + }
 + 
-+ #error_pin, #error_otp {
++ #error_pin, #error_otp, #error {
 +	color: #FF0000;
 + }
 + 
@@ -1609,7 +1800,31 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
      <div id="realms">
      ${_("Realms")}: <select id=realm></select>
      </div>
-@@ -884,6 +893,7 @@
+@@ -401,12 +410,19 @@
+ 	    		<option value="ocra">OCRA PIN</option>
+ 	    		<option selected value="otp">OTP PIN</option>
+ 	    		</select>
+-	    		</td></tr><tr><td>
++	    		</td></tr>
++				<tr><td>
++	    		<label for="pin0">Old PIN (if any)</label>
++	    		</td><td>
++	    		<input type="password" autocomplete="off" name="pin0" id="pin0" class="text ui-widget-content ui-corner-all"/>
++	    		</td></tr>
++				<tr><td>
++				<tr><td>
+ 	    		<label for="pin1">PIN</label>
+ 	    		</td><td>
+-	    		<input type="password" autocomplete="off" onkeyup="checkpins('pin1','pin2');" name="pin1" id="pin1"
+-	    			class="text ui-widget-content ui-corner-all" />
+-	    		</td></tr><tr><td>
++	    		<input type="password" autocomplete="off" name="pin1" id="pin1" class="text ui-widget-content ui-corner-all" />
++	    		</td></tr>
++				<tr><td>
+ 	    		<label for="pin2">${_("PIN (again)")}</label>
+ 	    		</td><td>
+ 	    		<input type="password" autocomplete="off" onkeyup="checkpins('pin1','pin2');" name="pin2" id="pin2" class="text ui-widget-content ui-corner-all" />
+@@ -884,6 +900,7 @@
  		$('#button_new_resolver_type_ldap .ui-button-text').html('${_("LDAP")}');
  		$('#button_new_resolver_type_sql .ui-button-text').html('${_("SQL")}');
  		$('#button_new_resolver_type_flatfile .ui-button-text').html('${_("Flatfile")}');
@@ -1617,7 +1832,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  		$('#button_new_resolver_type_cancel .ui-button-text').html('${_("Cancel")}');
  	}
  </script>
-@@ -1269,6 +1279,38 @@
+@@ -1269,6 +1286,38 @@
  	}
  </script>
  
@@ -1656,7 +1871,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  <!-- #################### dialog SQL resolver #################################### -->
  
  <div id='dialog_sql_resolver'>
-@@ -1368,6 +1410,8 @@
+@@ -1368,6 +1417,8 @@
  <div id="text_subscription_import_failed">${_("Failed to load support subscription")}: <span class="text_param1"> </span></div>
  <div id="text_subscription_import_result">${_("Support subscription import result")}: <span class="text_param1"> </span></div>
  <div id="text_error_ldap">${_("Error saving ldap configuration.")}: <span class="text_param1"> </span></div>
@@ -1665,7 +1880,7 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  <div id="text_error_realm">${_("Error saving realm configuration.")}: <span class="text_param1"> </span></div>
  <div id="text_realm_created">${_("Realm created")}: <span class="text_param1"> </span></div>
  <div id="text_error_set_realm">${_("Error setting Token realms")}: <span class="text_param1"> </span></div>
-@@ -1380,6 +1424,10 @@
+@@ -1380,6 +1431,10 @@
  <div id="text_regexp_error">${_("Error in regular expression for")}: <span class="text_param1"> </span></div>
  <div id="text_ldap_config_success">${_("LDAP config seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
  <div id="text_ldap_load_error">${_("Error loading LDAP resolver")}: <span class="text_param1"> </span></div>
@@ -1740,7 +1955,17 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
              'max_count_dpw': {'type': 'int'},
              'max_count_hotp': {'type': 'int'},
              'max_count_totp': {'type': 'int'},
-@@ -2016,12 +2017,15 @@
+@@ -667,8 +668,7 @@
+ 
+     # We may change this later to other authetnication schemes
+     admin_user = getUserFromRequest(request)
+-    log.info("[getAdminPolicies] Evaluating policies for the "
+-             "user: %s" % admin_user['login'])
++    log.info("[getAdminPolicies] Evaluating policies for user %s" % admin_user['login'])
+     pol_request = {'user': admin_user['login'], 'scope': 'admin'}
+     if '' != action:
+         pol_request['action'] = action
+@@ -2016,12 +2016,15 @@
          elif 'userwebprovision' == method:
              user_selfservice_actions = getSelfserviceActions(authUser)
              typ = param.get('type').lower()
@@ -1757,95 +1982,129 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
                  log.warning("[userwebprovision] user %r@%r is not allowed to "
                              "call this function!" % (authUser.login,
                                                       authUser.realm))
---- a/linotp/templates/selfservice/webprovisionelm.mako
+--- /dev/null
 +++ b/linotp/templates/selfservice/webprovisionelm.mako
-@@ -27,7 +27,7 @@
- -->
- <h1>${_("Activate Two-Factor Authentication")}</h1>
- 
--<div id='googletokenform'>
-+<div id='elmform'>
- 	<form class="cmxform" name='myForm'> 
- 		<fieldset>
- 			<ol id="provisionElmInstall">
-@@ -45,24 +45,24 @@
- 						</div>
- 					</div>
- 				</li>
--				<li>Choose a PIN code for the new token. Your PIN is required whenever you are asked for an access code - for example, if your PIN
-+				<li>Choose a four-digit PIN code for the new token. Your PIN is required whenever you are asked for an access code - for example, if your PIN
- 					is 1234 and your one-time-password is 000000, you would enter '1234000000'.
- 					<table>
--						<tr><td class="error_pin"></td></tr>
-+						<tr><td><span id=error_pin></span></td></tr>
- 						<tr>
- 							<!--[if lte IE 9]>
- 								<td><label class="ie-label" for="pin1">PIN</label></td>
- 							<![endif]-->
--							<td><input id="pin1" autocomplete="off" type="password" placeholder="PIN" size="10" maxlength="10" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
-+							<td><input id="pin1" autocomplete="off" type="password" placeholder="PIN" size="10" maxlength="4" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
- 						</tr>
- 						<tr>
- 							<!--[if lte IE 9]>
- 								<td><label class="ie-label" for="pin2">Confirm PIN</label></td>
- 							<![endif]-->						
--							<td><input id="pin2" autocomplete="off" type='password' placeholder="Confirm PIN" onkeyup="checkpins('pin1', 'pin2');" class="text ui-widget-content ui-corner-all"/></td>
-+							<td><input id="pin2" autocomplete="off" type="password" placeholder="Confirm PIN" size="10" maxlength="4" tabindex="1" onkeyup="checkpins('pin1', 'pin2');" class="text ui-widget-content ui-corner-all"/></td>
- 						</tr>
- 					</table>
--					<button class='action-button' onclick="elmProvision(); return false;">
-+					<button class='action-button' id="elmprovision" onclick="elmProvision(); return false;">
- 						${_("Activate token")}
- 					</button>
- 				</li>
-@@ -86,7 +86,7 @@
- 					on Single Sign On pages until you complete this step.
- 					
- 					<table>
--						<tr><td class="error_otp"></td></tr>
-+						<tr><td><span id=error_otp></span></td></tr>
- 						<tr>
- 							<!--[if lte IE 9]>
- 								<td><label class="ie-label" for="otp">Access Code</label></td>
-@@ -94,24 +94,28 @@
- 							<td><input id="otp" autocomplete="off" type="password" placeholder="Access Code" size="10" maxlength="10" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
- 						</tr>
- 					</table>
--					<button class='action-button' onclick="elmProvisionFinal(); return false;">
-+					<button class='action-button' id="elmfinal" onclick="elmProvisionFinal(); return false;">
- 						${_("Finish installation")}
- 					</button>
-+					<input type=hidden id=token_serial value="">
- 				</li>
- 			</ol>
- 			<div id="provisionElmComplete">
- 				<p>Your token has now been activated. Single Sign-On pages will now prompt you for an access code when you attempt to login.</p>
- 			</div>
- 		</fieldset>
-+		
- 	</form>
- </div>
- 
- <script>
-+		// Initial display.
- 		$('#provisionElmInstall').show();
- 	   	$('#provisionElmResultDiv').hide();
- 		$('#provisionElmComplete').hide();
- 	   	$('#qr_code_download').show();
- 	   	$('#qr_code_download').html(generate_qrcode(10,"https://mfa-test.bsp.ox.ac.uk/selfservice/authenticator.html"));
-+		// Set up the accordion drop-downs for the QR codes.
- 		$(function() {
- 			$("#accordion").accordion({
- 				'collapsible' : true,
-@@ -124,4 +128,5 @@
- 				'active' : false
- 			});
- 		});
+@@ -0,0 +1,117 @@
++# -*- coding: utf-8 -*-
++<!--
++ *
++ *   LinOTP - the open source solution for two factor authentication
++ *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
++ *
++ *   This file is part of LinOTP server.
++ *
++ *   This program is free software: you can redistribute it and/or
++ *   modify it under the terms of the GNU Affero General Public
++ *   License, version 3, as published by the Free Software Foundation.
++ *
++ *   This program is distributed in the hope that it will be useful,
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *   GNU Affero General Public License for more details.
++ *
++ *   You should have received a copy of the
++ *              GNU Affero General Public License
++ *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ *
++ *    E-mail: linotp@lsexperts.de
++ *    Contact: www.linotp.org
++ *    Support: www.lsexperts.de
++ *
++-->
++<h1>${_("Activate Two-Factor Authentication")}</h1>
 +
- </script>
++<div id='elmform'>
++	<form class="cmxform" name='myForm'> 
++		<fieldset>
++			<ol id="provisionElmInstall">
++				<li>Install the appropriate authenticator application on your mobile device:
++					<ul>
++						<li>Android, iOS or Blackberry OS 7 and earlier: <a href='http://m.google.com/authenticator' target='extern'>Google Authenticator</a></li>
++						<li>Blackberry OS 10: <a href='http://appworld.blackberry.com/webstore/content/76023/?lang=en' target='extern'>Duo Mobile</a></li>
++						<li>Windows Phone: <a href='http://go.microsoft.com/fwlink/?LinkId=279710' target='extern'>Microsoft Authenticator</a></li>
++					</ul>
++				</li>
++				<li>Choose a four-digit PIN code for the new token. Your PIN is required whenever you are asked for an access code - for example, if your PIN
++					is 1234 and your one-time-password is 000000, you would enter '1234000000'.
++					<table>
++						<tr><td><span id=error_pin></span></td></tr>
++						<tr>
++							<!--[if lte IE 9]>
++								<td><label class="ie-label" for="elm_pin1">PIN</label></td>
++							<![endif]-->
++							<td><input id="elm_pin1" autocomplete="off" type="password" placeholder="PIN" size="10" maxlength="4" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
++						</tr>
++						<tr>
++							<!--[if lte IE 9]>
++								<td><label class="ie-label" for="elm_pin2">Confirm PIN</label></td>
++							<![endif]-->						
++							<td><input id="elm_pin2" autocomplete="off" type="password" placeholder="Confirm PIN" size="10" maxlength="4" tabindex="1" onkeyup="checkpins('elm_pin1', 'elm_pin2');" class="text ui-widget-content ui-corner-all"/></td>
++						</tr>
++					</table>
++					<button class='action-button' id="elmprovision" onclick="elmProvision(); return false;">
++						${_("Activate token")}
++					</button>
++				</li>
++			</ol>
++			
++			<ol id="provisionElmResultDiv" start="3">
++				<li>${_("Token")} ${_("successfully created!")}
++					<p>${_("If you are viewing this site on the same device as your authenticator app, click the link below to activate your code:")}
++						 <a id=google_link>${_("Install token")}</a>
++					</p>
++					<p>${_("Alternatively, scan the QR code below with your authenticator device.")}</p>
++					<div id="accordion">
++						<h3>QR Code</h3>
++						<div>
++							<span id=google_qr_code></span>
++						</div>
++					</div>
++				</li>
++				<li>Enter your PIN followed by a one-time password generated by your authenticator app to complete setup. For example, if your PIN
++					is 1234 and your one-time-password is 000000, you would enter '1234000000'. Note that your authenticator <strong>will not work</strong>
++					on Single Sign On pages until you complete this step.
++					<table>
++						<tr><td><span id=error_otp></span></td></tr>
++						<tr>
++							<!--[if lte IE 9]>
++								<td><label class="ie-label" for="otp">Access Code</label></td>
++							<![endif]-->
++							<td><input id="otp" autocomplete="off" type="password" placeholder="Access Code" size="10" maxlength="10" tabindex="1" class="text ui-widget-content ui-corner-all"/></td>
++						</tr>
++					</table>
++					<button class='action-button' id="elmfinal" onclick="elmProvisionFinal(); return false;">
++						${_("Finish installation")}
++					</button>
++					<input type=hidden id=token_serial value="">
++				</li>
++			</ol>
++			<div id="provisionElmComplete">
++				<p>Your token has now been activated. Single Sign-On pages will now prompt you for an access code when you attempt to login.</p>
++			</div>
++		</fieldset>
++		
++	</form>
++</div>
++
++<script>
++		// Initial display.
++		$('#provisionElmInstall').show();
++	   	$('#provisionElmResultDiv').hide();
++		$('#provisionElmComplete').hide();
++
++		// Set up the accordion drop-down for the QR codes.
++		$(function() {
++			$("#accordion").accordion({
++				'collapsible' : true,
++				'active' : false
++			});
++		});
++
++</script>
 --- a/linotp/templates/selfservice/delete.mako
 +++ b/linotp/templates/selfservice/delete.mako
-@@ -25,18 +25,23 @@
+@@ -25,18 +25,32 @@
   *    Support: www.lsexperts.de
   *
  -->
@@ -1862,6 +2121,9 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -		</tr>
 -		</table>
 -		<button class='action-button' id='button_delete' onclick="token_delete(); return false;">${_("delete Token")}</button>
++			<span id=del_error>There was an error deleting your token. Please refresh the page and try again.</span>
++			<span id=del_success>Your token has been deleted. If this was your last token, the Single Sign On service will no longer ask for an access code when you login. You will also be unable to access secure resources that require two-factor authentication: to retain access to these services, you should create a new token.</span>
++
 +			<p>This page allows you to delete a token. Your authenticator app will continue to generate codes, but they will no longer be accepted by the Single Sign On service.</p>
 +			<p>If all of your tokens are deleted, the Single Sign On service will no longer ask for an access code when you login. You will also be unable to access secure resources that require two-factor authentication: to retain access to these services, you should create a new token.</p>
 +			<table>
@@ -1877,9 +2139,15 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  		</fieldset>
  	</form>
  </div>
++
++<script>
++		// Initial display.
++	   	$('#del_success').hide();
++		$('#del_error').hide();
++</script>
 --- a/linotp/templates/selfservice/setpin.mako
 +++ b/linotp/templates/selfservice/setpin.mako
-@@ -25,30 +25,39 @@
+@@ -25,30 +25,54 @@
   *    Support: www.lsexperts.de
   *
  -->
@@ -1908,8 +2176,13 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 -	<input type='hidden' value='${_("The passwords do not match!")}' 		id='setpin_fail'/>
 -		<input type='hidden' value='${_("Error setting PIN: ")}' 			id='setpin_error'/>
 -		<input type='hidden' value='${_("PIN set successfully")}'			id='setpin_ok'/>
++			<span id=setpin_error></span>
++			<span id=setpin_success>Your PIN was updated successfully.</span>
++
 +			<p>This page allows you to change the PIN associated with a token. Once you update your PIN, you should use the new PIN when logging in to Single Sign On services.</p>
 +			<p>Note that the PIN for each token is independent. If you have multiple tokens, this page will only update the PIN for the selected token - you should repeat the process for your other tokens if you wish to change their PINs as well.</p>
++
++			<p>If you do not know your current PIN, you should contact your College or department IT staff for assistance. </p>
 +			<table>
 +				<tr>
 +					<!--[if lte IE 9]>
@@ -1920,24 +2193,481 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 +				</tr>
 +				<tr>
 +					<!--[if lte IE 9]>
++						<td><label class="ie-label" for="pin0">Current PIN</label></td>
++					<![endif]-->
++					<td><input autocomplete="off" type='password' id="pin0" class="text ui-widget-content ui-corner-all" value='' placeholder="Current PIN"/></td>
++				</tr>
++				<tr>
++					<!--[if lte IE 9]>
 +						<td><label class="ie-label" for="pin1">New PIN</label></td>
 +					<![endif]-->
-+					<td><input autocomplete="off" type='password' id='pin1' class="text ui-widget-content ui-corner-all" value='' placeholder="New PIN"/></td>
++					<td><input autocomplete="off" type='password' id="pin1" class="text ui-widget-content ui-corner-all" value='' placeholder="New PIN"/></td>
 +				</tr>
 +				<tr>
 +					<!--[if lte IE 9]>
 +						<td><label class="ie-label" for="pin1">Confirm new PIN</label></td>
 +					<![endif]-->
 +
-+					<td><input autocomplete="off" type='password' onkeyup="checkpins('pin1', 'pin2');" id='pin2' class="text ui-widget-content ui-corner-all" value='' placeholder="Confirm new PIN"/></td>
++					<td><input autocomplete="off" type='password' onkeyup="checkpins('pin1', 'pin2');" id="pin2" class="text ui-widget-content ui-corner-all" value='' placeholder="Confirm new PIN"/></td>
 +				</tr>
 +			</table>
 +			<button class='action-button' id='button_setpin' onclick="setpin(); return false;">${_("set PIN")}</button>
-+			<input type='hidden' value='${_("The passwords do not match!")}' 		id='setpin_fail'/>
-+			<input type='hidden' value='${_("Error setting PIN: ")}' 			id='setpin_error'/>
-+			<input type='hidden' value='${_("PIN set successfully")}'			id='setpin_ok'/>
++
  		</fieldset>
  	</form>
  </div>
-Binary files a/linotp/public/favicon.ico and b/linotp/public/favicon.ico differ
-Binary files /dev/null and b/linotp/public/images/crest.png differ
++
++<script>
++		// Initial display.
++	   	$('#setpin_success').hide();
++		$('#setpin_error').hide();
++</script>
+\ No newline at end of file
+--- /dev/null
++++ b/config/linotp2-elm
+@@ -0,0 +1,180 @@
++<VirtualHost _default_:443>
++	ServerAdmin webmaster@localhost
++
++	Header always edit Set-Cookie ^(.*)$ $1;secure
++
++	AddRadiusAuth localhost:1812 testing123 5:3
++	DocumentRoot /var/www
++	<Directory />
++		Options FollowSymLinks
++		AllowOverride None
++	</Directory>
++	<Directory /var/www/>
++		Options Indexes FollowSymLinks MultiViews
++		AllowOverride None
++		Order allow,deny
++		allow from all
++	</Directory>
++
++	<Directory "/usr/share/weblogin">
++        	AllowOverride None
++	        Options +ExecCGI
++	        SSLRequireSSL
++        	Order allow,deny
++	        Allow from all
++	</Directory>
++
++	ScriptAlias /elm/login "/usr/share/weblogin/login.fcgi"
++	ScriptAlias /elm/logout "/usr/share/weblogin/logout.fcgi"
++    ScriptAlias /elm/pwchange "/usr/share/weblogin/pwchange.fcgi"
++
++    Alias /elm/help.html "/usr/share/weblogin/generic/templates/help.html"
++    Alias /elm/images/ "/usr/share/weblogin/generic/images/"
++	Alias /elm/css/ "/usr/share/weblogin/generic/css/"
++
++    <Location /webkdc-service>
++        SSLRequireSSL
++        SetHandler webkdc
++    </Location>
++
++
++	SetEnv PATH_KRB5_CONFIG /etc/krb5-client.conf
++
++    Alias /doc/html         /usr/share/doc/linotpdoc/html
++   	WSGIScriptAlias /       /etc/linotp2/linotpapp.wsgi
++	#
++	# The daemon is running as user 'linotp'
++	# This user should have access to the encKey database encryption file
++	WSGIDaemonProcess linotp processes=1 threads=15 display-name=%{GROUP} user=linotp
++	WSGIProcessGroup linotp
++    WSGIPassAuthorization On
++
++	WebAuthDebug on
++
++	<Location /webauth-status>
++		SetHandler webauth
++		Order allow,deny
++		Allow from all
++	</Location>
++
++    <Location /admin>
++        Order deny,allow
++        Deny from all
++        Allow from localhost
++        Satisfy Any
++
++		WebAuthRequireInitialFactor p m o3
++        WebAuthExtraRedirect on
++        AuthType WebAuth
++        require valid-user
++    </Location>
++
++
++	<Location /audit>
++        Order deny,allow
++        Deny from all
++        Allow from localhost
++        Satisfy Any
++
++		WebAuthRequireInitialFactor p m o3
++        WebAuthExtraRedirect on
++        AuthType WebAuth
++        require valid-user
++    </Location>
++
++	<Location /gettoken>
++		AuthType Digest
++		AuthName "LinOTP2 gettoken"
++		AuthDigestProvider file
++		AuthUserFile /etc/linotp2/gettoken-api
++		Require valid-user
++	</Location>
++
++	<Location /manage>
++        Order deny,allow
++        Deny from all
++        Allow from localhost
++        Satisfy Any
++
++		WebAuthRequireInitialFactor p m o3
++        WebAuthExtraRedirect on
++        AuthType WebAuth
++        require valid-user
++    </Location>
++
++    <Location /system>
++        Order deny,allow
++        Deny from all
++        Allow from localhost
++        Satisfy Any
++
++		WebAuthRequireInitialFactor p m o3
++        WebAuthExtraRedirect on
++        AuthType WebAuth
++        require valid-user
++    </Location>
++
++	<Location /selfservice>
++        Order deny,allow
++        Deny from all
++        Allow from localhost
++        Satisfy Any
++
++        WebAuthExtraRedirect on
++        AuthType WebAuth
++        require valid-user
++    </Location>
++
++	<Location /selfservice/authenticator.html>
++		Order deny, allow
++		Allow from all
++	</Location>
++
++	<Location /account>
++        Order deny,allow
++        Deny from all
++        Allow from localhost
++        Satisfy Any
++
++        WebAuthExtraRedirect on
++        AuthType WebAuth
++        require valid-user
++    </Location>
++
++	<Location /account/logout>
++		WebAuthDoLogout on
++	</Location>
++
++    <Location /validate>
++	    # No Authentication
++    </Location>
++
++
++	ErrorLog /var/log/apache2/error.log
++
++	LogLevel warn
++
++	# Do not use %q! This will reveal all parameters, including setting PINs and Keys!
++	# Using SSL_CLINET_S_DN_CN will show you, which administrator did what task
++	LogFormat "%h %l %u %t %>s \"%m %U %H\"  %b \"%{Referer}i\" \"%{User-agent}i\" \"%{SSL_CLIENT_S_DN_CN}x\"" LinOTP2
++	CustomLog /var/log/apache2/ssl_access.log LinOTP2
++
++	#   SSL Engine Switch:
++	#   Enable/Disable SSL for this virtual host.
++	SSLEngine on
++
++	#   If both key and certificate are stored in the same file, only the
++	#   SSLCertificateFile directive is needed.
++	SSLCertificateFile    /etc/ssl/certs/linotpserver.pem
++	SSLCertificateKeyFile /etc/ssl/private/linotpserver.key
++
++	<FilesMatch "\.(cgi|shtml|phtml|php)$">
++	SSLOptions +StdEnvVars
++	</FilesMatch>
++	<Directory /usr/lib/cgi-bin>
++		SSLOptions +StdEnvVars
++	</Directory>
++
++        ErrorDocument 500 "<h1>Internal Server Error</h1> Possible reasons can be missing modules or bad access rights on LinOTP configuration files or log files. Please check the apache logfile <pre>/var/log/apache2/error.log</pre> for more details."
++
++</VirtualHost>
+--- a/linotp/lib/selfservice.py
++++ b/linotp/lib/selfservice.py
+@@ -47,7 +47,6 @@
+         res = f.read()
+         f.close()
+     except Exception as e:
+-        log.info("[get_imprint] can not read imprint file: %s. (%r)"
+-                 % (filename, e))
++        log.debug("[get_imprint] can not read imprint file: %s. (%r)" % (filename, e))
+ 
+     return res
+--- a/linotp/lib/ImportOTP/vasco.py
++++ b/linotp/lib/ImportOTP/vasco.py
+@@ -40,7 +40,7 @@
+     vasco_lib = config.get("linotpImport.vasco_dll")
+     #/opt/vasco/Vacman_Controller-3.10.1/lib/libaal2sdk-3.10.1.so
+     if None == vasco_lib:
+-        log.warning("Missing linotpImport.vasco_dll in config file")
++        log.info("Missing linotpImport.vasco_dll parameter in config file.")
+     else:
+         log.info("loading vasco lib %s" % vasco_lib)
+         vasco_dll = CDLL(vasco_lib)
+@@ -56,7 +56,7 @@
+     '''
+     def new(*args, **kw):
+         if None == vasco_dll:
+-            log.error("[check_vasco] No vasco dll available!")
++            log.warning("[check_vasco] No vasco dll found. Vasco functions will not be available.")
+             return None
+         else:
+             return fn(*args, **kw)
+--- a/linotp/lib/audit/SQLAudit.py
++++ b/linotp/lib/audit/SQLAudit.py
+@@ -271,7 +271,7 @@
+             column.create(audit_table)
+         except Exception as exx:
+             # Obviously we already migrated the database.
+-            log.info("[__init__] Error during database migration: %r" % exx)
++            log.info("[__init__] Assuming database migration is complete: %r" % exx)
+ 
+ 
+     def _attr_to_dict(self, audit_line):
+--- a/linotp/lib/crypt.py
++++ b/linotp/lib/crypt.py
+@@ -97,11 +97,15 @@
+ 
+ 
+ class SecretObj:
+-    def __init__(self, val, iv, preserve=True):
++    def __init__(self, val, iv, preserve=True, pin=None):
+         self.val = val
+         self.iv = iv
+         self.bkey = None
+         self.preserve = preserve
++        # IVs are xored with the PIN for Elm tokens.
++        if (pin is not None):
++            log.warning("Pin: %r" % pin)
++            self.iv = xor_crypt(self.iv, pin)
+ 
+     def getKey(self):
+         log.warn('Requesting secret key '
+@@ -151,7 +155,9 @@
+             self.bkey = None
+ 
+         if self.bkey is None:
++            import traceback
+             akey = decrypt(self.val, self.iv)
++
+             self.bkey = binascii.unhexlify(akey)
+             zerome(akey)
+             del akey
+@@ -657,4 +663,18 @@
+     #print repr(bufferObject)
+     return
+ 
+-##eof##########################################################################
++# Get a binascii.unhexlified message, return a XOR-crypted / decrypted hex message.
++def xor_crypt(message, key):
++    res = []
++    k = bytearray(binascii.unhexlify(key))
++    l = len(k);
++    i = 0;
++
++    for b in bytearray(message):
++        res.append(b ^ k[i])
++        i = (i + 1) % l
++
++    result = binascii.hexlify(bytearray(res))
++    return binascii.unhexlify(result);
++
++##eof##########################################################################
+\ No newline at end of file
+--- a/linotp/lib/tokenclass.py
++++ b/linotp/lib/tokenclass.py
+@@ -223,7 +223,7 @@
+         if res != -1:
+             pin_match = check_pin(self, pin, user=user, options=options)
+             if pin_match is True:
+-                otp_counter = check_otp(self, otpval, options=options)
++                otp_counter = check_otp(self, otpval, options=options, pin=pin)
+ 
+         return (pin_match, otp_counter, reply)
+ 
+@@ -690,7 +690,9 @@
+         if enc is not None and "true" == enc.lower():
+             storeHashed = False
+ 
+-        self.token.setPin(pin, storeHashed)
++        oldpin = getParam(param, "oldpin", optional)
++
++        self.token.setPin(pin, storeHashed, oldpin)
+ 
+     def getPinHashSeed(self):
+         return self.token.LinOtpPinHash, self.token.LinOtpSeed
+@@ -1681,7 +1683,7 @@
+         return (transid, challenge, True, url)
+ 
+ 
+-    def checkOtp(self, passw , counter , window , options=None):
++    def checkOtp(self, passw , counter , window , options=None, pin=None):
+         '''
+         checkOtp - standard callback of linotp to verify the token
+ 
+@@ -1703,7 +1705,8 @@
+ 
+         ret = -1
+ 
+-        secretHOtp = self.token.getHOtpKey()
++        # Pass any PIN we might have got onwards.
++        secretHOtp = self.token.getHOtpKey(pin=pin)
+         ocraSuite = OcraSuite(self.getOcraSuiteSuite(), secretHOtp)
+ 
+         ## if we have no transactionid given through the options,
+--- a/linotp/lib/tokens/totptoken.py
++++ b/linotp/lib/tokens/totptoken.py
+@@ -376,7 +376,7 @@
+ 
+ 
+ 
+-    def checkOtp(self, anOtpVal, counter, window, options=None):
++    def checkOtp(self, anOtpVal, counter, window, options=None, pin=None):
+         '''
+         checkOtp - validate the token otp against a given otpvalue
+ 
+@@ -398,7 +398,7 @@
+         '''
+ 
+         log.debug("[checkOtp] begin. Validate the token otp: anOtpVal: %r ,\
+-                    counter: %r,window: %r, options: %r " %
++                    counter: %r,window: %r, options: %r" %
+                     (anOtpVal, counter, window, options))
+ 
+         try:
+@@ -406,7 +406,7 @@
+         except ValueError as e:
+             raise e
+ 
+-        secretHOtp = self.token.getHOtpKey()
++        secretHOtp = self.token.getHOtpKey(pin)
+         self.hashlibStr = self.getFromTokenInfo("hashlib", self.hashlibStr)
+ 
+         timeStepping = int(self.getFromTokenInfo("timeStep", self.timeStep))
+@@ -444,9 +444,11 @@
+         log.debug("[checkOTP] shift   : %r " % (shift))
+ 
+         hmac2Otp = HmacOtp(secretHOtp, counter, otplen, self.getHashlib(self.hashlibStr))
++
++        log.debug("got hmac")
+         res = hmac2Otp.checkOtp(anOtpVal, int (window / timeStepping), symetric=True)
+ 
+-        log.debug("[checkOTP] comparing the result %i to the old counter %i." % (res, oCount))
++        log.warning("[checkOTP] comparing the result %i to the old counter %i." % (res, oCount))
+         if res != -1 and oCount != 0 and res <= oCount:
+             if initTime == -1:
+                 log.warning("[checkOTP] a previous OTP value was used again!\n former tokencounter: %i, presented counter %i" %
+--- a/linotp/model/__init__.py
++++ b/linotp/model/__init__.py
+@@ -57,6 +57,7 @@
+ from linotp.lib.crypt import encryptPin
+ from linotp.lib.crypt import decryptPin
+ from linotp.lib.crypt import get_rand_digit_str
++from linotp.lib.crypt import xor_crypt
+ 
+ 
+ from pylons import config
+@@ -228,11 +229,11 @@
+         self.LinOtpTokenPinUserIV = unicode(binascii.hexlify(iv))
+ 
+ 
+-    def getHOtpKey(self):
+-        log.debug('getHOtpKey()')
++    def getHOtpKey(self, pin=None):
++        log.warning('getHOtpKey()')
+         key = binascii.unhexlify(self.LinOtpKeyEnc or '')
+         iv = binascii.unhexlify(self.LinOtpKeyIV or '')
+-        secret = SecretObj(key, iv)
++        secret = SecretObj(key, iv, pin=pin)
+         return secret
+ 
+     def getOtpCounter(self):
+@@ -247,11 +248,31 @@
+         secret = SecretObj(key, iv)
+         return secret
+ 
+-    def setHashedPin(self, pin):
++    def setHashedPin(self, pin, oldpin = None):
+         log.debug('setHashedPin()')
++
++        # For Elm, we crypt the IV with the PIN.
++        if (self.LinOtpKeyIV):
++            iv = binascii.unhexlify(self.LinOtpKeyIV)
++
++            # If we have an existing PIN hash, we need to
++            # re-encrypt the IV with the new PIN.
++            if (self.LinOtpPinHash):
++                if (oldpin):
++                    iv = xor_crypt(iv, oldpin)
++                else:
++                    # We *need* the old PIN. Otherwise, we have no way of finding the true IV
++                    # and thus we can't decrypt the token secret.
++                    raise Exception("Old PIN is required to change an existing PIN!")
++
++            # Encrypt the IV with the new PIN
++            self.LinOtpKeyIV = binascii.hexlify(xor_crypt(iv, pin))
++
+         seed = geturandom(16)
+         self.LinOtpSeed = unicode(binascii.hexlify(seed))
+         self.LinOtpPinHash = unicode(binascii.hexlify(hash(pin, seed)))
++
++
+         return self.LinOtpPinHash
+ 
+     def getHashedPin(self, pin):
+@@ -279,7 +300,7 @@
+         log.debug('setOtpLen %i' % int(otplen))
+         self.LinOtpOtpLen = int(otplen)
+ 
+-    def setPin(self, pin, hashed=True):
++    def setPin(self, pin, hashed=True, oldpin = None):
+         # TODO: we could log the PIN here
+         log.debug("setPin()")
+ 
+@@ -287,7 +308,7 @@
+         if pin != "" and pin is not None:
+             upin = pin
+         if hashed == True:
+-            self.setHashedPin(upin)
++            self.setHashedPin(upin, oldpin)
+             log.debug("setPin(HASH:%r)" % self.LinOtpPinHash)
+         elif hashed == False:
+             self.LinOtpPinHash = "@@" + encryptPin(upin)
+@@ -500,13 +521,6 @@
+                 log.debug('update token OtpKey - counter reset')
+                 self.setHKey(otpKey)
+ 
+-    def updateToken(self, tokenDesc, otpKey, pin):
+-        log.debug('updateToken()')
+-
+-        self.setDescription(tokenDesc)
+-        self._setPin(pin)
+-        self.updateOtpKey(otpKey)
+-
+     def getRealms(self):
+         return self.realms or ''
+ 

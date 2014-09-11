@@ -3,7 +3,6 @@
 
 	Header always edit Set-Cookie ^(.*)$ $1;secure
 
-	AddRadiusAuth localhost:1812 testing123 5:3
 	DocumentRoot /var/www
 	<Directory />
 		Options FollowSymLinks

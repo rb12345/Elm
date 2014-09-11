@@ -1301,9 +1301,21 @@ ${c.version} --- ${c.licenseinfo}
 					<td><input type="text" name="oak_realm" class="required"  id="oak_realm" size="10" maxlength="6"></td>
 				</tr>
 				<tr>
-					<td><label for=ldap_sizelimit>${_("Response size limit")}:</label></td>
+					<td><label for=oak_sizelimit>${_("Response size limit")}:</label></td>
 					<td><input type="text" name="oak_sizelimit" class="required"  id="oak_sizelimit" size="10" maxlength="10"></td>
 				</tr>
+				<tr>
+				<div id=realm_hidden>
+					<tr>
+						<td><label for=autorealm>Create matching realm:</label></td>
+						<td><input type="checkbox" name="autorealm" id="autorealm" value="autorealm" title="This will automatically create a realm linked to this resolver."></td>
+					</tr>
+					<tr id="autorealm_tr">
+						<td><label for=autorealm_name>Realm name:</label></td>
+						<td><input type="text" name="autorealm_name"  id="autorealm_name" size="20" maxlength="60" value=""></td>
+					</tr>
+				</div>
+				<input type=hidden id=is_edit value="">
 			</table>
 		</fieldset>
 	</form>
@@ -1312,6 +1324,13 @@ ${c.version} --- ${c.licenseinfo}
 </div>
 
 <script>
+	$('#autorealm_tr').hide();
+	$('#autorealm').change(function() {
+		if ($(this)[0].checked)
+			$('#autorealm_tr').show();
+		else
+			$('#autorealm_tr').hide();
+    });
 	function translate_dialog_oak_resolver() {
 		$("#dialog_oak_resolver" ).dialog( "option", "title", '${_("Oak Resolver")}' );
 		$('#button_test_oak .ui-button-text').html('${_("Test Oak connection")}');

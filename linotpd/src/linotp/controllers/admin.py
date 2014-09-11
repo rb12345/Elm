@@ -1143,6 +1143,10 @@ class AdminController(BaseController):
                     # Should only be one token with this serial.
                     token = tokenList[0]
 
+                    # We need the correct old PIN so that we can decrypt / recrypt the token IV
+                    # in the database. Otherwise, we can't recover the token seed, which we need
+                    # to validate codes for that token.
+
                     pin_match = check_pin(token, oldPin, user=user)
 
                     if (not pin_match):
