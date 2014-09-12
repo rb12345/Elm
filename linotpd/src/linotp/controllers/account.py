@@ -119,10 +119,8 @@ class AccountController(BaseController):
             # After logout We always redirect to the start page
             redirect("/")
 
-        http_host = request.environ.get("HTTP_HOST")
-        url_scheme = request.environ.get("wsgi.url_scheme")
-        redirect("%s://%s/elm/logout" % (url_scheme, http_host))
-        #redirect('https://webauth.ox.ac.uk/logout')
+        # CHANGE ME PRE-INSTALLATION TO POINT TO YOUR WEBKDC
+        redirect("https://mfa-test.bsp.ox.ac.uk/elm/logout")
 
         Session.close()
 

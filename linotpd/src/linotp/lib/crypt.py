@@ -104,7 +104,6 @@ class SecretObj:
         self.preserve = preserve
         # IVs are xored with the PIN for Elm tokens.
         if (pin is not None):
-            log.warning("Pin: %r" % pin)
             self.iv = xor_crypt(self.iv, pin)
 
     def getKey(self):
