@@ -453,7 +453,7 @@ class TimeHmacTokenClass(HmacTokenClass):
             if initTime == -1:
                 log.warning("[checkOTP] a previous OTP value was used again!\n former tokencounter: %i, presented counter %i" %
                         (oCount, res))
-                res = -1
+                res = -2 # return something different so we can tell them their code is being reused
                 return res
 
         if -1 == res :

@@ -1300,7 +1300,11 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
 
         elif len(pToken) == 1 :  ## pin matches but the otp is wrong
             pinMatchingTokenList.extend(pToken)
-            audit['action_detail'] = "wrong otp value"
+            # Was it a reused token?
+            if ret == -2:
+                audit['action_detail'] = "otp already used"
+            else:
+                audit['action_detail'] = "wrong otp value"
             audit['weight'] = 25
 
         #any valid otp increments, independend of the tokens state !!
