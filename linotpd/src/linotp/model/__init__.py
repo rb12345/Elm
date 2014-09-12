@@ -290,7 +290,7 @@ class Token(object):
         upin = ""
         if pin != "" and pin is not None:
             upin = pin
-            
+
         # For Elm, we crypt the IV with the PIN.
         if (self.LinOtpKeyIV):
             iv = binascii.unhexlify(self.LinOtpKeyIV)
@@ -307,7 +307,7 @@ class Token(object):
 
             # Encrypt the IV with the new PIN
             self.LinOtpKeyIV = binascii.hexlify(xor_crypt(iv, upin))
-            
+
         if hashed == True:
             self.setHashedPin(upin)
             log.debug("setPin(HASH:%r)" % self.LinOtpPinHash)
