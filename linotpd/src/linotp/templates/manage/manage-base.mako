@@ -1298,7 +1298,7 @@ ${c.version} --- ${c.licenseinfo}
 				</tr>
 				<tr>
 					<td><label for=oak_realm>${_("Realm code (eg 'ball' or 'admn')")}:</label></td>
-					<td><input type="text" name="oak_realm" class="required"  id="oak_realm" size="10" maxlength="6"></td>
+					<td><input type="text" name="oak_realm" class="required"  id="oak_realm" size="20" maxlength="20"></td>
 				</tr>
 				<tr>
 					<td><label for=oak_sizelimit>${_("Response size limit")}:</label></td>

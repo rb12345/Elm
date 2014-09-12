@@ -244,7 +244,7 @@ def splitResolver(resolver):
             conf = l[3]
     except Exception as e:
         log.error("[splitResolver] split of resolver failed %s : %r " % (reso, e))
-        raise Exception("invalid resolver class specification" + reso)
+        raise Exception("invalid resolver class specification " + reso)
     return (package, module, class_, conf)
 
 ## external system/getResolvers
