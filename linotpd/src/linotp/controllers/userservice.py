@@ -149,8 +149,7 @@ ENCODING = "utf-8"
 
 def get_auth_user(request):
     """
-    retrieve the authenticated user either from
-    - repoze or userservice or selftest
+    retrieve the authenticated user from WebAuth
 
     remark: should be moved in a utils thing, as it is used as well from
             selfservice
@@ -160,22 +159,12 @@ def get_auth_user(request):
     """
     auth_type = ''
 
-    repose_auth = request.environ.get('repoze.who.identity')
-    if repose_auth:
-        log.debug("getting identity from repoze.who: %r" % repose_auth)
-        user_id = request.environ.get('repoze.who.identity', {})\
-                                 .get('repoze.who.userid', '')
-        auth_type = "repoze"
+    if request.environ.has_key('REMOTE_USER'):
+        user_id = request.environ.get('REMOTE_USER')
+        auth_type = "webauth"
+        log.debug("[get_auth_user] getting identity from WebAuth: %r" % user_id)
+
     else:
-        log.debug("getting identity from params: %r" % request.params)
-        user_id = request.params.get('user', None)
-        auth_type = "userservice"
-
-    if not user_id and isSelfTest():
-        user_id = request.params.get('selftest_user', '')
-        auth_type = "selftest"
-
-    if not user_id:
         return ('unauthenticated', None)
 
     if type(user_id) == unicode:
@@ -208,21 +197,23 @@ class UserserviceController(BaseController):
             auth_type, identity = get_auth_user(request)
             if not identity:
                 abort(401, _("You are not authenticated"))
-
-            login, _foo, realm = identity.rpartition('@')
+            
+            # Put their current realm as the first one we find them in.
+            # Doesn't really matter since tokens are realm-independent.
+            realms = getAllUserRealms(User(identity, ""))
+            if realms:
+                login = identity
+                realm = realms[0]
+ 
             self.authUser = User(login, realm)
 
             if auth_type == "userservice":
                 res = check_userservice_session(request, config,
                                                 self.authUser, self.client)
-            elif auth_type == 'repoze':
-                res = check_selfservice_session(request.url,
-                                                       request.path,
-                                                       request.cookies,
-                                                       request.params
-                                                       )
-            elif auth_type == 'selftest':
-                res = True
+
+            # Check the session.
+            res = check_userservice_session(request, config, self.authUser, self.client)
+
             else:
                 abort(401, _("No valid authentication session %r") % auth_type)
 
@@ -280,12 +271,12 @@ class UserserviceController(BaseController):
 
 ###############################################################################
 # authentication hooks
-
+   
     def auth(self):
         """
         user authentication for example to the remote selfservice
 
-        :param login: login name of the user normaly in the user@realm format
+        :param login: login name of the user normally in the user@realm format
         :param realm: the realm of the user
         :param password: the password for the user authentication
                          which is base32 encoded to seperate the
@@ -349,9 +340,78 @@ class UserserviceController(BaseController):
         finally:
             Session.close()
 
+
+    def session_auth(self):
+        """
+        sets the session cookie for a selfservice session
+        """
+ 
+        if self.otpLogin:
+            res = self._webauth_OTP_check(request)
+        else
+            res = self._webauth_check(request)
+        
+        if res:
+            user = request.environ.get('REMOTE_USER')
+            log.debug("[session_auth] Successfully authenticated user %s" % user)
+            cookie = create_auth_cookie(config, user, self.client)
+            response.set_cookie('userauthcookie', cookie, max_age=360*24)
+            ok = user
+        else:
+            log.info("[session_auth] Session authentication failed")
+
+        c.audit['success'] = True
+        Session.commit()
+        return sendResult(response, ok, 0)
+
+
+    def _webauth_check(self, request):
+        """
+        check user is authenticated through WebAuth
+
+        :param request: the request object
+        :return: bool
+        """
+
+        res = True
+        if request.environ.has_key('REMOTE_USER'):
+            user = request.environ.get('REMOTE_USER')
+            # Check WebAuth token expiration
+            expiry = request.environ.get('WEBAUTH_TOKEN_EXPIRATION')
+            if expiry is not None:
+                if (expiry < time.time()):
+                    res = False
+            else:
+                res = False
+        else:
+            res = False
+
+        return res
+
+
+    def _webauth_OTP_check(self, request, otp):
+        """
+        secure authentication using WebAuth + otp
+        """
+        ret = False
+
+        webauth = self._webauth_check(request)
+        if webauth:
+            user = request.environ.get('REMOTE_USER')
+            toks = getTokenForUser(user)
+            th = TokenHandler()
+            
+            if len(toks) == 0:
+                log.error("[_webauth_OTP_check] No tokens found for user %s" % user)
+                raise Exception
+            else:
+                (ret, _reply) = th.checkUserPass(user, otp)
+        return ret
+
+
     def _default_auth_check(self, user, password, otp=None):
         """
-        the former selfservice login controll:
+        the former selfservice login control:
          check for username and os_pass
 
         :param user: user object
@@ -359,7 +419,7 @@ class UserserviceController(BaseController):
         :param otp: not used
 
         :return: bool
-        """
+        """ 
         (uid, _resolver, resolver_class) = getUserId(user)
         r_obj = getResolverObject(resolver_class)
         res = r_obj.checkPass(uid, password)
