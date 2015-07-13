@@ -164,7 +164,6 @@ setup(
                 ]
             ),
         ],
->>>>>>> upstream/master
     classifiers=[
         "Framework :: Pylons",
         "License :: OSI Approved :: GNU Affero General Public License v3",
@@ -173,15 +172,6 @@ setup(
         "Topic :: Security",
         "Topic :: System :: Systems Administration :: Authentication/Directory"
     ],
-<<<<<<< HEAD
-    message_extractors={'linotp': [
-            ('**.py', 'python', None),
-            ('templates/**.mako', 'mako', {'input_encoding': 'utf-8'}),
-            ('lib/tokens/*.mako', 'mako', {'input_encoding': 'utf-8'}),
-            ('public/**', 'ignore', None)]},
-    zip_safe=False,
-    paster_plugins=['PasteScript', 'Pylons'],
-=======
     message_extractors={
         'linotp': [
             (
@@ -243,7 +233,6 @@ setup(
     # The entry point for nose.plugins is required because otherwise nosetests
     # complains "no such option 'with-pylons'".
     # https://github.com/Pylons/pylons/issues/13
->>>>>>> upstream/master
     entry_points="""
     [paste.app_factory]
     main = linotp.config.middleware:make_app

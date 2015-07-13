@@ -1698,7 +1698,6 @@ ${c.version} --- &copy; ${c.licenseinfo}
 
 <div id="text_http_config_success">${_("HTTP Server configuration seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
 <div id="text_http_load_error">${_("Error loading HTTP resolver")}: <span class="text_param1"> </span></div>
->>>>>>> upstream/master
 <div id="text_sql_load_error">${_("Error loading SQL resolver")}: <span class="text_param1"> </span></div>
 <div id="text_sql_config_success">${_("SQL config seems to be OK! Number of users found")}: <span class="text_param1"> </span></div>
 <div id="text_sql_config_fail">${_("SQL config contains errors")}: <span class="text_param1"> </span></div>
