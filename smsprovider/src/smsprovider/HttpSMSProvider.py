@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP smsprovider.
 #
@@ -410,6 +410,9 @@ class HttpSMSProvider(ISMSProvider):
 
 
     def loadConfig(self, configDict):
-        self.config = configDict
+        if configDict:
+            self.config = configDict
+        else:
+            raise Exception('missing configuration')
 
 ##eof##########################################################################

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -104,7 +104,7 @@ class YubikeyTokenClass(TokenClass):
         log.debug("[getClassInfo] end. Returned the configuration section: ret %r " % (ret))
         return ret
 
-    def check_otp_exist(self, otp, window=None):
+    def check_otp_exist(self, otp, window=None, user=None, autoassign=False):
         '''
         checks if the given OTP value is/are values of this very token.
         This is used to autoassign and to determine the serial number of
@@ -175,28 +175,60 @@ class YubikeyTokenClass(TokenClass):
 
         return ret
 
+    def update(self, param, reset_failcount=True):
+        '''
+        update - process the initialization parameters
+
+        :param param: dict of initialization parameters
+        :type param: dict
+
+        :return: nothing
+        '''
+
+        # we use the public_uid to calculate the otplen which is at 48 or 32
+        # the public_uid is stored and used in validation
+
+        if 'public_uid' in param:
+            otplen = 32 + len(param['public_uid'])
+        else:
+            otplen = 48
+
+        if 'otplen' not in param:
+            param['otplen'] = otplen
+
+        TokenClass.update(self, param, reset_failcount)
+
+        if 'public_uid' in param:
+            self.addToTokenInfo('public_uid', param['public_uid'])
+
+        log.debug("[update] end. Processing the initialization parameters done.")
+        return
+
     def resetTokenInfo(self):
         """
         resetTokenInfo - hook called during token init/update
 
         in yubikey we have to reset the tokeninfo as it preserves the
-        tokenid, which changes with an token update
+        tokenid and or public_uid which changes with an token update
         """
 
         info = self.getTokenInfo()
 
-        if info and "yubikey.tokenid" in info:
-            del info["yubikey.tokenid"]
+        if info:
+            if "yubikey.tokenid" in info:
+                del info["yubikey.tokenid"]
+            if "public_uid" in info:
+                del info["public_uid"]
             self.setTokenInfo(info)
 
         return
 
-    def checkOtp(self, anOtpVal, counter=None, window=None, options=None):
+    def checkOtp(self, otpVal, counter=None, window=None, options=None):
         """
         checkOtp - validate the token otp against a given otpvalue
 
-        :param anOtpVal: the to be verified otpvalue
-        :type anOtpVal:  string
+        :param otpVal: the to be verified otpvalue
+        :type otpVal:  string
 
         :param counter: the counter state. It is not used by the Yubikey because the current counter value
         is sent encrypted inside the OTP value
@@ -220,19 +252,26 @@ class YubikeyTokenClass(TokenClass):
                     6 Implementation details
 
         """
-        log.debug("[checkOtp] begin. Validate the token otp: anOtpVal: %r, counter: %r,  options: %r "
-                  % (anOtpVal, counter, options))
+        log.debug("[checkOtp] begin. Validate the token otp: otpVal: %r, counter: %r,  options: %r "
+                  % (otpVal, counter, options))
         res = -1
 
-        if len(anOtpVal) < self.getOtpLen():
+        if len(otpVal) < self.getOtpLen():
             return res
 
         serial = self.token.getSerial()
         secret = self.token.getHOtpKey()
 
+        anOtpVal = otpVal.lower()
+
         # The prefix is the characters in front of the last 32 chars
         # We can also check the PREFIX! At the moment, we do not use it!
         yubi_prefix = anOtpVal[:-32]
+
+        # verify the prefix if any
+        enroll_prefix = self.getFromTokenInfo('public_uid', None)
+        if enroll_prefix and enroll_prefix != yubi_prefix:
+            return res
 
         # The variable otp val is the last 32 chars
         yubi_otp = anOtpVal[-32:]

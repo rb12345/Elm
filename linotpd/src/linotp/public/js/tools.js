@@ -1,6 +1,6 @@
 /*!
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -189,7 +189,7 @@ function exportToken(attributes) {
 function create_tools_exporttoken_dialog() {
      var $dialog = $('#dialog_export_token').dialog({
         autoOpen: false,
-        title: 'Export token information',
+        title: 'Export Token Information',
         width: 600,
         modal: true,
         buttons: {
@@ -197,7 +197,7 @@ function create_tools_exporttoken_dialog() {
                         exportToken($('#exporttoken_attributes').val());
                         },
                     id: "button_export_token",
-                    text: "Export token"
+                    text: "Export Token"
             },
             'Close': { click: function(){
                             $(this).dialog('close');
@@ -237,13 +237,13 @@ function exportAudit(audit_num, audit_page) {
 function create_tools_exportaudit_dialog() {
      var $dialog = $('#dialog_export_audit').dialog({
         autoOpen: false,
-        title: 'Export audit information',
+        title: 'Export Audit Information',
         width: 600,
         modal: true,
         buttons: {
             'Export': { click:  function(){
                         exportAudit($('#export_audit_number').val(),
-                                    $('#exüprt_audit_page').val());
+                                    $('#export_audit_page').val());
                         $(this).dialog('close');
                         },
                     id: "button_export_audit",

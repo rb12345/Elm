@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -50,7 +50,10 @@ class TestSmsToken(TestCase):
         """
 
         sms_provider_config = get_from_tconfig(['sms_token', 'sms_provider_config'])
-        radius_server = get_from_tconfig(['radius', 'server'], default=self.http_host)
+        radius_server = get_from_tconfig(
+            ['radius', 'server'],
+            default=self.http_host.split(':')[0],
+            )
         radius_secret = get_from_tconfig(['radius', 'secret'], required=True)
         disable_radius = get_from_tconfig(['radius', 'disable'], default='False')
 
@@ -90,7 +93,7 @@ class TestSmsToken(TestCase):
             print "No sms_provider_config in testconfig file. Using LinOTP default."
 
         # Enroll sms token
-        driver.get(self.base_url + "/manage/")
+        driver.get(self.base_url + "/manage")
         time.sleep(2)
         user_view = UserView(driver, self.base_url, realm_name)
         username = "rollo"

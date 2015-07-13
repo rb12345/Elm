@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -30,6 +30,7 @@ XML files, that hold the OTP secrets for eToken PASS.
 
 import xml.etree.ElementTree as etree
 import re
+import os
 import binascii
 from linotp.lib.util import modhex_decode
 from linotp.lib.util import modhex_encode
@@ -45,8 +46,8 @@ def getKnownTypes():
 def getImportText():
     return { 'feitian' : 'Feitian XML',
         'pskc' : 'OATH compliant PSKC',
-        'dpw' : 'Tagespasswort file',
-        'dat' : 'eToken dat file',
+        'dpw' : 'Tagespasswort Token File',
+        'dat' : 'eToken DAT File',
         'vasco' : 'Vasco DPX' }
 
 def create_static_password(key_hex):
@@ -229,9 +230,9 @@ def parseYubicoCSV(csv):
 
                 if public_id == "":
                     log.warning("No public ID in line %r" % line)
-                    continue
-
-                serial_int = int(binascii.hexlify(modhex_decode(public_id)), 16)
+                    serial_int = int(binascii.hexlify(os.urandom(4)), 16)
+                else:
+                    serial_int = int(binascii.hexlify(modhex_decode(public_id)), 16)
 
                 if typ.lower() == "yubico otp":
                     ttype = "yubikey"

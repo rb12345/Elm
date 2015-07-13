@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -52,7 +52,7 @@ class TokenImport:
             tf.close()
             self.file_path = tf.name
 
-        self.driver.get(self.base_url + "/manage/")
+        self.driver.get(self.base_url + "/manage")
         import_button = self.driver.find_element_by_xpath(u"//ul[@id='menu']//"
                                        "li[a[text()='Import Token File']]")
         time.sleep(1)

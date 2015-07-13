@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -43,13 +43,11 @@ class SmsToken(Token):
         if phone:
             driver.find_element_by_id("sms_phone").clear()
             driver.find_element_by_id("sms_phone").send_keys(phone)
+        driver.find_element_by_id("sms_pin1").clear()
+        driver.find_element_by_id("sms_pin1").send_keys(pin)
+        driver.find_element_by_id("sms_pin2").clear()
+        driver.find_element_by_id("sms_pin2").send_keys(pin)
         driver.find_element_by_id("button_enroll_enroll").click()
-        time.sleep(1)
-        driver.find_element_by_id("pin1").clear()
-        driver.find_element_by_id("pin1").send_keys(pin)
-        driver.find_element_by_id("pin2").clear()
-        driver.find_element_by_id("pin2").send_keys(pin)
-        driver.find_element_by_id("button_setpin_setpin").click()
         time.sleep(1)
         info_boxes = driver.find_elements_by_css_selector("#info_box > .info_box > span")
         for box in info_boxes:

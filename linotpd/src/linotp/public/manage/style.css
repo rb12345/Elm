@@ -1,6 +1,6 @@
 /*!
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -81,20 +81,38 @@ a.close_all {
 }
 
 /*
+ * Flexigrid Selection
+ */
+
+.flexigrid div.bDiv tr.trSelected:hover td,
+.flexigrid div.bDiv tr.trSelected:hover td.sorted,
+.flexigrid div.bDiv tr.trOver.trSelected td.sorted,
+.flexigrid div.bDiv tr.trOver.trSelected td,
+.flexigrid tr.trSelected td.sorted,
+.flexigrid tr.trSelected td
+	{
+	color: #000000;
+	background: #f6a350;
+	border-right: 1px solid #da9147;
+	border-left: 1px solid #ffa953;
+	border-bottom: 1px solid #b6793b;
+}
+
+/*
  * jqeury selectable stuff for selecting Resolvers
  * #resolvers_select, realms_select... li { margin: 3px; padding: 0.4em; font-size: 1.4em; height: 18px; }
  */
-.select_list .ui-selecting { background: #FECA40; }
+.select_list .ui-selecting { background: #d9ebf5; }
 /*#realms_select .ui-selected { background: #F39814; color: white; }*/
 .select_list .ui-selected {
-			background: #d5effc url(/css/flexigrid/images/hl.png) repeat-x top;
-			border-right: 1px solid #d2e3ec;
-			border-left: 1px solid #eef8ff;
-			border-bottom: 1px solid #a8d8eb;
-			}
+	background: #f6a350;
+	border-right: 1px solid #da9147;
+	border-left: 1px solid #ffa953;
+	border-bottom: 1px solid #b6793b;
+}
 .select_list { list-style-type: none; margin: 0; padding: 0; width: 95%; }
 .select_list li { margin: 3px; padding: 0.4em; }
-.select_list li:hover { background: #FEB77E; }
+.select_list li:hover { background: #d9ebf5; }
 
 
 #logDiv { width: 100%; height: 50px; padding: 0.5em; }
@@ -182,11 +200,11 @@ z-index: 1;
 }
 
 #selected_tokens {
-	font-size: 100%;
+	font-size: 80%;
 	font-style:italic;
 }
 #selected_users {
-	font-size: 100%;
+	font-size: 80%;
 	font-style:italic;
 }
 
@@ -226,12 +244,13 @@ z-index: 1;
 	float: left;
 	width: 100%;
 	margin: 5px 0;
+	height: 45px;
  }
 
  #header #logo {
- 	float: right;
+	float: right;
 	margin-right: 5px;
-	padding-top: 2px;
+	margin-top: 5px;
  }
 
  #header #logo img {
@@ -260,7 +279,9 @@ z-index: 1;
 
  #menu.sf-menu a {
 	border-top: none;
-    color: black;
+	color: black;
+	font-size: 16px;
+	height: 21px;
  }
 
  #header .sf-menu li:first-child a {

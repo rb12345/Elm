@@ -1,6 +1,6 @@
 /*!
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -25,6 +25,9 @@
  */
 window.onerror = error_handling;
 
+/* Use Jed for i18n. The correct JSON file is dynamically loaded later. */
+var i18n = new Jed({});
+var sprintf = Jed.sprintf;
 
 encodings = [
     "ascii","big5","big5hkscs",
@@ -94,13 +97,99 @@ function error_handling(message, file, line){
     return true;
 }
 
+/*
+ * add the jquery validation methods
+ */
+$.validator.addMethod('valid_json', function (value, element, param) {
+    var isValid = false;
+    try {
+        var obj = $.parseJSON(value);
+        isValid = true;
+    } catch(err) {
+        isValid = false;
+    }
+    return isValid;
+    },
+    i18n.gettext('Not a valid json string!')
+);
+
+jQuery.validator.addMethod("realmname", function(value, element, param){
+    return value.match(/^[a-zA-z0-9_\-\.]+$/i);
+    },
+    i18n.gettext("Please enter a valid realm name. It may contain characters, numbers and '_-.'.")
+);
+
+jQuery.validator.addMethod("resolvername", function(value, element, param){
+    return value.match(/^[a-zA-z0-9_\-]+$/i);
+    },
+    i18n.gettext("Please enter a valid resolver name. It may contain characters, numbers and '_-'.")
+);
+
+jQuery.validator.addMethod("ldap_uri", function(value, element, param){
+    return value.match(param);
+    },
+    i18n.gettext("Please enter a valid ldap uri. It needs to start with ldap:// or ldaps://")
+);
+jQuery.validator.addMethod("http_uri", function(value, element, param){
+    return value.match(param);
+    },
+    i18n.gettext("Please enter a valid http uri. It needs to start with http:// or https://")
+);
+
+// LDAPSEARCHFILTER: "(sAMAccountName=*)(objectClass=user)"
+jQuery.validator.addMethod("ldap_searchfilter", function(value, element, param){
+    return value.match(/(\(\S+=\S+\))+/);
+    },
+    i18n.gettext("Please enter a valid searchfilter like this: (sAMAccountName=*)(objectClass=user)")
+);
+
+// LDAPFILTER: "(&(sAMAccountName=%s)(objectClass=user))"
+jQuery.validator.addMethod("ldap_userfilter", function(value, element, param){
+    return value.match(/\(\&(\(\S+=\S+\))+\)/);
+    },
+    i18n.gettext("Please enter a valid user searchfilter like this: (&(sAMAccountName=%s)(objectClass=user))")
+);
+
+jQuery.validator.addMethod("ldap_mapping", function(value, element, param){
+    return value.match(/{.+}/);
+    },
+    i18n.gettext('Please enter a valid searchfilter like this: \
+    { "username": "sAMAccountName", "phone" : "telephoneNumber", "mobile" \
+    : "mobile", "email" : "mail", "surname" : "sn", "givenname" : "givenName" }')
+);
+
+jQuery.validator.addMethod("ldap_uidtype", function(value,element,param){
+    return value.match(/.*/);
+    },
+    i18n.gettext('Please enter the UID of your LDAP server like DN, entryUUID, objectGUID or GUID')
+);
+
+jQuery.validator.addMethod("oak_realm", function(value, element, param){
+        return value.match(/^[a-z0-9]+$/i);
+    }, "Please enter a valid Oak realm identifier. It may contain characters or numbers.");
+
+jQuery.validator.addMethod("sql_driver", function(value, element, param){
+    return value.match(/(mysql)|(postgres)|(mssql)|(oracle)|(ibm_db_sa\+pyodbc)/);
+    },
+    i18n.gettext("Please enter a valid driver specification like: mysql, postgres, mssql, oracle or ibm_db_sa+pyodbc")
+);
+
+jQuery.validator.addMethod("sql_mapping", function(value, element, param){
+    return value.match(/{.+}/);
+    },
+    i18n.gettext('Please enter a valid searchfilter like this: \
+    { "username": "usercolumn", "password":"pw", "salt": "salt", "phone" : "telephoneNumber", "mobile" \
+    : "mobile", "email" : "mail", "surname" : "sn", "givenname" : "givenName" }')
+);
+
+
 // We need this dialogs globally, so that we do not create more than one instance!
 
 var $dialog_ldap_resolver;
+var $dialog_http_resolver;
 var $dialog_file_resolver;
 var $dialog_sql_resolver;
 var $dialog_oak_resolver;
-
 var $dialog_edit_realms;
 var $dialog_ask_new_resolvertype;
 var $dialog_resolvers;
@@ -130,7 +219,20 @@ var g = {};
 
 ERROR = "error";
 
-
+var support_license_dict = {
+    'comment' : i18n.gettext('Description'),
+    'issuer' : i18n.gettext('Issuer'),
+    'token-num' : i18n.gettext('Number of tokens'),
+    'licensee' : i18n.gettext('Licensee'),
+    'address' : i18n.gettext('Address'),
+    'contact-name' : i18n.gettext('Contact name'),
+    'contact-email' : i18n.gettext('Contact EMail'),
+    'contact-phone' : i18n.gettext('Contact phone'),
+    'date' : i18n.gettext('Date'),
+    'expire' : i18n.gettext('Expiration'),
+    'subscription' : i18n.gettext('Subscription'),
+    'version' : i18n.gettext('Version'),
+};
 
 function len(obj) {
   var len = obj.length ? --obj.length : -1;
@@ -235,12 +337,12 @@ function alert_info_text(s, text_container, display_type) {
 function toggle_close_all_link() {
     /*
      * This function counts the number of visible info boxes and error boxes and
-     * if more than 3 are displayed it shows the "Close all" link. Otherwise it
+     * if more than 1 are displayed it shows the "Close all" link. Otherwise it
      * hides the link.
      */
     visible_boxes = $("#info_box > div").filter(":visible");
     close_all = $("a.close_all");
-    if (visible_boxes.length > 3) {
+    if (visible_boxes.length > 1) {
         close_all.click(function( event ) {
             event.preventDefault();
             visible_boxes.hide('blind', {}, 500);
@@ -275,7 +377,11 @@ function alert_box(title, s, param1) {
     }
     title_t = title;
     try {
-        title_t=$('#'+title).text();
+        if ($('#'+title).length > 0 ) {
+            title_t=$('#'+title).text();
+        } else {
+            title_t = title;
+        }
     } catch(e) {
         title_t = title;
     }
@@ -313,16 +419,24 @@ function get_selected_users(){
     var selectedUserItems = new Array();
     var tt = $("#user_table");
     var selected = $('.trSelected', tt);
+    if (selected.length > 1){
+        // unselect all selected users - as the last selected could not be identified easily
+        selected.removeClass('trSelected');
+        alert_box( i18n.gettext("User selection:"),
+                   i18n.gettext("Selection of more than one user is not supported!")+"<p>"
+                   + i18n.gettext("Please select only one user.") + "</p>");
+        return selectedUserItems;
+    }
+    var actual_realm = $('#realm').val();
     selected.each(function(){
         var user = new Object();
-        user = { resolver:"" , login:"" };
+        user = { resolver:"" , login:"" , realm:actual_realm };
         column = $('td', $(this));
         column.each(function(){
             var attr = $(this).attr("abbr");
             if (attr == "useridresolver") {
                 var resolver = $('div', $(this)).html().split('.');
                 user.resolver = resolver[resolver.length-1];
-
             }
         });
 
@@ -349,8 +463,10 @@ function get_scope_actions(scope) {
      * This function returns the allowed actions within a scope
      */
     var actions = Array();
-    var resp = clientUrlFetchSync("/system/getPolicyDef",{"scope" : scope}, true, "Error fetching policy definitions:");
-    obj = jQuery.parseJSON(resp);
+    var resp = clientUrlFetchSync("/system/getPolicyDef",
+                                  {"scope" : scope},
+                                  true, "Error fetching policy definitions:");
+    var obj = jQuery.parseJSON(resp);
     if (obj.result.status) {
             for (var k in obj.result.value) {
                 action = k;
@@ -364,6 +480,25 @@ function get_scope_actions(scope) {
             }
     }
     return actions.sort();
+}
+
+function get_policy(definition) {
+    /*
+     * This function returns the policies which conform to the
+     * set of definitions: scope, action, user, realm
+     */
+    var policies = Array();
+    var resp = clientUrlFetchSync("/system/getPolicy",
+                                  definition,
+                                  true, "Error fetching policy definitions:");
+    var obj = jQuery.parseJSON(resp);
+    if (obj.result.status) {
+            for (var k in obj.result.value) {
+                policy = obj.result.value[k];
+                policies.push(policy);
+            }
+    }
+    return policies;
 }
 
 function get_selected_mobile(){
@@ -394,6 +529,31 @@ function get_selected_email() {
         selectedEmailItems.push(value);
     });
     return selectedEmailItems;
+}
+
+function get_token_owner(token_serial){
+
+    // sorry: we need to do this synchronously
+    var resp = clientUrlFetchSync('/admin/getTokenOwner',
+                                    {'serial': token_serial});
+    if (resp == undefined) {
+        alert('Server is not responding');
+        return 0;
+    }
+    var obj = jQuery.parseJSON(resp);
+    return obj.result.value;
+
+}
+
+function show_selected_status(){
+    var selectedUserItems = get_selected_user();
+    var selectedTokenItems = get_selected_tokens();
+    document.getElementById('selected_tokens').innerHTML = selectedTokenItems.join(", ");
+    // we can only select a single user
+    if ( selectedUserItems.length > 0 )
+        document.getElementById('selected_users').innerHTML = selectedUserItems[0].login;
+    else
+        document.getElementById('selected_users').innerHTML = "";
 }
 
 function get_selected(){
@@ -924,27 +1084,43 @@ function losttoken_callback(xhdr, textStatus){
     if (obj.result.status) {
         var serial = obj.result.value.serial;
         var end_date = obj.result.value.end_date;
-        var password = obj.result.value.password;
+        var password = '';
+        if ('password' in obj.result.value){
+            password = obj.result.value.password ;
+            $('#temp_token_password').html(password);
+        }
         $('#temp_token_serial').html(serial);
-        $('#temp_token_password').html(password);
         $('#temp_token_enddate').html(end_date);
         $dialog_view_temporary_token.dialog("open");
     } else {
-        alert_info_text("text_losttoken_failed", obj.result.error.message, ERROR);
+        alert_info_text("text_losttoken_failed",
+                obj.result.error.message, ERROR);
     }
     $("#token_table").flexReload();
     $('#selected_tokens').html('');
     disable_all_buttons();
-    log('Token ' + tokens + ' lost.');
+    log('Token ' + serial + ' lost.');
 }
 
-function token_losttoken() {
-    var tokentab = 0;
+function token_losttoken(token_type) {
+    /*
+     * token_losttoken - request enrollment of losttoken
+     */
     var tokens = get_selected_tokens();
     var count = tokens.length;
+
+    /* this for loop is unused as the gui allows only the losttoken action
+     * if only one token is selected (count is 1) */
     for (i = 0; i < count; i++) {
-        var serial = tokens[i];
-        resp = clientUrlFetch("/admin/losttoken", {"serial" : serial}, losttoken_callback);
+        var params = {"serial" : tokens[i]};
+
+        if (token_type === 'password' ||
+            token_type === 'email' ||
+            token_type === 'sms')
+            params['type'] = token_type;
+
+        resp = clientUrlFetch("/admin/losttoken",
+                                params, losttoken_callback);
     }
 }
 
@@ -962,8 +1138,6 @@ function setpin_callback(xhdr, textStatus) {
             else
                 alert_info_text("text_setpin_failed", obj.result.error.message, ERROR);
         }
-	else
-		alert_info_text("text_setpin_failed", obj.result.error.message, ERROR);
 }
 
 function token_setpin(){
@@ -1009,22 +1183,30 @@ function view_setpin_dialog(tokens) {
     $dialog_setpin_token.dialog('open');
 }
 
-
-function view_setpin_after_enrolling(tokens) {
-    /*
-     * TODO: depending on the OTP PIN type (o,1,2,) we can display
-     * or not display it. In case of no OTP PIN or AD PIN, we don't want to see this dialog!
-     */
-    view_setpin_dialog(tokens);
-    check_license();
-}
-
 function view_setpin_after_assigning(tokens) {
     /*
-     * TODO: depending on the OTP PIN type (o,1,2,) we can display
-     * or not display it. In case of no OTP PIN or AD PIN, we don't want to see this dialog!
+     * depending on the policies
+     * - random pin
+     * we can display or not display it.
+     * TODO: should this be disabled on otppin != 0 as well?
      */
-    view_setpin_dialog(tokens);
+    var display_setPin = true;
+
+    var selected_users = get_selected_user();
+    var policy_def = {'scope':'enrollment',
+                  'action': 'otp_pin_random'};
+        policy_def['realm'] = selected_users[0].realm;
+        policy_def['user']  = selected_users[0].login;
+
+    var rand_pin = get_policy(policy_def);
+    if (rand_pin.length > 0) {
+        display_setPin = false;
+    }
+
+    if (display_setPin === true) {
+        view_setpin_dialog(tokens);
+    }
+
 }
 
 /******************************************************************************
@@ -1096,12 +1278,10 @@ function token_info_save(){
             alert(rObj.result.error.message);
         }
     }
-
     // re-display
     tokeninfo_redisplay();
     return true;
 }
-
 
 
 function enroll_callback(xhdr, textStatus, p_serial) {
@@ -1132,35 +1312,46 @@ function enroll_callback(xhdr, textStatus, p_serial) {
                 $('#token_enroll_user').html("---");
             }
 
+            var dia_tabs = {};
+            var dia_tabs_content = {};
 
-            var dia_text = '<div id="qr_url_tabs"><ul>';
-            // TAB header
             for (var k in obj.detail) {
                 var theDetail = obj.detail[k];
                 if (theDetail != null && theDetail.hasOwnProperty('description') ){
-                    dia_text += '<li><a href="#url_content_'+k+'">'+theDetail.description+'</a></li>';
+                    // fallback, if no ordering is defined
+                    if (theDetail.hasOwnProperty('order')) {
+                        order = theDetail.order;
+                    } else {
+                        order = k;
+                    }
+                    var description = theDetail.description;
+                    if ( $("#description_" +k ).length !== 0) {
+                        description = $("#description_" +k ).html();
+                    }
+                    dia_tabs[order] = '<li><a href="#url_content_'+k+'">'+ description + '</a></li>';
+                    dia_tabs_content[order] = _extract_tab_content(theDetail, k);
                 }
             };
+            // now extract all orders and sort them
+            var keys = [];
+            for (var key in dia_tabs) {
+                keys.push(key);
+            }
+            keys.sort();
+
+            // create the TAB header
+            var dia_text = '<div id="qr_url_tabs">';
+            dia_text += '<ul>';
+            for (var i = 0; i < keys.length; i++) {
+                order = keys[i];
+                dia_text += dia_tabs[order];
+            }
             dia_text += '</ul>';
-            //console_log(obj.detail);
-            // TAB content
-            for (var k in obj.detail) {
-                var theDetail = obj.detail[k];
-                if (theDetail != null && theDetail.hasOwnProperty('description') ){
-                    //console_log(theDetail)
-                    dia_text += '<div id="url_content_'+k+'">';
-                    var desc = theDetail.description;
-                    var value = theDetail.value;
-                    var img   = theDetail.img;
-                    dia_text += "<p>";
-                    var href = "<a href='"+ value+ "'>"+desc+"</a>";
-                    dia_text += href;
-                    var qr_code = img;
-                    dia_text += "<br/>";
-                    dia_text += qr_code;
-                    dia_text += "</p>";
-                    dia_text += "</div>";
-                }
+
+            // create the TAB content
+            for (var i = 0; i < keys.length; i++) {
+                order = keys[i];
+                dia_text += dia_tabs_content[order];
             }
             // serial number
             dia_text += '<input type=hidden id=enroll_token_serial value='+serial+'>';
@@ -1170,20 +1361,37 @@ function enroll_callback(xhdr, textStatus, p_serial) {
             $('#enroll_url').html(dia_text);
             $('#qr_url_tabs').tabs();
             $dialog_show_enroll_url.dialog("open");
-        } else {
-            view_setpin_after_enrolling([serial]);
         }
     }
     else {
         alert_info_text("text_error_creating_token", obj.result.error.message, ERROR);
     }
-    $('#token_table').flexReload();
+    reset_buttons();
 }
 
+function _extract_tab_content(theDetail, k) {
+    var value = theDetail.value;
+    var img   = theDetail.img;
+
+    var annotation = '';
+    if($('#annotation_' + k).length !== 0) {
+        annotation = $('#annotation_' + k).html();
+    }
+
+    var dia_text ='';
+    dia_text += '<div id="url_content_'+k+'">';
+    dia_text += "<p>";
+    dia_text += "<div class='enrollment_annotation'>" + annotation + "</div>";
+    dia_text += "<a href='"+ value+ "'>"+img+"</a>";
+    dia_text += "<br/>";
+    dia_text += "<div class='enrollment_value'>" + value + "</div>";
+    dia_text += "</p></div>";
+    return dia_text;
+}
 
 function token_enroll(){
-
-    var users = get_selected_users();
+    check_license();
+    var users = get_selected_user();
     var url = '/admin/init';
     var params = {};
     var serial = '';
@@ -1211,6 +1419,9 @@ function token_enroll(){
             } else {
                 // OTP Key
                 params['otpkey']    = $('#ocra_key').val();
+            }
+            if ($('#ocra_pin1').val() != '') {
+                params['pin'] = $('#ocra_pin1').val();
             }
             break;
 
@@ -1296,7 +1507,18 @@ function tokentype_changed(){
             var exi = typeof funct;
             try{
                 if (exi == 'function') {
-                    var l_params = window[functionString]($systemConfig);
+                    var rand_pin = 0;
+                    var options = {};
+                    var selected_users = get_selected_user();
+                    if (selected_users.length == 1) {
+                        var policy_def = {'scope':'enrollment',
+                                      'action': 'otp_pin_random'};
+                        policy_def['realm'] = selected_users[0].realm;
+                        policy_def['user']  = selected_users[0].login;
+                        rand_pin = get_policy(policy_def).length;
+                        options = {'otp_pin_random':rand_pin}
+                    }
+                    var l_params = window[functionString]($systemConfig, options);
                 }
             }
             catch(err) {
@@ -1448,6 +1670,23 @@ function fill_realms() {
     return defaultRealm;
 }
 
+function get_defaultrealm(){
+    var realms = new Array();
+    var url = '/system/getDefaultRealm';
+
+    var resp = $.ajax({
+            url: url,
+            async: false,
+            data: { 'session':getsession()},
+            type: "GET"
+        }).responseText;
+    var data = jQuery.parseJSON(resp);
+    for (var i in data.result.value) {
+        realms.push(i);
+    };
+    return realms;
+}
+
 function get_realms(){
     var realms = new Array();
     var resp = $.ajax({
@@ -1462,6 +1701,25 @@ function get_realms(){
     };
     return realms;
 }
+
+function get_resolvers(){
+    /*
+     * return the list of the resolver names
+     */
+    var resolvers = new Array();
+    var resp = $.ajax({
+            url: '/system/getResolvers',
+            async: false,
+            data: { 'session':getsession()},
+            type: "POST"
+        }).responseText;
+    var data = jQuery.parseJSON(resp);
+    for (var i in data.result.value) {
+        resolvers.push(i);
+    };
+    return resolvers;
+}
+
 
 // ####################################################
 //
@@ -1536,6 +1794,21 @@ function ldap_resolver_ldaps() {
     return false;
 }
 
+function http_resolver_https() {
+    /*
+     * This function checks if the HTTP URI is using SSL.
+     * If so, it displays the CA certificate entry field.
+     */
+    var http_uri = $('#http_uri').val();
+    if (http_uri.toLowerCase().match(/^lhttpss:/)) {
+        $('#http_resolver_certificate').show();
+    } else {
+        $('#http_resolver_certificate').hide();
+    }
+    return false;
+}
+
+
 function parseXML(xml, textStatus){
     var version = $(xml).find('version').text();
     var status = $(xml).find('status').text();
@@ -1589,17 +1862,22 @@ function parseLicense(xhdr, textStatus){
     var obj = jQuery.parseJSON(resp);
     var status = obj.result.status;
 
-    // error occured    
+    var error_intro = i18n.gettext('The upload of your support and subscription license failed: ');
+    var dialog_title = i18n.gettext('License upload');
+
+    // error occured
     if ( status === false) {
-        message = obj.result.error.message;
+        var message = i18n.gettext('Invalid License') + ': <br>' + obj.result.error.message;
         alert_info_text(message, '' ,ERROR);
+        alert_box(dialog_title, error_intro + message);
     } else {
         value = obj.result.value;
         if (value === false){
-            message = obj.detail.reason;
+            message = i18n.gettext('Invalid License') + ': <br>' + obj.detail.reason;
             alert_info_text(message, '', ERROR);
+            alert_box(dialog_title, error_intro + message);
         } else {
-            alert_box('', "text_support_lic_installed");
+            alert_box(dialog_title, "text_support_lic_installed");
         }
     }
     hide_waiting();
@@ -1719,84 +1997,40 @@ function support_set(){
 
 function support_view(){
 
+    // clean out old data
+    $("#dialog_support_view").html("");
+
     $.get('/system/getSupportInfo', { 'session':getsession()} ,
      function(data, textStatus, XMLHttpRequest){
-        support_dict = data.result.value;
-        if ('description' in data.result.value) {
-            support_dict = data.result.value.description;
+        support_info = data.result.value;
+
+        if ($.isEmptyObject(support_info)) {
+            var info = "";
+            info += '<h2 class="contact_info">' + i18n.gettext('Professional LinOTP support and enterprise subscription') + '</h2>';
+            info += i18n.gettext('For professional LinOTP support and enterprise subscription, feel free to contact <p class="contact_info"><a href="mailto:sales@lsexperts.de">LSE Leading Security Experts GmbH</a></p> for support agreement purchase.');
+            $("#dialog_support_view").html(info);
+
+        } else {
+            var info = "";
+            info += '<h2 class="contact_info">' + i18n.gettext('Your LinOTP support subscription') + '</h2>';
+            info += "<table><tbody>";
+            $.map(support_info, function(value,key){
+                if ( support_license_dict.hasOwnProperty(key) ) {
+                    key = i18n.gettext(support_license_dict[key]);
+                }
+                if (value && value.length > 0) {
+                    info += "<tr><td class='subscription_detail'>" + key + "</td><td class='subscription_detail'>" + value + "</td></tr>";
+                }
+            });
+            info += "</tbody></table>";
+            info += "<div class='subscription_info'><br>" +
+                i18n.gettext("For support and subscription please contact us at") +
+                " <a href='https://www.lsexperts.de/service-support.html' target='_blank'>https://www.lsexperts.de</a> <br>" +
+                i18n.gettext("by phone") + " +49 6151 86086-115 " + i18n.gettext("or email") + " support@lsexperts.de</div>";
+            $("#dialog_support_view").html(info);
         }
-        if (support_dict['comment'].length > 0 ) {
-            $('#lic_comment').html(support_dict['comment']);
-            $('#lic_comment_tr').show();
-            }
-        else { $('#lic_comment_tr').hide(); }
-
-        if (support_dict['token-num'].length > 0 ) {
-            $('#lic_token-num').html(support_dict['token-num']);
-            $('#lic_token-num_tr').show();
-            }
-        else { $('#lic_token-num_tr').hide(); }
-
-        if (support_dict['contact-name'].length > 0 ) {
-            $('#lic_contact-name').html(support_dict['contact-name']);
-            $('#lic_contact-name_tr').show();
-            }
-        else { $('#lic_contact-name_tr').hide(); }
-
-        if (support_dict['version'].length > 0 ) {
-            $('#lic_version').html(support_dict['version']);
-            $('#lic_version_tr').show();
-            }
-        else { $('#lic_version_tr').hide(); }
-
-        if (support_dict['contact-email'].length > 0 ) {
-            $('#lic_contact-email').html(support_dict['contact-email']);
-            $('#lic_contact-email_tr').show();
-            }
-        else { $('#lic_contact-email_tr').hide(); }
-
-        if (support_dict['licensee'].length > 0 ) {
-            $('#lic_licensee').html(support_dict['licensee']);
-            $('#lic_licensee_tr').show();
-            }
-        else { $('#lic_licensee_tr').hide(); }
-
-        if (support_dict['expire'].length > 0 ) {
-            $('#lic_expire').html(support_dict['expire']);
-            $('#lic_expire_tr').show();
-            }
-        else { $('#lic_expire_tr').hide(); }
-
-        if (support_dict['contact-phone'].length > 0 ) {
-            $('#lic_contact-phone').html(support_dict['contact-phone']);
-            $('#lic_contact-phone_tr').show();
-            }
-        else { $('#lic_contact-phone_tr').hide(); }
-
-        if (support_dict['address'].length > 0 ) {
-            $('#lic_address').html(support_dict['address']);
-            $('#lic_address_tr').show();
-            }
-        else { $('#lic_address_tr').hide(); }
-
-        if (support_dict['date'].length > 0 ) {
-            $('#lic_date').html(support_dict['date']);
-            $('#lic_date_tr').show();
-            }
-        else { $('#lic_date_tr').hide(); }
-
-        if (support_dict['issuer'].length > 0 ) {
-            $('#lic_issuer').html(support_dict['issuer']);
-            $('#lic_issuer_tr').show();
-            }
-        else { $('#lic_issuer_tr').hide(); }
-
-        if (support_dict['subscription'].length > 0 ) {
-            $('#lic_subscription').html(support_dict['subscription']);
-            $('#lic_subscription_tr').show();
-            }
-        else { $('#lic_subscription_tr').hide(); }
     });
+    return false;
 }
 
 function load_system_config(){
@@ -1847,8 +2081,17 @@ function load_system_config(){
         $('#ocra_max_challenge').val(data.result.value.OcraMaxChallenges);
         $('#ocra_challenge_timeout').val(data.result.value.OcraChallengeTimeout);
 
-        /*todo call the 'tok_fill_config.js */
 
+        $('#sys_x_forwarded_for').prop('checked', false);
+        if (data.result.value['client.X_FORWARDED_FOR'] == "True") {
+            $('#sys_x_forwarded_for').prop('checked', true);
+        }
+        $('#sys_forwarded').prop('checked', false);
+        if (data.result.value['client.FORWARDED'] == "True") {
+            $('#sys_forwarded').prop('checked', true);
+        }
+        $('#sys_forwarded_proxy').val(data.result.value['client.FORWARDED_PROXY']);
+        /*todo call the 'tok_fill_config.js */
     });
 }
 
@@ -1869,6 +2112,7 @@ function save_system_config(){
         'QrOcraDefaultSuite' : $('#ocra_default_qr_suite').val(),
         'OcraMaxChallenges' : $('#ocra_max_challenge').val(),
         'OcraChallengeTimeout' : $('#ocra_challenge_timeout').val(),
+        'client.FORWARDED_PROXY': $('#sys_forwarded_proxy').val(),
         'session':getsession()},
      function(data, textStatus, XMLHttpRequest){
         hide_waiting();
@@ -1913,6 +2157,14 @@ function save_system_config(){
     if ($("#sys_realmbox").is(':checked')) {
         realmbox = "True";
     }
+    var client_forward = "False";
+    if ($("#sys_forwarded").is(':checked')) {
+        client_forward = "True";
+    }
+    var client_x_forward = "False";
+    if ($("#sys_x_forwarded_for").is(':checked')) {
+        client_x_forward = "True";
+    }
     $.get('/system/setConfig', { 'session':getsession(),
             'PrependPin' :prepend,
             'FailCounterIncOnFalsePin' : fcounter ,
@@ -1922,7 +2174,10 @@ function save_system_config(){
             'PassOnUserNotFound' : passOUNFound,
             'PassOnUserNoToken' : passOUNToken,
             'selfservice.realmbox' : realmbox,
-            'allowSamlAttributes' : allowsaml },
+            'allowSamlAttributes' : allowsaml,
+            'client.FORWARDED' : client_forward,
+            'client.X_FORWARDED_FOR' : client_x_forward,
+             },
      function(data, textStatus, XMLHttpRequest){
         if (data.result.status == false) {
             alert_info_text("text_system_save_error_checkbox", "", ERROR);
@@ -2010,7 +2265,37 @@ function save_oak_config(){
     return false;
 }
 
+function save_http_config(){
+    // Save all HTTP config
+    var resolvername = $('#http_resolvername').val();
+    var resolvertype = "httpresolver";
+
+    var url = '/system/setResolver';
+    var params = get_form_input('form_httpconfig')
+    params["session"] = getsession();
+    params['name'] = resolvername;
+    params['type'] = resolvertype;
+
+    show_waiting();
+    clientUrlFetch(url, params,
+         function(xhdr, textStatus, XMLHttpRequest){
+            hide_waiting();
+            var resp = xhdr.responseText;
+            var data = jQuery.parseJSON(resp);
+            if (data.result.status == false) {
+                alert_info_text("text_error_http", data.result.error.message, ERROR);
+            } else {
+                resolvers_load();
+                $dialog_http_resolver.dialog('close');
+            }
+        }
+    );
+    return false;
+}
+
+
 function save_realm_config(){
+    check_license();
     var realm = $('#realm_name').val();
     show_waiting();
     $.get('/system/setRealm', {
@@ -2046,6 +2331,7 @@ function save_tokenrealm_config(){
             }
             else {
                 $('#token_table').flexReload();
+                $('#selected_tokens').html('');
             }
          });
     }
@@ -2257,11 +2543,14 @@ function resolver_edit_type(){
     var reso = g.resolver_to_edit.replace(/(\S+)\s+\S+/, "$1");
     var type = g.resolver_to_edit.replace(/\S+\s+\[(\S+)\]/, "$1");
     switch (type) {
-		case "oakresolver":
-			resolver_oak(reso)
-			break;
-		case "ldapresolver":
+	case "oakresolver":
+            resolver_oak(reso)
+            break;
+	case "ldapresolver":
             resolver_ldap(reso);
+            break;
+        case "httpresolver":
+            resolver_http(reso);
             break;
         case "sqlresolver":
             resolver_sql(reso);
@@ -2274,7 +2563,6 @@ function resolver_edit_type(){
 
 
 function resolver_new_type(){
-
 
     $dialog_ask_new_resolvertype.dialog('open');
 
@@ -2541,26 +2829,61 @@ function tokenbuttons(){
         width: 400,
         modal: true,
         buttons: {
-            'Get temporary token': {click: function(){
-                token_losttoken();
+            'Get Temporary Token': {click: function() {
+                var token_type =  $('#dialog_lost_token select').val();
+                if (token_type == "password_token") {
+                    token_losttoken('password');
+                }
+                if (token_type == "email_token") {
+                    token_losttoken('email');
+                }
+                if (token_type == "sms_token") {
+                    token_losttoken('sms');
+                }
                 $(this).dialog('close');
                 },
                 id: "button_losttoken_ok",
-                text: "Get temporary token"
-                },
-            Cancel: {click: function(){
+                text: i18n.gettext("Get Temporary Token")
+            },
+            'Cancel': {click: function() {
                 $(this).dialog('close');
                 },
                 id: "button_losttoken_cancel",
-                text: "Cancel"
+                text: i18n.gettext("Cancel")
                 }
-        },
+            },
         open: function() {
-            tokens = get_selected_tokens();
-            token_string = tokens.join(" ");
-            $('#lost_token_serial').html(token_string);
-            translate_dialog_lost_token();
-            do_dialog_icons();
+            /* get_selected_tokens() returns a list of tokens.
+             * We can only handle one selected token (token == 1).
+             */
+            var tokens = get_selected_tokens();
+            if (tokens.length == 1 ){
+                var token_string = tokens[0];
+                var user_info = get_token_owner(tokens[0]);
+                if ('email' in user_info && "" != user_info['email']) {
+                    $("#dialog_lost_token select option[value=email_token]").
+                        removeAttr('disabled');
+                } else {
+                // ToDo: if no email is given, let the user insert one.
+                    $("#dialog_lost_token select option[value=email_token]").
+                        attr('disabled','disabled');
+                }
+                if ('mobile' in user_info && "" != user_info['mobile']) {
+                    $("#dialog_lost_token select option[value=sms_token]").
+                        removeAttr('disabled');
+                } else {
+                //ToDo: if no mobil entry is given, let the user insert one.
+                    $("#dialog_lost_token select option[value=sms_token]").
+                        attr('disabled','disabled');
+                }
+                $("#dialog_lost_token select option[value=select_token]").
+                    attr('selected',true);
+                $('#lost_token_serial').html(token_string);
+                translate_dialog_lost_token();
+                do_dialog_icons();
+            } else {
+                $(this).dialog('close');
+            }
         }
     });
     $('#button_losttoken').click(function(){
@@ -2692,6 +3015,7 @@ function tokenbuttons(){
     $('#button_tokenrealm').click(function(event){
         tokens = get_selected_tokens();
         token_string = tokens.join(", ");
+        g.realms_of_token = Array();
 
         // get all realms the admin is allowed to view
         var realms = '';
@@ -2710,7 +3034,6 @@ function tokenbuttons(){
 
             $('#tokenrealm_select').selectable({
                 stop: function(){
-                    g.realms_of_token = Array();
                     $(".ui-selected", this).each(function(){
                         // fill realms of token
                         var index = $("#tokenrealm_select li").index(this);
@@ -2742,6 +3065,8 @@ $(document).ready(function(){
 
     $("button").button();
 
+    // install handler for https certificate entry field
+    $('#http_uri').keyup(http_resolver_https);
     /*
      $('ul.sf-menu').superfish({
      delay: 0,
@@ -2754,7 +3079,10 @@ $(document).ready(function(){
      dropShadows: true
      });
      */
-    $('ul.sf-menu').superfish();
+    $('ul.sf-menu').superfish({
+        delay: 0,
+        speed: 'fast'
+    });
 
     // Button functions
     $('#button_assign').click(function(event){
@@ -2903,14 +3231,6 @@ $(document).ready(function(){
             do_dialog_icons();
         }
     });
-    jQuery.validator.addMethod("realmname", function(value, element, param){
-        return value.match(/^[a-zA-z0-9_\-\.]+$/i);
-    }, "Please enter a valid realm name. It may contain characters, numbers and '_-.'.");
-
-    jQuery.validator.addMethod("resolvername", function(value, element, param){
-        return value.match(/^[a-zA-z0-9_\-]+$/i);
-    }, "Please enter a valid resolver name. It may contain characters, numbers and '_-'.");
-
 
     $("#form_realmconfig").validate({
         rules: {
@@ -2936,7 +3256,7 @@ $(document).ready(function(){
                 $(this).dialog('close');
                 },
                 id: "button_view_temporary_token_close",
-                text: "Close"
+                text: i18n.gettext("Close")
                 },
         },
         open: function() {
@@ -2996,14 +3316,21 @@ $(document).ready(function(){
                     text: "LDAP"
 
             },
-			'Oak': { click: function(){
+            'Oak': { click: function(){
                         // calling with no parameter, creates a new resolver
                         resolver_oak("");
                         $(this).dialog('close');
+                   },
+                   id: "button_new_resolver_type_oak",
+                   text: "Oak"
+            },
+            'HTTP': { click: function(){
+                        // calling with no parameter, creates a new resolver
+                        resolver_http("");
+                        $(this).dialog('close');
                     },
-                    id: "button_new_resolver_type_oak",
-                    text: "Oak"
-
+                    id: "button_new_resolver_type_http",
+                    text: "HTTP"
             },
             'SQL': { click: function(){
                     // calling with no parameter, creates a new resolver
@@ -3060,7 +3387,6 @@ $(document).ready(function(){
         title: 'LDAP Resolver',
         width: 600,
         modal: true,
-        maxHeight: 500,
         buttons: {
             'Cancel': { click: function(){
                 $(this).dialog('close');
@@ -3176,10 +3502,18 @@ $(document).ready(function(){
                     $('#progress_test_ldap').hide();
                     if (obj.result.status == true) {
                         result = obj.result.value.result;
-                        if (result == "success") {
+                        if (result.lastIndexOf("success", 0) === 0 ) {
+                            var limit = "";
+                            if (result === "success SIZELIMIT_EXCEEDED") {
+                                limit = i18n.gettext("LDAP Server, especially Active Directory, implement a default serverside maximum size limit of 1000 objects.") +
+                                        i18n.gettext("This is independed of the local sizelimit and does not hinder the functionality of LinOTP.");
+                            }
                             // show number of found users
                             var userarray = obj.result.value.desc;
-                            alert_box("LDAP Test", "text_ldap_config_success", userarray.length);
+                            var usr_msg = sprintf(i18n.gettext("Number of users found: %d"),userarray.length);
+                            var msg = i18n.gettext("Connection Test: successful") +
+                                      "<p>" + usr_msg + "</p><p class='hint'>" + limit + "</p>";
+                            alert_box(i18n.gettext("LDAP Connection Test"), msg);
                         }
                         else {
                             alert_box("LDAP Test", obj.result.value.desc);
@@ -3197,7 +3531,7 @@ $(document).ready(function(){
         $('#ldap_searchfilter').val('(sAMAccountName=*)(objectClass=user)');
         $('#ldap_userfilter').val('(&(sAMAccountName=%s)(objectClass=user))');
         $('#ldap_mapping').val('{ "username": "sAMAccountName", "phone" : "telephoneNumber", "mobile" : "mobile", "email" : "mail", "surname" : "sn", "givenname" : "givenName" }');
-        $('#ldap_uidtype').val('DN');
+        $('#ldap_uidtype').val('objectGUID');
         return false;
     });
     $('#button_preset_ldap').click(function(event){
@@ -3210,11 +3544,75 @@ $(document).ready(function(){
         return false;
     });
 
+
+    $dialog_http_resolver = $('#dialog_http_resolver').dialog({
+        autoOpen: false,
+        title: 'HTTP Resolver',
+        width: 600,
+        modal: true,
+        buttons: {
+            'Cancel': { click: function(){
+                $(this).dialog('close');
+                },
+                id: "button_http_resolver_cancel",
+                text: "Cancel"
+                },
+            'Save': { click: function(){
+                    // Save the LDAP configuration
+                    if ($("#form_httpconfig").valid()) {
+                        save_http_config();
+                        //$(this).dialog('close');
+                    }
+                },
+                id: "button_http_resolver_save",
+                text: "Save"
+            }
+        },
+        open: function() {
+            do_dialog_icons();
+            http_resolver_https();
+        }
+    });
+
+    $('#button_test_http').click(function(event){
+        $('#progress_test_http').show();
+
+        var params = get_form_input("form_httpconfig");
+
+        var url = '/admin/testresolver';
+        params['type']              = 'http';
+
+        clientUrlFetch(url, params, function(xhdr, textStatus) {
+                    var resp = xhdr.responseText;
+                    var obj = jQuery.parseJSON(resp);
+                    $('#progress_test_http').hide();
+                    if (obj.result.status == true) {
+                        result = obj.result.value.result;
+                        if (result.lastIndexOf("success", 0) === 0 ) {
+                            var limit = "";
+                            // show number of found users
+                            var userarray = obj.result.value.desc;
+                            var usr_msg = sprintf(i18n.gettext("Number of users found: %d"),userarray.length);
+                            var msg = i18n.gettext("Connection Test: successful") +
+                                      "<p>" + usr_msg + "</p><p class='hint'>" + limit + "</p>";
+                            alert_box(i18n.gettext("HTTP Connection Test"), msg);
+                        }
+                        else {
+                            alert_box("HTTP Test", obj.result.value.desc);
+                        }
+                    }
+                    else {
+                        alert_box("HTTP Test", obj.result.error.message);
+                    }
+                    return false;
+                 });
+        return false;
+    });
+
     $dialog_sql_resolver = $('#dialog_sql_resolver').dialog({
         autoOpen: false,
         title: 'SQL Resolver',
-        width: 650,
-        heigh: 500,
+        width: 600,
         modal: true,
         buttons: {
             'Cancel': {click: function(){
@@ -3332,10 +3730,12 @@ $(document).ready(function(){
             },
             'Close': { click: function(){
                             $(this).dialog('close');
-                            var realms = get_realms();
-                            if (realms.length == 0) {
-                                $('#text_no_realm').dialog('open');
-                            }
+                            var resolvers = get_resolvers();
+                            if (resolvers.length > 0) {
+                                var realms = get_realms();
+                                if (realms.length == 0) {
+                                    $('#text_no_realm').dialog('open');
+                            }   }
                         },
                         id: "button_resolver_close",
                         text:"Close"
@@ -3398,7 +3798,6 @@ $(document).ready(function(){
         buttons: {
             'OK': {click:function() {
                     $(this).dialog('close');
-                    view_setpin_after_enrolling([$('#enroll_token_serial').val()]);
                 },
                 id: "button_show_enroll_ok",
                 text: "Ok"
@@ -3530,7 +3929,7 @@ $(document).ready(function(){
     var $dialog_token_config = $('#dialog_token_settings').dialog({
         autoOpen: false,
         title: 'Token Config',
-        width: 600,
+        width: 900,
         modal: true,
         buttons: {
             'Save config': {
@@ -3876,6 +4275,8 @@ $(document).ready(function(){
             }]
         });
         $('#user_table').flexReload();
+        // remove the selected user display
+        document.getElementById('selected_users').innerHTML = "";
     });
 
     $dialog_setpin_token = $('#dialog_set_pin').dialog({
@@ -4015,14 +4416,32 @@ $(document).ready(function(){
      * Tabs
      */
     $("#tabs").tabs({
-        ajaxOptions: {
-            error: function(xhr, status, index, anchor){
-                $(anchor.hash).html("Couldn't load this tab. Please respond to the administrator:" + status);
-            }
-        },
         collapsible: false,
         spinner: 'Retrieving data...',
-        cache: true,
+        beforeLoad: function( event, ui ) {
+            // The purpose of the following is to prevent automatic reloads
+            // of the tab. When the tab loads for the first time the 'loaded'
+            // option is set.
+            // The tab can be reloaded by reloading the whole page, or using
+            // the controls provided inside the tab.
+            // Tab Option 'cache: true' (used before for this same purpose)
+            // was removed in jQuery UI version 1.10
+            if ( ui.tab.data( "loaded" )  ) {
+                event.preventDefault();
+            }
+            else {
+                ui.jqXHR.success(function() {
+                    ui.tab.data ( "loaded", true );
+                });
+                // Following replaces ajaxOptions error function. ajaxOptions was
+                // removed in jQuery UI 1.10
+                ui.jqXHR.error(function(){
+                    ui.panel.html("Couldn't load this tab. " +
+                        "Please contact your administrator.");
+                });
+            }
+            return;
+        }
         //load: function(event, ui){
         //    get_selected();
         //}
@@ -4216,11 +4635,14 @@ function realm_edit(name){
                         alert_info_text("text_regexp_error", reso, ERROR);
                     }
                     switch (t) {
-						case 'oakresolver':
-							g.resolvers_in_realm_to_edit += 'useridresolver.OakIdResolver.IdResolver.' + r;
-							break;
+			case 'oakresolver':
+                            g.resolvers_in_realm_to_edit += 'useridresolver.OakIdResolver.IdResolver.' + r;
+                            break;
                         case 'ldapresolver':
                             g.resolvers_in_realm_to_edit += 'useridresolver.LDAPIdResolver.IdResolver.' + r;
+                            break;
+                        case 'httpresolver':
+                            g.resolvers_in_realm_to_edit += 'useridresolver.HTTPIdResolver.IdResolver.' + r;
                             break;
                         case 'sqlresolver':
                             g.resolvers_in_realm_to_edit += 'useridresolver.SQLIdResolver.IdResolver.' + r;
@@ -4236,9 +4658,6 @@ function realm_edit(name){
     $dialog_edit_realms.dialog("option", "title", "Edit Realm " + realm);
     $dialog_edit_realms.dialog('open');
 
-    jQuery.validator.addMethod("realmname", function(value, element, param){
-        return value.match(/^[a-zA-Z0-9_\-\.]+$/i);
-    }, "Please enter a valid realm name. It may contain characters, numbers and '_-.'.");
 
 
     $("#form_realmconfig").validate({
@@ -4280,11 +4699,12 @@ function resolver_ldap(name){
                     'LDAPURI': 'ldap://linotpserver1, ldap://linotpserver2',
                     'LDAPBASE': 'dc=yourdomain,dc=tld',
                     'TIMEOUT': '5',
-                    'SIZELIMIT' : '1000',
+                    'SIZELIMIT' : '500',
                     'LOGINNAMEATTRIBUTE': 'sAMAccountName',
                     'LDAPSEARCHFILTER': '(sAMAccountName=*)(objectClass=user)',
                     'LDAPFILTER': '(&(sAMAccountName=%s)(objectClass=user))',
                     'USERINFO': '{ "username": "sAMAccountName", "phone" : "telephoneNumber", "mobile" : "mobile", "email" : "mail", "surname" : "sn", "givenname" : "givenName" }',
+                    'UIDTYPE': 'objectGUID',
                     'CACERTIFICATE' : '',
                     'NOREFERRALS' : 'True',
                 }
@@ -4317,33 +4737,6 @@ function resolver_ldap(name){
     $('#progress_test_ldap').hide();
     $dialog_ldap_resolver.dialog('open');
 
-    jQuery.validator.addMethod("ldap_uri", function(value, element, param){
-        return value.match(param);
-    }, "Please enter a valid ldap uri. It needs to start with ldap:// or ldaps://");
-
-    jQuery.validator.addMethod("resolvername", function(value, element, param){
-        return value.match(/^[a-z0-9_\-]+$/i);
-    }, "Please enter a valid resolver name. It may contain characters, numbers and '_-'.");
-
-    // LDAPSEARCHFILTER: "(sAMAccountName=*)(objectClass=user)"
-    jQuery.validator.addMethod("ldap_searchfilter", function(value, element, param){
-        return value.match(/(\(\S+=\S+\))+/);
-    }, "Please enter a valid searchfilter like this: (sAMAccountName=*)(objectClass=user)");
-
-    // LDAPFILTER: "(&(sAMAccountName=%s)(objectClass=user))"
-    jQuery.validator.addMethod("ldap_userfilter", function(value, element, param){
-        return value.match(/\(\&(\(\S+=\S+\))+\)/);
-    }, "Please enter a valid searchfilter like this: (&(sAMAccountName=%s)(objectClass=user))");
-
-    jQuery.validator.addMethod("ldap_mapping", function(value, element, param){
-        return value.match(/{.+}/);
-    }, 'Please enter a valid searchfilter like this: \
-        { "username": "sAMAccountName", "phone" : "telephoneNumber", "mobile" \
-        : "mobile", "email" : "mail", "surname" : "sn", "givenname" : "givenName" }');
-    jQuery.validator.addMethod("ldap_uidtype", function(value,element,param){
-        return value.match(/.*/);
-    }, 'Please enter the UID of your LDAP server like DN, entryUUID, objectGUID or GUID'
-    );
     $("#form_ldapconfig").validate({
         rules: {
             ldap_uri: {
@@ -4374,6 +4767,7 @@ function resolver_ldap(name){
             },
             ldap_mapping: {
                 required: true,
+                valid_json: true,
                 minlength: 5,
                 ldap_mapping: true
             },
@@ -4406,8 +4800,6 @@ function resolver_oak(name){
             }
         }
     };
-
-
     if (name) {
         // load the config of the resolver "name".
         clientUrlFetch('/system/getResolver', {'resolver' : name}, function(xhdr, textStatus) {
@@ -4437,7 +4829,7 @@ function resolver_oak(name){
 
 	jQuery.validator.addMethod("oak_realm", function(value, element, param){
         return value.match(/^[a-z0-9]+$/i);
-    }, "Please enter a valid Oak realm identifier. It may contain characters or numbers but not spaces or symbols.");
+    }, "Please enter a valid Oak realm identifier. It may contain characters or numbers.");
 
 	$("#form_oakconfig").validate({
         rules: {
@@ -4454,6 +4846,150 @@ function resolver_oak(name){
         }
     });
 }
+
+
+function set_form_input(form_name, data) {
+/*
+ * for all input fields of the form, set the corresponding
+ * values from the obj
+ *
+ * Assumption:
+ *   the input form names are the same as the config entries
+ */
+    var items = {};
+    $('#'+form_name).find(':input').each(
+        function (id, el) {
+            if (el.name != "") {
+                name = el.name;
+                id = el.id;
+                if (data.hasOwnProperty(name) ){
+                    var value = data[name];
+                    $('#'+id).val(value);
+                } else {
+                    $('#'+id).val('');
+            } } }
+    );
+
+    for (var i = 0; i < items.length; i++) {
+        var name = items[i];
+
+    }
+
+}
+
+function get_form_input(form_name) {
+/*
+ * for all input fields of the form, set the corresponding
+ * values from the obj
+ *
+ * Assumption:
+ *   the input form names are the same as the config entries
+ */
+    var items = {};
+    $('#'+form_name).find(':input').each(
+        function (id, el) {
+            if (el.name != "") {
+                items[el.name] = el.value;
+            }   }
+    );
+    return items;
+}
+
+function resolver_set_http(data) {
+    set_form_input('form_httpconfig', data)
+    http_resolver_https();
+}
+
+function resolver_http(name){
+
+    var obj = {
+        'result': {
+            'value': {
+                'data': {
+                    'AUTHUSER': 'administrator',
+                    'HTTPURI': 'http://linotpserver1,http://linotpserver2',
+                    'TIMEOUT': '5',
+                    'LOGINNAMEATTRIBUTE': '{ "path"="getUserId","searchstr"="username=%(username)s@%(realm)s"}',
+                    'HTTPSEARCHFILTER': '{ "path"="getUser","searchstr"="userid=%(userid)s"}',
+                    'HTTPFILTER': '{ "path"="admin/userlist","searchstr"="username=%(username)s"} "jsonpath"="/result/value"',
+                    'USERINFO': '{ "username": "login", "phone" : "telephoneNumber", "mobile" : "mobile", "email" : "mail", "surname" : "sn", "givenname" : "givenName" }',
+                    'CACERTIFICATE' : '',
+                }
+            }
+        }
+    };
+
+
+    if (name) {
+        // load the config of the resolver "name".
+        clientUrlFetch('/system/getResolver', {'resolver' : name}, function(xhdr, textStatus) {
+            var resp = xhdr.responseText;
+            var obj = jQuery.parseJSON(resp);
+            $('#http_resolvername').val(name);
+            if (obj.result.status) {
+                var data = obj.result.value.data;
+                resolver_set_http(data);
+            } else {
+                // error reading resolver
+                alert_box("", "text_http_load_error", obj.result.error.message);
+            }
+
+          });
+    } // end if
+    else {
+        $('#http_resolvername').val("");
+        var data = obj.result.value.data;
+        resolver_set_http(data);
+    }
+
+    $('#progress_test_http').hide();
+    $('#http_setting_tabs').tabs();
+    $dialog_http_resolver.dialog('open');
+
+
+    $("#form_httpconfig").validate({
+        rules: {
+            http_uri: {
+                required: true,
+                minlength: 8,
+                number: false,
+                http_uri: /^(http:\/\/|https:\/\/)/i
+            },
+            http_timeout: {
+                required: true,
+                minlength: 1,
+                number: true
+            },
+            http_resolvername: {
+                required: true,
+                minlength: 4,
+                resolvername: true
+            },
+            http_searchfilter: {
+                required: true,
+                minlength: 5,
+                http_searchfilter: true
+            },
+            http_userfilter: {
+                required: true,
+                minlength: 5,
+                http_userfilter: true
+            },
+            http_mapping: {
+                required: true,
+                valid_json: true,
+                minlength: 5,
+                http_mapping: true
+            },
+            http_uidtype: {
+                http_uidtype: true
+            }
+        }
+    });
+
+}
+
+
 
 function resolver_set_sql(obj) {
 
@@ -4518,19 +5054,6 @@ function resolver_sql(name){
 
     $dialog_sql_resolver.dialog('open');
 
-    jQuery.validator.addMethod("resolvername", function(value, element, param){
-        return value.match(/^[a-zA-Z0-9_\-]+$/i);
-    }, "Please enter a valid resolver name. It may contain characters, numbers and '_-'.");
-
-    jQuery.validator.addMethod("sql_driver", function(value, element, param){
-        return value.match(/(mysql)|(postgres)|(mssql)|(oracle)|(sqlite)|(ibm_db_sa\+pyodbc)/);
-    }, "Please enter a valid driver specification like: mysql, postgres, mssql, oracle, sqlite or ibm_db_sa+pyodbc");
-
-    jQuery.validator.addMethod("sql_mapping", function(value, element, param){
-        return value.match(/{.+}/);
-    }, 'Please enter a valid searchfilter like this: \
-        { "username": "usercolumn", "password":"pw", "salt": "salt", "phone" : "telephoneNumber", "mobile" \
-        : "mobile", "email" : "mail", "surname" : "sn", "givenname" : "givenName" }');
 
     $("#form_sqlconfig").validate({
         rules: {
@@ -4554,6 +5077,7 @@ function resolver_sql(name){
                 number: true
             },
             sql_mapping: {
+                valid_json: true,
                 required: true,
                 minlength: 5,
                 sql_mapping: true
@@ -4583,13 +5107,6 @@ function define_policy_action_autocomplete(availableActions) {
      * This sets the allowed actions in the policy action input
      */
     $( "#policy_action" )
-        // don't navigate away from the field on tab when selecting an item
-        .bind( "keydown", function( event ) {
-            if ( event.keyCode === $.ui.keyCode.TAB &&
-                    $( this ).data( "autocomplete" ).menu.active ) {
-                event.preventDefault();
-            }
-        })
         .autocomplete({
             minLength: 0,
             source: function( request, response ) {
@@ -4621,18 +5138,19 @@ function view_policy() {
             url : '/system/policies_flexi?session='+getsession(),
             method: 'GET',
             dataType : 'json',
-            colModel : [    {display: 'Active', name : 'active', width : 35, sortable : true},
-                            {display: 'Name', name : 'name', width : 100, sortable : true},
-                            {display: 'User', name : 'user', width : 80, sortable : true},
-                            {display: 'Scope', name : 'scope', width : 80, sortable : true},
-                            {display: 'Action', name : 'action', width : 200, sortable : true},
-                            {display: 'Realm', name : 'realm', width : 100, sortable : true},
-                            {display: 'Client', name : 'client', width : 200, sortable : true},
-                            {display: 'Time', name : 'time', width : 50, sortable : true}
-                                ],
+            colModel : [
+                {display: i18n.gettext('Active'), name : 'active', width : 35, sortable : true},
+                {display: i18n.gettext('Name'), name : 'name', width : 100, sortable : true},
+                {display: i18n.gettext('User'), name : 'user', width : 80, sortable : true},
+                {display: i18n.gettext('Scope'), name : 'scope', width : 80, sortable : true},
+                {display: i18n.gettext('Action'), name : 'action', width : 200, sortable : true},
+                {display: i18n.gettext('Realm'), name : 'realm', width : 100, sortable : true},
+                {display: i18n.gettext('Client'), name : 'client', width : 200, sortable : true},
+                {display: i18n.gettext('Time'), name : 'time', width : 50, sortable : true}
+                ],
             height: 200,
             searchitems : [
-                {display: 'in all columns', name : 'all', isdefault: true}
+                {display: i18n.gettext('All other columns'), name : 'all', isdefault: true}
                 ],
             rpOptions: [10,15,20,50,100],
             sortname: "name",
@@ -4670,7 +5188,8 @@ function view_policy() {
         $dialog_import_policy.dialog("open");
     });
 
-    $('#button_policy_add').click(function(){
+    $('#button_policy_add').click(function(event){
+        event.preventDefault();
         var pol_name = $('#policy_name').val();
         pol_name = $.trim(pol_name);
         if (pol_name.length == 0) {
@@ -4704,7 +5223,8 @@ function view_policy() {
         });
     });
 
-    $('#button_policy_delete').click(function(){
+    $('#button_policy_delete').click(function(event){
+        event.preventDefault();
         var policy = get_selected_policy().join(',');
         if (policy) {
             $.get('/system/delPolicy', {'name' : policy, 'session':getsession()},
@@ -4716,9 +5236,14 @@ function view_policy() {
                     alert_info_text(data.result.error.message, "", ERROR);
                 }
             });
+            $('#policy_form').trigger("reset");
         }
     });
 
+    $('#button_policy_clear').click(function(event){
+        event.preventDefault();
+        $('#policy_form').trigger("reset");
+    });
 
     $('#policy_scope_combo').change(function(){
         renew_policy_actions();
@@ -4736,22 +5261,22 @@ function view_token() {
             method: 'GET',
             dataType : 'json',
             colModel : [
-							// Rearrange table into something more helpful.
-							{display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
-                            {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
-							{display: 'description', name : 'TokenDesc', width : 200, sortable : true, align: 'center'},
-                            {display: 'active', name : 'Isactive', width : 35, sortable : true, align: 'center'},
+			// Rearrange table into something more helpful.
+			{display: 'serial number', name : 'TokenSerialnumber', width : 100, sortable : true, align: 'center'},
+                        {display: 'type', name : 'TokenType', width : 50, sortable : true, align: 'center'},
+			{display: 'description', name : 'TokenDesc', width : 200, sortable : true, align: 'center'},
+                        {display: 'active', name : 'Isactive', width : 35, sortable : true, align: 'center'},
 
-                            {display: 'username', name : 'Username', width : 100, sortable : false, align: 'center'},
-                            {display: 'realm', name : 'realm', width : 100, sortable : false, align: 'center'},
-                            {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'},
+                        {display: 'username', name : 'Username', width : 100, sortable : false, align: 'center'},
+                        {display: 'realm', name : 'realm', width : 100, sortable : false, align: 'center'},
+                        {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'},
 							{display: 'userid', name : 'Userid', width : 100, sortable : true, align: 'center'},
 
-                            {display: 'fail count', name : 'FailCount', width : 60, sortable : true, align: 'center'},
-                            {display: 'max fails', name : 'maxfailcount', width : 60, sortable : false, align: 'center'},
-                            {display: 'otplen', name : 'otplen', width : 50, sortable : false, align: 'center'},
-                            {display: 'countwindow', name : 'countwindow', width : 50, sortable : false, align: 'center'},
-                            {display: 'syncwindow', name : 'syncwindow', width : 50, sortable : false, align: 'center'}
+                        {display: 'fail count', name : 'FailCount', width : 60, sortable : true, align: 'center'},
+                        {display: 'max fails', name : 'maxfailcount', width : 60, sortable : false, align: 'center'},
+                        {display: 'otplen', name : 'otplen', width : 50, sortable : false, align: 'center'},
+                        {display: 'countwindow', name : 'countwindow', width : 50, sortable : false, align: 'center'},
+                        {display: 'syncwindow', name : 'syncwindow', width : 50, sortable : false, align: 'center'}
             ],
             height: 400,
             searchitems : [
@@ -4768,6 +5293,7 @@ function view_token() {
             showTableToggleBtn: true,
             preProcess: pre_flexi,
             onError: error_flexi,
+            onSuccess: show_selected_status,
             addTitleToCell: true,
             dblClickResize: true,
             searchbutton: true
@@ -4784,21 +5310,21 @@ function view_user() {
             method: 'GET',
             dataType : 'json',
             colModel : [
-				// Rearrange table into something more helpful.
-				{display: 'username', name : 'username', width : 100, sortable : true, align:"left"},
-				{display: 'givenname', name : 'givenname', width : 150, sortable : true, align:"left"},
-				{display: 'surname', name : 'surname', width : 150, sortable : true, align:"left"},
-				{display: 'email', name : 'email', width : 300, sortable : false, align:"left"},
-                {display: 'userid', name : 'userid', width : 100, sortable : true, align:"left"},
-				{display: 'useridresolver', name : 'useridresolver', width : 200, sortable : true, align:"left"}
+			// Rearrange table into something more helpful.
+			{display: 'username', name : 'username', width : 100, sortable : true, align:"left"},
+			{display: 'givenname', name : 'givenname', width : 150, sortable : true, align:"left"},
+			{display: 'surname', name : 'surname', width : 150, sortable : true, align:"left"},
+			{display: 'email', name : 'email', width : 300, sortable : false, align:"left"},
+                        {display: 'userid', name : 'userid', width : 100, sortable : true, align:"left"},
+			{display: 'useridresolver', name : 'useridresolver', width : 200, sortable : true, align:"left"}
             ],
             height: 400,
             searchitems : [
-                {display: 'in username          ', name : 'username', isdefault: true},
-                {display: 'given name           ', name : 'givenname'},
-				{display: 'surname          ', name : 'surname'},
-			    {display: 'email            ', name : 'email'},
-                {display: 'userid           ', name : 'userid'},
+                {display: 'in username', name : 'username', isdefault: true},
+                {display: 'given name', name : 'givenname'},
+		{display: 'surname', name : 'surname'},
+                {display: 'email', name : 'email'},
+                {display: 'userid', name : 'userid'},
             ],
             rpOptions: [15,20,50,100],
             sortname: "username",
@@ -4811,6 +5337,7 @@ function view_user() {
             preProcess: pre_flexi,
             onError: error_flexi,
             onSubmit: load_flexi,
+            onSuccess: show_selected_status,
             addTitleToCell: true,
             dblClickResize: true,
             searchbutton: true
@@ -4826,40 +5353,41 @@ function view_audit() {
             url : '/audit/search?session='+getsession(),
             method: 'GET',
             dataType : 'json',
-            colModel : [ {display: 'number', name : 'number', width : 50, sortable : true},
-                        {display: 'date', name : 'date', width : 160, sortable : true},
-                        {display: 'signature', name : 'signature', width : 40, sortable : false},
-                        {display: 'missing lines', name : 'missing_lines', width : 40, sortable : false},
-                        {display: 'action', name : 'action', width : 120, sortable : true},
-                        {display: 'success', name : 'success', width : 40, sortable : true},
-                        {display: 'serial', name : 'serial', width : 100, sortable : true},
-                        {display: 'tokentype', name : 'tokentype', width : 50, sortable : true},
-                        {display: 'user', name : 'user', width : 100, sortable : true},
-                        {display: 'realm', name : 'realm', width : 100, sortable : true},
-                        {display: 'administrator', name : 'administrator', width : 100, sortable : true},
-                        {display: 'action_detail', name : 'action_detail', width : 200, sortable : true},
-                        {display: 'info', name : 'info', width : 200, sortable : true},
-                        {display: 'linotp_server', name : 'linotp_server', width : 100, sortable : true},
-                        {display: 'client', name : 'client', width : 100, sortable : true},
-                        {display: 'log_level', name : 'log_level', width : 40, sortable : true},
-                        {display: 'clearance_level', name : 'clearance_level', width : 20, sortable : true}
-            ],
+            colModel : [
+                {display: i18n.gettext('Number'), name : 'number', width : 50, sortable : true},
+                {display: i18n.gettext('Date'), name : 'date', width : 160, sortable : true},
+                {display: i18n.gettext('Signature'), name : 'signature', width : 60, sortable : false},
+                {display: i18n.gettext('Missing Lines'), name : 'missing_lines', width : 90, sortable : false},
+                {display: i18n.gettext('Action'), name : 'action', width : 120, sortable : true},
+                {display: i18n.gettext('Success'), name : 'success', width : 50, sortable : true},
+                {display: i18n.gettext('Serial'), name : 'serial', width : 100, sortable : true},
+                {display: i18n.gettext('Token Type'), name : 'tokentype', width : 80, sortable : true},
+                {display: i18n.gettext('User'), name : 'user', width : 100, sortable : true},
+                {display: i18n.gettext('Realm'), name : 'realm', width : 100, sortable : true},
+                {display: i18n.gettext('Administrator'), name : 'administrator', width : 100, sortable : true},
+                {display: i18n.gettext('Action Detail'), name : 'action_detail', width : 200, sortable : true},
+                {display: i18n.gettext('Info'), name : 'info', width : 200, sortable : true},
+                {display: i18n.gettext('LinOTP Server'), name : 'linotp_server', width : 100, sortable : true},
+                {display: i18n.gettext('Client'), name : 'client', width : 100, sortable : true},
+                {display: i18n.gettext('Log Level'), name : 'log_level', width : 40, sortable : true},
+                {display: i18n.gettext('Clearance Level'), name : 'clearance_level', width : 20, sortable : true}
+                ],
             height: 400,
             searchitems : [
-                {display: 'serial', name : 'serial', isdefault: true},
-                {display: 'user', name : 'user', isdefault: false},
-                {display: 'realm', name : 'realm', isdefault: false},
-                {display: 'action', name: 'action' },
-                {display: 'action detail', name: 'action_detail' },
-                {display: 'tokentype', name: 'token_type' },
-                {display: 'administrator', name: 'administrator' },
-                {display: 'successful action', name: 'success' },
-                {display: 'info', name: 'info' },
-                {display: 'LinOTP server', name: 'linotp_server' },
-                {display: 'Client', name: 'client' },
-                {display: 'date', name: 'date' },
-                {display: 'extended search', name: 'extsearch' }
-            ],
+                {display: i18n.gettext('Serial'), name : 'serial', isdefault: true},
+                {display: i18n.gettext('User'), name : 'user', isdefault: false},
+                {display: i18n.gettext('Realm'), name : 'realm', isdefault: false},
+                {display: i18n.gettext('Action'), name: 'action' },
+                {display: i18n.gettext('Action Detail'), name: 'action_detail' },
+                {display: i18n.gettext('Token Type'), name: 'token_type' },
+                {display: i18n.gettext('Administrator'), name: 'administrator' },
+                {display: i18n.gettext('Successful'), name: 'success' },
+                {display: i18n.gettext('Info'), name: 'info' },
+                {display: i18n.gettext('LinOTP Server'), name: 'linotp_server' },
+                {display: i18n.gettext('Client'), name: 'client' },
+                {display: i18n.gettext('Date'), name: 'date' },
+                {display: i18n.gettext('Extended Search'), name: 'extsearch' }
+                ],
             rpOptions: [10,15,30,50],
             sortname: "number",
             sortorder: "desc",
@@ -4876,3 +5404,24 @@ function view_audit() {
     });
 }
 
+
+/*
+ * window.CURRENT_LANGUAGE is set in the template from the mako lib.
+ * Here, we dynamically load the desired language JSON file for Jed.
+ */
+var browser_lang = window.CURRENT_LANGUAGE || 'en';
+if (browser_lang && browser_lang !== 'en') {
+    try {
+        var url = sprintf("/i18n/%s.json", browser_lang);
+        $.get(
+            url,
+            {},
+            function(data, textStatus) {
+                i18n.options.locale_data.messages = data;
+            },
+            "json"
+        );
+    } catch(e) {
+        alert('Unsupported localisation for ' + browser_lang);
+    }
+}

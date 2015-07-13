@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -28,33 +28,47 @@
 admin controller - interfaces to administrate LinOTP
 """
 
-
-
 import logging
 
 from pylons import request, response, config, tmpl_context as c
-
+import json
 
 from linotp.lib.base import BaseController
+from linotp.lib.tokeniterator import TokenIterator
+from linotp.lib.token import TokenHandler
 
-from linotp.lib.token import enableToken, assignToken , unassignToken, removeToken
-from linotp.lib.token import setPin, setMaxFailCount, setOtpLen, setSyncWindow, setCounterWindow
+from linotp.lib.token import setPin, setOtpLen, setSyncWindow, setCounterWindow
 from linotp.lib.token import setDescription
-from linotp.lib.token import resyncToken, resetToken, setPinUser, setPinSo, setHashLib, addTokenInfo
-from linotp.lib.token import TokenIterator, initToken, setRealms, getTokenType, get_serial_by_otp
-from linotp.lib.token import getTokens4UserOrSerial, copyTokenPin, copyTokenUser, losttoken, check_serial
-from linotp.lib.token import genSerial
+from linotp.lib.token import (resetToken, setPinUser, setPinSo,
+                              setHashLib
+                              )
+from linotp.lib.token import setRealms, getTokenType
+from linotp.lib.token import (getTokens4UserOrSerial,
+                              )
 from linotp.lib.token import newToken
 
 from linotp.lib.error import ParameterError
 from linotp.lib.util import getParam, getLowerParams
 from linotp.lib.util import check_session, SESSION_KEY_LENGTH, remove_session_from_param
 from linotp.lib.util import get_client
-from linotp.lib.user import getSearchFields, getUserList, User, getUserFromParam, getUserFromRequest
+from linotp.lib.user import (getSearchFields,
+                             getUserList,
+                             getUserListIterators,
+                             User,
+                             getUserFromParam,
+                             getUserFromRequest
+                             )
 
-from linotp.lib.realm import getDefaultRealm
 
-from linotp.lib.reply import sendResult, sendError, sendXMLResult, sendXMLError, sendCSVResult
+from linotp.lib.realm import getDefaultRealm, getRealms
+
+from linotp.lib.reply import (sendResult,
+                              sendError,
+                              sendXMLResult,
+                              sendXMLError,
+                              sendCSVResult,
+                              sendResultIterator,
+                              )
 from linotp.lib.reply import sendQRImageResult
 
 from linotp.lib.validate import get_challenges
@@ -108,11 +122,9 @@ class AdminController(BaseController):
             audit.initialize()
             c.audit['success'] = False
             c.audit['client'] = get_client()
-            self.set_language()
             # Session handling
             check_session()
 
-            Session.commit()
             return request
 
         except Exception as exx:
@@ -125,14 +137,18 @@ class AdminController(BaseController):
         finally:
             log.debug("[__before__::%r] done" % (action))
 
-
-    def __after__(self):
+    def __after__(self, action):
         '''
         '''
         params = {}
 
         try:
+            # prevent logging of getsession or other irrelevant requests
+            if action in ['getsession', 'dropsession']:
+                return request
+
             params.update(request.params)
+
             c.audit['administrator'] = getUserFromRequest(request).get("login")
             if 'serial' in params:
                     serial = request.params['serial']
@@ -157,22 +173,22 @@ class AdminController(BaseController):
     def logout(self):
         # see http://docs.pylonsproject.org/projects/pyramid/1.0/narr/webob.html
         c.audit['action_detail'] = "logout"
-        #response.status = "401 Not authenticated"
+        # response.status = "401 Not authenticated"
 
         nonce = request.environ.get("nonce")
         realm = request.environ.get("realm")
         detail = "401 Unauthorized"
-        #return HTTPUnauthorized(request=request)
+        # return HTTPUnauthorized(request=request)
         raise HTTPUnauthorized(
              unicode(detail),
              [('WWW-Authenticate', 'Digest realm="%s", nonce="%s", qop="auth"' % (realm, nonce))]
             )
 
-        #raise exc.HTTPUnauthorized(
+        # raise exc.HTTPUnauthorized(
         #                           str(detail),
         #                           [('WWW-Authenticate', 'Basic realm="%s"' % realm)]
         #                          )
-        #abort(401, "You are not authenticated")
+        # abort(401, "You are not authenticated")
 
 
     def getsession(self):
@@ -211,13 +227,52 @@ class AdminController(BaseController):
             Session.close()
             log.debug("[getsession] done")
 
-
     def dropsession(self):
-        #request.cookies.pop( 'admin_session', None )
+        # request.cookies.pop( 'admin_session', None )
         # FIXME: Does not seem to work
         response.set_cookie('admin_session', None, expires=1)
         return
 
+    def getTokenOwner(self):
+        """
+        provide the userinfo of the token, which is specified as serial
+        """
+        log.debug("get the owner as user info for a token")
+
+        param = {}
+        ret = {}
+        try:
+            param.update(request.params)
+            serial = param["serial"]
+
+            # check admin authorization
+            checkPolicyPre('admin', 'tokenowner', param)
+            th = TokenHandler()
+            owner = th.getTokenOwner(serial)
+            if owner.info:
+                ret = owner.info
+
+            c.audit['success'] = len(ret) > 0
+
+            Session.commit()
+            return sendResult(response, ret)
+
+        except PolicyException as pe:
+            log.error("policy failed %r" % pe)
+            log.error("%s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, unicode(pe), 1)
+
+        except Exception as e:
+            log.error("failed: %r" % e)
+            log.error("%s" % traceback.format_exc())
+            Session.rollback()
+            log.error('error getting token owner')
+            return sendError(response, e, 1)
+
+        finally:
+            Session.close()
+            log.debug('[enable] done')
 
     def show(self):
         """
@@ -364,8 +419,9 @@ class AdminController(BaseController):
             # check admin authorization
             checkPolicyPre('admin', 'remove', param)
 
+            th = TokenHandler()
             log.info("[remove] removing token with serial %s for user %s", serial, user.login)
-            ret = removeToken(user, serial)
+            ret = th.removeToken(user, serial)
 
             c.audit['user'] = user.login
             c.audit['realm'] = user.realm
@@ -431,8 +487,10 @@ class AdminController(BaseController):
             # check admin authorization
             checkPolicyPre('admin', 'enable', param , user=user)
 
-            log.info("[enable] enable token with serial %s for user %s@%s.", serial, user.login, user.realm)
-            ret = enableToken(True, user, serial)
+            th = TokenHandler()
+            log.info("[enable] enable token with serial %s for user %s@%s.",
+                        serial, user.login, user.realm)
+            ret = th.enableToken(True, user, serial)
 
             c.audit['success'] = ret
             c.audit['user'] = user.login
@@ -509,8 +567,10 @@ class AdminController(BaseController):
 
             # check admin authorization
             checkPolicyPre('admin', 'getserial', param)
-
-            serial, username, resolverClass = get_serial_by_otp(None, otp, 10, typ=typ, realm=realm, assigned=assigned)
+            th = TokenHandler()
+            serial, username, resolverClass = th.get_serial_by_otp(None, otp,
+                                                                   10, typ=typ,
+                                                realm=realm, assigned=assigned)
             log.debug("[getSerialByOtp] found %s with user %s" % (serial, username))
 
             if "" != serial:
@@ -576,8 +636,10 @@ class AdminController(BaseController):
             # check admin authorization
             checkPolicyPre('admin', 'disable', param, user=user)
 
-            log.info("[disable] disable token with serial %s for user %s@%s.", serial, user.login, user.realm)
-            ret = enableToken(False, user, serial)
+            th = TokenHandler()
+            log.info("[disable] disable token with serial %s for user %s@%s.",
+                     serial, user.login, user.realm)
+            ret = th.enableToken(False, user, serial)
 
             c.audit['success'] = ret
             c.audit['user'] = user.login
@@ -639,13 +701,14 @@ class AdminController(BaseController):
             serial = getParam(param, "serial", required)
 
             # check admin authorization
-            #try:
+            # try:
             #    checkPolicyPre('admin', 'disable', param )
-            #except PolicyException as pe:
+            # except PolicyException as pe:
             #    return sendError(response, str(pe), 1)
 
             log.info("[check_serial] checking serial %s" % serial)
-            (unique, new_serial) = check_serial(serial)
+            th = TokenHandler()
+            (unique, new_serial) = th.check_serial(serial)
 
             c.audit['success'] = True
             c.audit['serial'] = serial
@@ -731,7 +794,7 @@ class AdminController(BaseController):
                 helper_param['user.login'] = user.login
                 helper_param['user.realm'] = user.realm
 
-            ## for genkey, we have to transfer this to the lowest level
+            # # for genkey, we have to transfer this to the lowest level
             key_size = getParam(param, "keysize", optional) or 20
             helper_param['key_size'] = key_size
 
@@ -743,12 +806,12 @@ class AdminController(BaseController):
                 tokenrealm = res['realms']
 
 
-            ## look for the tokenclass to support a class init
-            ## the classInit could do a rewrite of the request parameters
-            ## which are then used in the tokenInit as parameters
-            ## this is for example
-            ##   to find all open init challenges of a token type and set the
-            ##   serial number in the parameter list
+            # # look for the tokenclass to support a class init
+            # # the classInit could do a rewrite of the request parameters
+            # # which are then used in the tokenInit as parameters
+            # # this is for example
+            # #   to find all open init challenges of a token type and set the
+            # #   serial number in the parameter list
 
             g = config['pylons.app_globals']
             tokenclasses = g.tokenclasses
@@ -761,22 +824,28 @@ class AdminController(BaseController):
                     h_params = tclass_object.classInit(param, user=user)
                     helper_param.update(h_params)
 
-
             serial = helper_param.get('serial', None)
             prefix = helper_param.get('prefix', None)
+            th = TokenHandler()
             if not serial:
-                serial = genSerial(tok_type, prefix)
+                serial = th.genSerial(tok_type, prefix)
 
             helper_param['serial'] = serial
 
-            log.info("[init] initialize token. user: %s, serial: %s" % (user.login, serial))
-            (ret, tokenObj) = initToken(helper_param, user, tokenrealm=tokenrealm)
+            log.info("[init] initialize token. user: %s, serial: %s"
+                     % (user.login, serial))
+            (ret, tokenObj) = th.initToken(helper_param, user,
+                                           tokenrealm=tokenrealm)
 
-            ## result enrichment - if the token is sucessfully created,
-            ## some processing info is added to the result document,
-            ##  e.g. the otpkey :-) as qr code
+            # # result enrichment - if the token is sucessfully created,
+            # # some processing info is added to the result document,
+            # #  e.g. the otpkey :-) as qr code
             initDetail = tokenObj.getInitDetail(helper_param, user)
             response_detail.update(initDetail)
+
+            if tokenObj is not None and ret is True:
+                c.audit['serial'] = tokenObj.getSerial()
+                c.audit['token_type'] = tokenObj.type
 
             c.audit['success'] = ret
             c.audit['user'] = user.login
@@ -784,7 +853,7 @@ class AdminController(BaseController):
 
             # DeleteMe: This code will never run, since getUserFromParam
             # always returns a realm!
-            #if "" == c.audit['realm'] and "" != c.audit['user']:
+            # if "" == c.audit['realm'] and "" != c.audit['user']:
             #    c.audit['realm'] = getDefaultRealm()
 
             logTokenNum()
@@ -793,8 +862,8 @@ class AdminController(BaseController):
 
             Session.commit()
 
-            ## finally we render the info as qr immage, if the qr parameter
-            ## is provided and if the token supports this
+            # # finally we render the info as qr immage, if the qr parameter
+            # # is provided and if the token supports this
             if 'qr' in param and tokenObj is not None:
                 (rdata, hparam) = tokenObj.getQRImageData(response_detail)
                 hparam.update(response_detail)
@@ -857,9 +926,10 @@ class AdminController(BaseController):
             # check admin authorization
             checkPolicyPre('admin', 'unassign', param)
 
+            th = TokenHandler()
             log.info("[unassign] unassigning token with serial %r from "
                      "user %r@%r" % (serial, user.login, user.realm))
-            ret = unassignToken(serial, user, None)
+            ret = th.unassignToken(serial, user, None)
 
             c.audit['success'] = ret
             c.audit['user'] = user.login
@@ -930,8 +1000,11 @@ class AdminController(BaseController):
             # check admin authorization
             checkPolicyPre('admin', 'assign', param)
 
+            th = TokenHandler()
             log.info("[assign] assigning token with serial %s to user %s@%s" % (serial, user.login, user.realm))
-            res = assignToken(serial, user, upin, param)
+            res = th.assignToken(serial, user, upin, param)
+
+            checkPolicyPost('admin', 'assign', param, user)
 
             c.audit['success'] = res
             c.audit['user'] = user.login
@@ -996,7 +1069,7 @@ class AdminController(BaseController):
         try:
             param = getLowerParams(request.params)
 
-            ## if there is a pin
+            # # if there is a pin
             if param.has_key("userpin"):
                 msg = "setting userPin failed"
                 userPin = getParam(param, "userpin", required)
@@ -1128,8 +1201,9 @@ class AdminController(BaseController):
             # check admin authorization
             checkPolicyPre('admin', 'set', param, user=user)
 
-            ## if there is a pin
-            if param.has_key("pin"):
+            th = TokenHandler()
+            # # if there is a pin
+            if 'pin' in param:
                 msg = "[set] setting pin failed"
                 upin = getParam(param, "pin", required)
                 log.info("[set] setting pin for token with serial %r" % serial)
@@ -1162,7 +1236,7 @@ class AdminController(BaseController):
                 msg = "[set] setting MaxFailCount failed"
                 maxFail = int(getParam(param, "MaxFailCount".lower(), required))
                 log.info("[set] setting maxFailCount (%r) for token with serial %r" % (maxFail, serial))
-                ret = setMaxFailCount(maxFail, user, serial)
+                ret = th.setMaxFailCount(maxFail, user, serial)
                 res["set MaxFailCount"] = ret
                 count = count + 1
                 c.audit['action_detail'] += "maxFailCount=%d, " % maxFail
@@ -1216,7 +1290,7 @@ class AdminController(BaseController):
                 msg = "[set] setting timeWindow failed"
                 timeWindow = int(getParam(param, "timeWindow".lower(), required))
                 log.info("[set] setting timeWindow (%r) for token with serial %r" % (timeWindow, serial))
-                ret = addTokenInfo("timeWindow", timeWindow , user, serial)
+                ret = th.addTokenInfo("timeWindow", timeWindow , user, serial)
                 res["set timeWindow"] = ret
                 count = count + 1
                 c.audit['action_detail'] += "timeWindow=%d, " % timeWindow
@@ -1225,7 +1299,7 @@ class AdminController(BaseController):
                 msg = "[set] setting timeStep failed"
                 timeStep = int(getParam(param, "timeStep".lower(), required))
                 log.info("[set] setting timeStep (%r) for token with serial %r" % (timeStep, serial))
-                ret = addTokenInfo("timeStep", timeStep , user, serial)
+                ret = th.addTokenInfo("timeStep", timeStep , user, serial)
                 res["set timeStep"] = ret
                 count = count + 1
                 c.audit['action_detail'] += "timeStep=%d, " % timeStep
@@ -1234,7 +1308,7 @@ class AdminController(BaseController):
                 msg = "[set] setting timeShift failed"
                 timeShift = int(getParam(param, "timeShift".lower(), required))
                 log.info("[set] setting timeShift (%r) for token with serial %r" % (timeShift, serial))
-                ret = addTokenInfo("timeShift", timeShift , user, serial)
+                ret = th.addTokenInfo("timeShift", timeShift , user, serial)
                 res["set timeShift"] = ret
                 count = count + 1
                 c.audit['action_detail'] += "timeShift=%d, " % timeShift
@@ -1340,7 +1414,7 @@ class AdminController(BaseController):
 
             # DeleteMe: This code will never run, since getUserFromParam
             # always returns a realm!
-            #if "" == c.audit['realm'] and "" != c.audit['user']:
+            # if "" == c.audit['realm'] and "" != c.audit['user']:
             #    c.audit['realm'] = getDefaultRealm()
             Session.commit()
             return sendResult(response, res, 1)
@@ -1408,10 +1482,10 @@ class AdminController(BaseController):
 
             # check admin authorization
             checkPolicyPre('admin', 'resync', param)
-
+            th = TokenHandler()
             log.info("[resync] resyncing token with serial %r, user %r@%r"
                      % (serial, user.login, user.realm))
-            res = resyncToken(otp1, otp2, user, serial, options)
+            res = th.resyncToken(otp1, otp2, user, serial, options)
 
             c.audit['success'] = res
             c.audit['user'] = user.login
@@ -1452,6 +1526,8 @@ class AdminController(BaseController):
             * <searchexpr> - will be retrieved from the UserIdResolverClass
             * realm	 - a realm, which is a collection of resolver configurations
             * resConf	 - a destinct resolver configuration
+            * page    - the number of page, which should be retrieved (optional)
+            * rp    - the number of users per page (optional)
 
         returns:
             a json result with a boolean
@@ -1462,16 +1538,14 @@ class AdminController(BaseController):
 
         """
         users = []
-        param = request.params
+        param = {}
 
         # check admin authorization
         # check if we got a realm or resolver, that is ok!
         try:
+            param.update(request.params)
             realm = getParam(param, "realm", optional)
-            #_resolver = getParam(param, "resConf", optional)
-
-            checkPolicyPre('admin', 'userlist',
-                           { 'user': "dummy", 'realm':realm})
+            checkPolicyPre('admin', 'userlist', param)
 
             up = 0
             user = getUserFromParam(param, optional)
@@ -1482,24 +1556,49 @@ class AdminController(BaseController):
                 up = up + 1
             if (len(user.conf) > 0):
                 up = up + 1
-            # Here we need to list the users, that are only visible in the realm!!
-            #  we could also only list the users in the realm, if the admin got
-            #  the right "userlist".
 
-            ### list searchfields if no other param
+            # Here we need to list the users, that are only visible in the
+            # realm!! we could also only list the users in the realm, if the
+            # admin got the right "userlist".
+
             if len(param) == up:
-                usage = {"usage":"list available users matching the given search patterns:"}
+                usage = {"usage": "list available users matching the "
+                                    "given search patterns:"}
                 usage["searchfields"] = getSearchFields(user)
                 res = usage
+                Session.commit()
+                return sendResult(response, res)
+
             else:
-                users = getUserList(remove_session_from_param(param), user)
-                res = users
+                list_params = {}
+                list_params.update(param)
+                if 'session' in list_params:
+                    del list_params['session']
+
+                rp = None
+                if "rp" in list_params:
+                    rp = list_params['rp']
+                    del list_params['rp']
+
+                page = None
+                if "page" in list_params:
+                    page = list_params['page']
+                    del list_params['page']
+
+                users_iters = getUserListIterators(list_params, user)
+                # TODO: check if admin is allowed to see the useridresolvers
+                # as users_iters is (user_iterator, resolvername)
+                # we could simply check if the admin is allowed to view the
+                # resolver
 
                 c.audit['success'] = True
                 c.audit['info'] = "realm: %s" % realm
 
-            Session.commit()
-            return sendResult(response, res)
+                Session.commit()
+
+                response.content_type = 'application/json'
+                return sendResultIterator(iterate_users(users_iters),
+                                          rp=rp, page=page)
 
         except PolicyException as pe:
             log.error('[userlist] policy failed %r' % pe)
@@ -1610,7 +1709,7 @@ class AdminController(BaseController):
 
             # DeleteMe: This code will never run, since getUserFromParam
             # always returns a realm!
-            #if "" == c.audit['realm'] and "" != c.audit['user']:
+            # if "" == c.audit['realm'] and "" != c.audit['user']:
             #    c.audit['realm'] = getDefaultRealm()
 
             opt_result_dict = {}
@@ -1673,8 +1772,9 @@ class AdminController(BaseController):
             # check admin authorization
             checkPolicyPre('admin', 'copytokenpin', param)
 
+            th = TokenHandler()
             log.info("[copyTokenPin] copying Pin from token %s to token %s" % (serial_from, serial_to))
-            ret = copyTokenPin(serial_from, serial_to)
+            ret = th.copyTokenPin(serial_from, serial_to)
 
             c.audit['success'] = ret
             c.audit['serial'] = serial_to
@@ -1746,8 +1846,9 @@ class AdminController(BaseController):
             # check admin authorization
             checkPolicyPre('admin', 'copytokenuser', param)
 
+            th = TokenHandler()
             log.info("[copyTokenUser] copying User from token %s to token %s" % (serial_from, serial_to))
-            ret = copyTokenUser(serial_from, serial_to)
+            ret = th.copyTokenUser(serial_from, serial_to)
 
             c.audit['success'] = ret
             c.audit['serial'] = serial_to
@@ -1798,6 +1899,9 @@ class AdminController(BaseController):
 
         arguments:
             * serial - serial of the old token
+            * type   - optional, password, email or sms
+            * email  - optional, email address, to overrule the owner email
+            * mobile - optional, mobile number, to overrule the owner mobile
 
         returns:
             a json result with the new serial an the password
@@ -1810,16 +1914,16 @@ class AdminController(BaseController):
 
         ret = 0
         res = {}
-        param = request.params
+        param = {}
 
         try:
-
-            serial = getParam(param, "serial", required)
+            param.update(request.params)
+            serial = param["serial"]
 
             # check admin authorization
             checkPolicyPre('admin', 'losttoken', param)
-
-            res = losttoken(serial)
+            th = TokenHandler()
+            res = th.losttoken(serial, param=param)
 
             c.audit['success'] = ret
             c.audit['serial'] = res.get('serial')
@@ -1858,6 +1962,7 @@ class AdminController(BaseController):
         arguments:
             * file -  the file in a post request
             * type -  the file type.
+            * realm - the target real of the tokens
 
         returns:
             a json result with a boolean
@@ -1897,6 +2002,12 @@ class AdminController(BaseController):
             log.debug("[loadtokens] %r" % request.POST)
             tokenFile = request.POST['file']
             fileType = request.POST['type']
+            targetRealm = request.POST.get('realm', None)
+
+            # for encrypted token import data, this is the decryption key
+            transportkey = request.POST.get('transportkey', None)
+            if not transportkey:
+                transportkey = None
 
             pskc_type = None
             pskc_password = None
@@ -1974,56 +2085,64 @@ class AdminController(BaseController):
                     TOKENS = parsePSKCdata(fileString, preshared_key_hex=pskc_preshared, do_checkserial=pskc_checkserial)
                 elif "password" == pskc_type:
                     TOKENS = parsePSKCdata(fileString, password=pskc_password, do_checkserial=pskc_checkserial)
-                    #log.debug(TOKENS)
+                    # log.debug(TOKENS)
                 elif "plain" == pskc_type:
                     TOKENS = parsePSKCdata(fileString, do_checkserial=pskc_checkserial)
             elif typeString == "vasco":
-                vasco_otplen = request.POST['vasco_otplen']
-                (fh, filename) = mkstemp()
-                f = open(filename, "w")
-                f.write(fileString)
-                f.close()
-                TOKENS = parseVASCOdata(filename, int(vasco_otplen))
-                os.remove(filename)
+                vasco_otplen = int(request.POST.get('vasco_otplen', 6))
+                TOKENS = parseVASCOdata(fileString, vasco_otplen, transportkey)
                 if TOKENS is None:
-                    raise ImportException("Vasco DLL was not properly loaded. Importing of VASCO token not possible. Please check the log file for more details.")
+                    raise ImportException("Vasco DLL was not properly loaded. "
+                                          "Importing of VASCO token not "
+                                          "possible. Please check the log file"
+                                          " for more details.")
 
+            # determin the target realm
+            tokenrealm = None
+            # default for available realms if no admin policy is defined
+            available_realms = getRealms()
 
-            log.debug("[loadtokens] read %i tokens. starting import now" % len(TOKENS))
+            # this needs to return the valid realms of the admin.
+            # it also checks the token number
+            res = checkPolicyPre('admin', 'import', {})
+            if res['realms']:
+                # by defualt, wee put the token in the FIRST realm of the admin
+                # so tokenrealm will either be ONE realm or NONE
+                tokenrealm = res.get('realms')[0]
+                available_realms = res.get('realms')
+
+            # if parameter realm is provided, we have to check if this target
+            # realm exists and is in the set of the allowed realms
+            if targetRealm and targetRealm.lower() in available_realms:
+                    tokenrealm = targetRealm
+            log.info("[loadtokens] setting tokenrealm %s" % tokenrealm)
+
+            log.debug("[loadtokens] read %i tokens. starting import now"
+                      % len(TOKENS))
 
             # Now import the Tokens from the dictionary
             ret = ""
+            th = TokenHandler()
             for serial in TOKENS:
                 log.debug("[loadtokens] importing token %s" % TOKENS[serial])
 
-                # this needs to return the valid realms of the admin.
-                # it also checks the token number
-                res = checkPolicyPre('admin', 'import', {})
-                # we put the token in the FIRST realm of the admin.
-                # so tokenrealm will either be ONE realm or NONE
-                log.info("[loadtokens] setting tokenrealm %s" % res['realms'])
-                tokenrealm = None
-                if res['realms']:
-                    tokenrealm = res.get('realms')[0]
-
-
                 log.info("[loadtokens] initialize token. serial: %s, realm: %s" % (serial, tokenrealm))
 
-                ## for the eToken dat we assume, that it brings all its
-                ## init parameters in correct format
+                # # for the eToken dat we assume, that it brings all its
+                # # init parameters in correct format
                 if typeString == "dat":
                     init_param = TOKENS[serial]
 
                 else:
-                    init_param = {'serial':serial,
-                                    'type':TOKENS[serial]['type'],
-                                    'description': TOKENS[serial].get("description", "imported"),
-                                    'otpkey' : TOKENS[serial]['hmac_key'],
-                                    'otplen' : TOKENS[serial].get('otplen'),
-                                    'timeStep' : TOKENS[serial].get('timeStep'),
-                                    'hashlib' : TOKENS[serial].get('hashlib')}
-
-
+                    init_param = {
+                            'serial': serial,
+                            'type': TOKENS[serial]['type'],
+                            'description': TOKENS[serial].get("description", "imported"),
+                            'otpkey': TOKENS[serial]['hmac_key'],
+                            'otplen': TOKENS[serial].get('otplen'),
+                            'timeStep': TOKENS[serial].get('timeStep'),
+                            'hashlib': TOKENS[serial].get('hashlib')
+                            }
 
                 # add additional parameter for vasco tokens
                 if TOKENS[serial]['type'] == "vasco":
@@ -2041,9 +2160,9 @@ class AdminController(BaseController):
 
                 if tokenrealm:
                     checkPolicyPre('admin', 'loadtokens',
-                                   {'tokenrealm': tokenrealm })
+                                   {'tokenrealm': tokenrealm})
 
-                (ret, tokenObj) = initToken(init_param, User('', '', ''),
+                (ret, tokenObj) = th.initToken(init_param, User('', '', ''),
                                             tokenrealm=tokenrealm)
 
             log.info ("[loadtokens] %i tokens imported." % len(TOKENS))
@@ -2123,10 +2242,10 @@ class AdminController(BaseController):
         try:
             param = getLowerParams(request.params)
 
-            type = getParam(param, "type", required)
-            log.debug("[testresolver] testing resolver of type %s" % type)
+            typ = getParam(param, "type", required)
+            log.debug("[testresolver] testing resolver of type %s" % typ)
 
-            if type == "ldap":
+            if typ == "ldap":
                 import useridresolver.LDAPIdResolver
 
                 param['BINDDN'] = getParam(param, "ldap_binddn", required)
@@ -2142,11 +2261,21 @@ class AdminController(BaseController):
                 param['NOREFERRALS'] = getParam(param, "noreferrals", optional)
                 param['CACERTIFICATE'] = getParam(param, "ldap_certificate", optional)
 
-                (success, desc) = useridresolver.LDAPIdResolver.IdResolver.testconnection(param)
-                res['result'] = success
+                (status, desc) = useridresolver.LDAPIdResolver.IdResolver.testconnection(param)
+                res['result'] = status
                 res['desc'] = desc
 
-            elif type == "sql":
+            elif typ == "http":
+                from useridresolver.HTTPIdResolver import (
+                                                IdResolver as HttpResolver
+                                                )
+                config_params = {}
+                config_params.update(param)
+                (status, desc) = HttpResolver.testconnection(config_params)
+                res['result'] = status
+                res['desc'] = desc
+
+            elif typ == "sql":
                 import useridresolver.SQLIdResolver
 
                 param["Driver"] = getParam(param, "sql_driver", required)
@@ -2157,6 +2286,7 @@ class AdminController(BaseController):
                 param["Password"] = getParam(param, "sql_password", required)
                 param["Table"] = getParam(param, "sql_table", required)
                 param["Where"] = getParam(param, "sql_where", optional)
+                param["ConnectionParams"] = getParam(param, "sql_conparams", optional)
 
                 (num, err_str) = useridresolver.SQLIdResolver.testconnection(param)
                 res['result'] = True
@@ -2225,12 +2355,12 @@ class AdminController(BaseController):
             serial = getParam(param, 'serial'          , optional)
 
             if transid is None and user.isEmpty() and serial is None:
-                ## raise exception
+                # # raise exception
                 log.error("[admin/checkstatus] : missing parameter: "
                              "transactionid, user or serial number for token")
                 raise ParameterError("Usage: %s" % description, id=77)
 
-            ## gather all challenges from serial, transactionid and user
+            # # gather all challenges from serial, transactionid and user
             challenges = set()
             if serial is not None:
                 challenges.update(get_challenges(serial=serial))
@@ -2238,7 +2368,7 @@ class AdminController(BaseController):
             if transid is not None :
                 challenges.update(get_challenges(transid=transid))
 
-            ## if we have a user
+            # # if we have a user
             if user.isEmpty() == False:
                 tokens = getTokens4UserOrSerial(user=user)
                 for token in tokens:
@@ -2250,23 +2380,23 @@ class AdminController(BaseController):
                 serials.add(challenge.getTokenSerial())
 
             status = {}
-            ## sort all information by token serial number
+            # # sort all information by token serial number
             for serial in serials:
                 stat = {}
                 chall_dict = {}
 
-                ## add the challenges info to the challenge dict
+                # # add the challenges info to the challenge dict
                 for challenge in challenges:
                     if challenge.getTokenSerial() == serial:
                         chall_dict[challenge.getTransactionId()] = challenge.get_vars(save=True)
                 stat['challenges'] = chall_dict
 
-                ## add the token info to the stat dict
+                # # add the token info to the stat dict
                 tokens = getTokens4UserOrSerial(serial=serial)
                 token = tokens[0]
                 stat['tokeninfo'] = token.get_vars(save=True)
 
-                ## add the local stat to the summary status dict
+                # # add the local stat to the summary status dict
                 status[serial] = stat
 
             res['values'] = status
@@ -2292,5 +2422,39 @@ class AdminController(BaseController):
             log.debug('[ocra/checkstatus] done')
 
 
-#eof###########################################################################
+def iterate_users(user_iterators):
+    """
+    build a userlist iterator / generator that returns the user data on demand
 
+    :param user_iterators: list of tuple (userlist iterators, resolver descr)
+    :return: generator of user data dicts (yield)
+    """
+
+    for itera in user_iterators:
+        user_iterator = itera[0]
+        reso = itera[1]
+        log.debug("iterating: %r" % reso)
+
+        try:
+            while True:
+                user_data = user_iterator.next()
+                if type(user_data) in [list]:
+                    for data in user_data:
+                        data['resolver'] = reso
+                        resp = "%s" % json.dumps(data)
+                        yield resp
+                else:
+                    user_data['resolver'] = reso
+                    resp = "%s" % json.dumps(user_data)
+                    yield resp
+        except StopIteration as exx:
+            # pass on to next iterator
+            pass
+        except Exception as exx:
+            log.error("Problem during iteration of userlist iterators: %r"
+                       % exx)
+            log.error("%s" % traceback.format_exc())
+
+    raise StopIteration()
+
+#eof###########################################################################

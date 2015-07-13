@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -121,17 +121,17 @@ def getLinotpConfig():
 # #     implementation class
 ###############################################################################
 class LinOtpConfig(dict):
-    '''
-    this class should be a request singleton.
+    """
+    This class should be a request singleton.
 
-     In case of a change, it must cover the different aspects like
-    - env config entry   and
-    - app_globals
-    and finally
-    - sync this to disc
+    In case of a change, it must cover the different aspects like
 
+    - env config entry
+    - and app_globals
+    - and finally sync this to disc
 
-    '''
+    """
+
     def __init__(self, *args, **kw):
         self.parent = super(LinOtpConfig, self)
         self.parent.__init__(*args, **kw)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP admin clients.
 #
@@ -26,17 +26,12 @@
 #
 
 
-from distutils.core import setup
-#from distutils.core import setup
-#try:
-#    from setuptools import setup, find_packages
-#except ImportError:
-#	from ez_setup import use_setuptools
-#	use_setuptools()
-#	from setuptools import setup, find_packages
+from setuptools import setup, find_packages
 
 import os
 import sys
+
+from linotpadminclientcli import __version__
 
 # Taken from kennethreitz/requests/setup.py
 package_directory = os.path.realpath(os.path.dirname(__file__))
@@ -53,14 +48,14 @@ def get_file_contents(file_path):
 
 setup(
     name='LinOTPAdminClientCLI',
-    version='2.7.1.dev0',
+    version=__version__,
     description='LinOTP command-line client',
     author='LSE Leading Security Experts GmbH',
     author_email='linotp-community@lsexperts.de',
     url='http://www.linotp.org',
-    packages=['linotputils'],
-    scripts=['linotpadm.py'],
-     data_files=[('share/man/man1', ["linotpadm.py.1"])],
+    packages=['linotpadminclientcli'],
+    scripts=['bin/linotpadm.py'],
+     data_files=[('share/man/man1', ["doc/linotpadm.py.1"])],
 #    data_files=[('/usr/lib/python2.6/site-packages/',['linotp2-client.pth']),
 #       ],
     license='AGPLv3, (C) LSE Leading Security Experts GmbH',

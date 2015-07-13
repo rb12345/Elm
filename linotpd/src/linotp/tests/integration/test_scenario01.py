@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -26,6 +26,8 @@
 """LinOTP Selenium Test for Scenario 01 - General functionality tests"""
 
 import time
+import re
+import binascii
 
 from linotp_selenium_helper import TestCase, Policy, LdapUserIdResolver, \
     Realm, SqlUserIdResolver
@@ -37,7 +39,6 @@ from linotp_selenium_helper.remote_token import RemoteToken
 from linotp_selenium_helper.spass_token import SpassToken
 
 from linotp.lib.HMAC import HmacOtp
-import binascii
 
 
 def calculate_motp(epoch, key, pin, digits=6):
@@ -244,7 +245,9 @@ gYzNiYwtvAu74Q+eTC6R5Uf0hOlFig==
                                    base_url=self.base_url,
                                    url="https://billybones",
                                    remote_serial="LSSP0002F653",
-                                   pin="1234")
+                                   pin="1234",
+                                   remote_otp_length=6,
+                                   )
         serial_token_debussy = remote_token.serial
         remote_token_otp = "666666"
         time.sleep(1)
@@ -284,13 +287,23 @@ gYzNiYwtvAu74Q+eTC6R5Uf0hOlFig==
         driver.find_element_by_id("button_register_motp").click()
         time.sleep(1)
         alert_box_text = driver.find_element_by_id("alert_box_text").text
-        alert_box_text_list = alert_box_text.split("\n")
-        self.assertEqual(
-            alert_box_text_list[0],
-            "Token enrolled successfully:"
+        m = re.match(
+            r"""
+                .*?
+                Token\ enrolled\ successfully
+                .*?
+                [sS]erial(\ number)?:     # 'serial:' or 'Serial number:'
+                \s*
+                (?P<serial>\w+)           # For example: LSMO0001222C
+                """,
+            alert_box_text,
+            re.DOTALL | re.VERBOSE
             )
-        serial_text = alert_box_text_list[1] # serial: LSMO12345678
-        serial_token_mozart = serial_text[8:].strip()
+        self.assertTrue(
+            m is not None,
+            "alert_box_text does not match regex. Possibly the token was not enrolled properly. %r" % alert_box_text
+            )
+        serial_token_mozart = m.group('serial')
         self.driver.find_element_by_xpath("//button[@type='button' and ancestor::div[@aria-describedby='alert_box']]").click()
         driver.find_element_by_link_text("Logout").click()
 
@@ -312,7 +325,7 @@ gYzNiYwtvAu74Q+eTC6R5Uf0hOlFig==
             driver.find_element_by_xpath("//div[@id='tabs']/ul/li/a/span[text()='set PIN']").click()
             time.sleep(1)
             # driver.find_element_by_css_selector('#tokenDiv > ul > li > a').click()
-            driver.find_element_by_id('tokenDiv').find_element_by_link_text(user_token_dict[user]).click()
+            driver.find_element_by_id('tokenDiv').find_element_by_partial_link_text(user_token_dict[user]).click()
             driver.find_element_by_id("pin1").clear()
             driver.find_element_by_id("pin1").send_keys(user + "newpin")
             driver.find_element_by_id("pin2").clear()

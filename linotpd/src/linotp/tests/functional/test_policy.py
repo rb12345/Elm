@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -28,15 +28,17 @@
 """
 """
 
-import logging
-from linotp.tests import TestController, url
 import re
-from json import loads
+import json
+import copy
+import logging
+
+from linotp.tests import TestController, url
 
 log = logging.getLogger(__name__)
 
-class TestPolicies(TestController):
 
+class TestPolicies(TestController):
 
     def setUp(self):
         '''
@@ -51,6 +53,8 @@ class TestPolicies(TestController):
         #self.__deleteAllResolvers__()
         #self.__createResolvers__()
         #self.__createRealms__()
+        TestController.setUp(self)
+        self.set_config_selftest()
         return
 
     def tearDown(self):
@@ -129,6 +133,7 @@ class TestPolicies(TestController):
                        'scope' : 'system',
                        'realm' : '*',
                        'action' : 'read',
+                       'enforce': 'true',
                        'user' : 'adminR1',
                        'selftest_admin' : 'superadmin'
                       }
@@ -808,7 +813,7 @@ class TestPolicies(TestController):
                        'otppin' : '1234',
                        'selftest_user' : 'horst@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userinit'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='enroll'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -818,7 +823,7 @@ class TestPolicies(TestController):
                        'otppin' : '1234',
                        'selftest_user' : 'postgres@myOtherRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userinit'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='enroll'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -831,7 +836,7 @@ class TestPolicies(TestController):
                        'otppin' : '1234',
                        'selftest_user' : 'horst@myMixRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userinit'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='enroll'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -843,7 +848,7 @@ class TestPolicies(TestController):
         parameters = { 'serial': 'self001',
                        'selftest_user' : 'horst@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userdisable'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='disable'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -851,7 +856,7 @@ class TestPolicies(TestController):
         parameters = { 'serial': 'self002',
                        'selftest_user' : 'postgres@myOtherRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userdisable'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='disable'), params=parameters)
 
         self.assertTrue('"disable token": 1' in response, response)
 
@@ -859,7 +864,7 @@ class TestPolicies(TestController):
         parameters = { 'serial': 'self002',
                        'selftest_user' : 'not_the_owner@myOtherRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userdisable'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='disable'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -873,7 +878,7 @@ class TestPolicies(TestController):
                        'userpin' : 'test',
                        'selftest_user' : 'horst@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -882,7 +887,7 @@ class TestPolicies(TestController):
                        'userpin' : 'test',
                        'selftest_user' : 'postgres@myOtherRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -909,21 +914,21 @@ class TestPolicies(TestController):
                        'type' : 'oathtoken',
                        'selftest_user' : 'horst@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userwebprovision'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='webprovision'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
         parameters = { 'type' : 'oathtoken',
                        'selftest_user' : 'horst@myMixRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userwebprovision'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='webprovision'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
         parameters = { 'type' : 'googleauthenticator',
                        'selftest_user' : 'horst@myMixRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userwebprovision'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='webprovision'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -953,7 +958,7 @@ class TestPolicies(TestController):
         parameters = { 'serial' : 'cko_test_003',
                        'selftest_user' : 'horst@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userassign'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='assign'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -981,7 +986,7 @@ class TestPolicies(TestController):
         parameters = { 'serial' : 'cko_test_003',
                        'selftest_user' : 'root@myOtherRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userassign'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='assign'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -1003,7 +1008,7 @@ class TestPolicies(TestController):
         parameters = { 'type' : 'oathtoken',
                        'selftest_user' : 'user2@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userwebprovision'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='webprovision'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -1011,7 +1016,7 @@ class TestPolicies(TestController):
         parameters = { 'type' : 'oathtoken',
                        'selftest_user' : 'user1@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userwebprovision'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='webprovision'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -1067,7 +1072,7 @@ class TestPolicies(TestController):
         parameters = { 'type' : 'oathtoken',
                        'selftest_user' : 'other_user@myMixRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userwebprovision'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='webprovision'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -1075,7 +1080,7 @@ class TestPolicies(TestController):
         parameters = { 'type' : 'oathtoken',
                        'selftest_user' : 'user1@myMixRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userwebprovision'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='webprovision'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -1127,7 +1132,7 @@ class TestPolicies(TestController):
         parameters = { 'serial' : serial,
                        'selftest_user' : 'horst@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userassign'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='assign'), params=parameters)
 
         self.assertTrue('"assign token": true' in response, response)
 
@@ -1172,7 +1177,7 @@ class TestPolicies(TestController):
         parameters = { 'serial' : serial,
                        'selftest_user' : 'horst@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='userassign'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='assign'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
         self.assertTrue('The token you want to assign is not contained in your realm!' in response, response)
@@ -1216,7 +1221,7 @@ class TestPolicies(TestController):
         parameters = { 'otp' : otps[3],
                        'selftest_user' : 'passthru_user1@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usergetSerialByOtp'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='getSerialByOtp'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
         self.assertTrue('The policy settings do not allow you to request a serial by OTP!' in response, response)
@@ -1236,7 +1241,7 @@ class TestPolicies(TestController):
                        'realm' : "myDefRealm",
                        'selftest_user' : 'passthru_user1@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usergetSerialByOtp'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='getSerialByOtp'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
         self.assertTrue('"serial": "oath429"' in response, response)
@@ -1244,7 +1249,7 @@ class TestPolicies(TestController):
         parameters = { 'otp' : otps[3],
                        'selftest_user' : 'passthru_user1@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usergetSerialByOtp'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='getSerialByOtp'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
         self.assertTrue('"serial": "oath429"' in response, response)
@@ -2164,7 +2169,7 @@ class TestPolicies(TestController):
                        'userpin': 'bla',
                        'selftest_user' : 'root@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -2173,7 +2178,7 @@ class TestPolicies(TestController):
                        'userpin': '12345678test',
                        'selftest_user' : 'root@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -2182,7 +2187,7 @@ class TestPolicies(TestController):
                        'userpin': '1234567',
                        'selftest_user' : 'root@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -2210,7 +2215,7 @@ class TestPolicies(TestController):
                        'userpin': '123456',
                        'selftest_user' : 'root@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -2223,7 +2228,7 @@ class TestPolicies(TestController):
                        'userpin': 'ab3456',
                        'selftest_user' : 'root@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -2250,7 +2255,7 @@ class TestPolicies(TestController):
                        'userpin': 'ab3456',
                        'selftest_user' : 'root@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": false' in response, response)
 
@@ -2262,7 +2267,7 @@ class TestPolicies(TestController):
                        'userpin': 'ab3456!!',
                        'selftest_user' : 'root@myDefRealm'
                       }
-        response = self.app.get(url(controller='selfservice', action='usersetpin'), params=parameters)
+        response = self.app.get(url(controller='userservice', action='setpin'), params=parameters)
 
         self.assertTrue('"status": true' in response, response)
 
@@ -2483,7 +2488,7 @@ class TestPolicies(TestController):
                                                                                 'pin' : 'otppin',
                                                                                 'selftest_admin' : 'superadmin'})
 
-        self.assertTrue('the maximum number of allowed tokens per user is exceeded' in response, response)
+        self.assertTrue('maximum number of allowed tokens per user is exceeded' in response, response)
 
         # enroll 2 tokens for max2
         response = self.app.get(url(controller='admin', action='init'), params={'user':'max2',
@@ -2640,100 +2645,151 @@ class TestPolicies(TestController):
         '''
         Policy 712: Testing scope=enrollment, autoassignment for different users
 
+        Remark: added multiple tokens to the test case
+
         max1/password1
         max2/password2
         '''
-        response = self.app.get(url(controller='system', action='setPolicy'), params={'name' : 'autoassignment_user',
-                                                                                       'scope' : 'enrollment',
-                                                                                       'realm' : 'myOtherRealm',
-                                                                                       'user' : 'max1',
-                                                                                       'action' : 'autoassignment=6',
-                                                                                       'client' : '',
-                                                                                       'selftest_admin' : 'superadmin'
-                                                                                       })
+
+        tokens = {
+            'token1': {'type': 'hmac',
+                       'otpkey': 'd9848218d9977592fa70522579ec00e30adc490a',
+                       'otpval': '585489',
+                    },
+            'token2': {'type': 'hmac',
+                       'otpkey': '6b9c172fd7a521e57891f758141ce66741694c59',
+                       'otpval': '843851',
+                    },
+            }
+
+        response = self.app.get(url(controller='system', action='setPolicy'),
+                                params={'name': 'autoassignment_user',
+                                       'scope': 'enrollment',
+                                       'realm': 'myOtherRealm',
+                                       'user': 'max1',
+                                       'action': 'autoassignment=6',
+                                       'client': '',
+                                       'selftest_admin': 'superadmin',
+                                       })
 
         self.assertTrue('"status": true' in response, response)
 
+        # generate dummy tokens from template token1
+        token_template = tokens['token1']
+
+        for i in range(0, 5):
+            serial = "token0%d" % i
+            descr = copy.deepcopy(token_template)
+            descr['otpkey'] = "%s%d" % (token_template['otpkey'][:-1], i)
+            tokens[serial] = descr
+
+        for i in range(0, 5):
+            serial = "token1%d" % i
+            descr = copy.deepcopy(token_template)
+            descr['otpkey'] = "%s%d" % (token_template['otpkey'][:-1], i)
+            tokens[serial] = descr
+
+        for serial, descr in tokens.items():
         # enroll tokens in realm myOtherRealm
-        response = self.app.get(url(controller='admin', action='init'), params={'type' : 'hmac',
-                                                                                'serial' : 'token1',
-                                                                                'otpkey' : 'd9848218d9977592fa70522579ec00e30adc490a',
-                                                                                'selftest_admin' : 'superadmin'})  # OTP: 585489
+            params = {'type': 'hmac',
+                    'serial': serial,
+                    'otpkey': descr['otpkey'],
+                    'realm': 'myOtherRealm',
+                    'selftest_admin': 'superadmin'
+                    }
+            response = self.app.get(url(controller='admin', action='init'),
+                                        params=params)
 
-        self.assertTrue('"value": true' in response, response)
+            self.assertTrue('"value": true' in response, response)
 
-        response = self.app.get(url(controller='admin', action='init'), params={'type' : 'hmac',
-                                                                                'serial' : 'token2',
-                                                                                'otpkey' : '6b9c172fd7a521e57891f758141ce66741694c59',
-                                                                                'selftest_admin' : 'superadmin'})  # OTP: 843851
+        for serial, descr in tokens.items():
+            # set realm of tokens
+            params = {'serial': serial,
+                    'realms': 'myOtherRealm',
+                    'selftest_admin': 'superadmin'
+                    }
+            response = self.app.get(url(controller='admin',
+                                        action='tokenrealm'),
+                                    params=params)
 
-        self.assertTrue('"value": true' in response, response)
+            self.assertTrue('"status": true' in response, response)
+            self.assertTrue('"value": 1' in response, response)
 
-        # set realm of tokens
-        response = self.app.get(url(controller='admin', action='tokenrealm'), params={'serial' : 'token1',
-                                                                                     'realms' : 'myOtherRealm',
-                                                                                     'selftest_admin' : 'superadmin'})
+            # check tokens in realm
+            params = {'selftest_admin': 'superadmin',
+                      'serial': serial,
+                    }
+            response = self.app.get(url(controller='admin', action='show'),
+                                params=params)
 
-        self.assertTrue('"status": true' in response, response)
-        self.assertTrue('"value": 1' in response, response)
+            serial_str = '"LinOtp.TokenSerialnumber": "%s"' % serial
+            self.assertTrue(serial_str in response, response)
+            self.assertTrue('"LinOtp.CountWindow": 10' in response, response)
+            self.assertTrue('"LinOtp.MaxFail": 10' in response, response)
+            self.assertTrue('"User.description": ""' in response, response)
+            self.assertTrue('"LinOtp.IdResClass": ""' in response, response)
 
-        response = self.app.get(url(controller='admin', action='tokenrealm'), params={'serial' : 'token2',
-                                                                                     'realms' : 'myOtherRealm',
-                                                                                     'selftest_admin' : 'superadmin'})
-
-        self.assertTrue('"status": true' in response, response)
-        self.assertTrue('"value": 1' in response, response)
-
-        # check tokens in realm
-        response = self.app.get(url(controller='admin', action='show'), params={ 'selftest_admin' : 'superadmin'})
-
-        self.assertTrue('"LinOtp.TokenSerialnumber": "token2"' in response, response)
-        self.assertTrue('"LinOtp.CountWindow": 10' in response, response)
-        self.assertTrue('"LinOtp.MaxFail": 10' in response, response)
-        self.assertTrue('"User.description": ""' in response, response)
-        self.assertTrue('"LinOtp.IdResClass": ""' in response, response)
-
-        self.assertTrue('"myotherrealm"' in response, response)
-
-        self.assertTrue('"LinOtp.TokenSerialnumber": "token1"' in response, response)
-        self.assertTrue('"LinOtp.CountWindow": 10' in response, response)
-        self.assertTrue('"LinOtp.MaxFail": 10' in response, response)
-        self.assertTrue('"User.description": ""' in response, response)
-        self.assertTrue('"LinOtp.IdResClass": ""' in response, response)
-        self.assertTrue('"myotherrealm"' in response, response)
+            self.assertTrue('"myotherrealm"' in response, response)
 
         # authenticate max1, gets the token assigned.
-        response = self.app.get(url(controller='validate', action='check'), params={'user' : 'max1',
-                                                                                  'realm' : 'myotherrealm',
-                                                                                  'pass' : 'password1585489'
-                                                                                  })
+        serial = 'token1'
+        descr = tokens[serial]
+        params = {'user': 'max1',
+                  'realm': 'myotherrealm',
+                  'pass': 'password%s' % descr['otpval']
+                  }
+        response = self.app.get(url(controller='validate', action='check'),
+                                params=params)
 
         self.assertTrue('"value": true' in response, response)
 
+        # check tokens belongs to max
+        params = {'selftest_admin': 'superadmin',
+                  'serial': serial,
+                }
+        response = self.app.get(url(controller='admin', action='show'),
+                            params=params)
+
+        serial_str = '"LinOtp.TokenSerialnumber": "%s"' % serial
+        self.assertTrue(serial_str in response, response)
+        self.assertTrue('"LinOtp.CountWindow": 10' in response, response)
+        self.assertTrue('"LinOtp.MaxFail": 10' in response, response)
+        self.assertTrue('"User.username": "max1"' in response, response)
+        self.assertTrue('"myotherrealm"' in response, response)
+
+        serial = 'token2'
+        descr = tokens[serial]
+        params = {'user': 'max2',
+                  'realm': 'myotherrealm',
+                  'pass': 'password%s' % descr['otpval']
+                  }
+
         # max 2 can not autoassign a token pw2
-        response = self.app.get(url(controller='validate', action='check'), params={'user' : 'max2',
-                                                                                  'realm' : 'myotherrealm',
-                                                                                  'pass' : 'password2843851'
-                                                                                  })
+        response = self.app.get(url(controller='validate', action='check'),
+                                params=params)
 
         self.assertTrue('"value": false' in response, response)
 
-
         # delete the tokens of the user
-        for serial in ["token1", "token2"]:
-            response = self.app.get(url(controller='admin', action='remove'), params={'serial' : serial,
-                                                                                 'selftest_admin' : 'superadmin'
-                                                                                  })
+        for serial in tokens.keys():
+            params = {'serial': serial,
+                    'selftest_admin': 'superadmin'
+                    }
+            response = self.app.get(url(controller='admin', action='remove'),
+                                    params=params)
 
             self.assertTrue('"status": true' in response, response)
 
         # delete the policy
-        response = self.app.get(url(controller='system', action='delPolicy'), params={'name' : 'autoassignment_user',
-                                                                                       'selftest_admin' : 'superadmin'
-                                                                                       })
+        params = {'name': 'autoassignment_user',
+                'selftest_admin': 'superadmin'
+                }
+        response = self.app.get(url(controller='system', action='delPolicy'),
+                                params=params)
 
         self.assertTrue('"status": true' in response, response)
 
+        return
 
     def test_713_losttoken_for_users(self):
         '''
@@ -3074,15 +3130,16 @@ class TestPolicies(TestController):
         response = self.app.get(url(controller='system', action='getPolicy'), params=parameters)
 
 
-        result = loads(response.body)
+        result = json.loads(response.body)
         names = result.get("result").get('value').keys()
 
         ## delete all standard policies
         for name in names:
             if name in ["ManageAll", "sysSuper"]:
                 continue
-            parameters = { 'name' : name,
-                          'selftest_admin' : 'superadmin' }
+            parameters = {'name': name,
+                          'enforce': 'true',
+                          'selftest_admin': 'superadmin'}
             response = self.app.get(url(controller='system', action='delPolicy'), params=parameters)
 
             self.assertTrue('"status": true' in response, response)
@@ -3107,3 +3164,4 @@ class TestPolicies(TestController):
 
         self.assertTrue('"status": true' in response, response)
         self.assertTrue('"value": {}' in response, response)
+

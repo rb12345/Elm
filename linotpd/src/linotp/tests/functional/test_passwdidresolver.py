@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -35,6 +35,7 @@ from useridresolver.UserIdResolver import getResolverClass
 from linotp.tests import TestController
 
 
+import os
 import logging
 log = logging.getLogger(__name__)
 
@@ -44,16 +45,25 @@ class TestPasswdController(TestController):
     '''
     def setUp(self):
         TestController.setUp(self)
+        self.__createResolvers__()
+        self.__createRealms__()
         self.serials = []
+        self.fixture_path = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            'fixtures',
+            )
 
-
+    def tearDown(self):
+        self.__deleteAllRealms__()
+        self.__deleteAllResolvers__()
+        TestController.tearDown(self)
 
     def test_resolver(self):
         '''
         Testing PasswdIdResolver
         '''
         y = getResolverClass("PasswdIdResolver", "IdResolver")()
-        y.loadConfig({ 'linotp.passwdresolver.fileName' : 'my-passwd' }, "")
+        y.loadConfig({ 'linotp.passwdresolver.fileName' : os.path.join(self.fixture_path, 'my-passwd') }, "")
 
         userlist = y.getUserList({'username':'*', "userid":"= 1000"})
         print userlist
@@ -97,7 +107,7 @@ class TestPasswdController(TestController):
         Testing checkpass with PasswdIdResolver with a shadow passwd file
         '''
         y = getResolverClass("PasswdIdResolver", "IdResolver")()
-        y.loadConfig({ 'linotp.passwdresolver.fileName' : 'my-passwd' }, "")
+        y.loadConfig({ 'linotp.passwdresolver.fileName' : os.path.join(self.fixture_path, 'my-passwd') }, "")
 
         success = False
         try:
@@ -112,7 +122,7 @@ class TestPasswdController(TestController):
         Testing checkpass
         '''
         y = getResolverClass("PasswdIdResolver", "IdResolver")()
-        y.loadConfig({ 'linotp.passwdresolver.fileName' : 'my-pass2' }, "")
+        y.loadConfig({ 'linotp.passwdresolver.fileName' : os.path.join(self.fixture_path, 'my-pass2') }, "")
 
         res = y.checkPass('2001', "geheim")
         print "result %r" % res
@@ -127,7 +137,7 @@ class TestPasswdController(TestController):
         Testing getSearchfields
         '''
         y = getResolverClass("PasswdIdResolver", "IdResolver")()
-        y.loadConfig({ 'linotp.passwdresolver.fileName' : 'my-pass2' }, "")
+        y.loadConfig({ 'linotp.passwdresolver.fileName' : os.path.join(self.fixture_path, 'my-pass2') }, "")
 
         s = y.getSearchFields()
         print s

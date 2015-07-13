@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -28,7 +28,7 @@
 """
 """
 
-
+import json
 import logging
 from linotp.tests import TestController, url
 
@@ -36,6 +36,17 @@ log = logging.getLogger(__name__)
 
 class TestAdminController(TestController):
 
+
+    def setUp(self):
+        TestController.setUp(self)
+        self.set_config_selftest()
+        self.__createResolvers__()
+        self.__createRealms__()
+
+    def tearDown(self):
+        self.__deleteAllRealms__()
+        self.__deleteAllResolvers__()
+        TestController.tearDown(self)
 
     def createToken3(self):
         parameters = {
@@ -182,11 +193,66 @@ class TestAdminController(TestController):
         response = self.removeTokenByUser("root")
         self.assertTrue('"value": 2' in response, response)
 
-
     def test_remove(self):
         self.createToken()
         response = self.removeTokenByUser("root")
         log.debug(response)
+
+    def test_userlist(self):
+        """
+        test the admin/userlist for iteration reply and paging
+
+        scope of test:
+        - stabilty of the userlist api
+        - support of result paging
+
+        """
+        # first standard query for users
+        parameters = {"username": "*"}
+        response = self.app.get(url(controller='admin', action='userlist'),
+                                params=parameters)
+        self.assertTrue('"status": true,' in response, response)
+        resp = json.loads(response.body)
+        values = resp.get('result', {}).get('value', [])
+        self.assertTrue(len(values) > 15, "not enough users returned %r" % resp)
+
+        # paged query
+        parameters = {"username": "*", "rp": 5, "page": 2}
+        response = self.app.get(url(controller='admin', action='userlist'),
+                                params=parameters)
+        self.assertTrue('"status": true,' in response, response)
+        resp = json.loads(response.body)
+
+        entries = parameters['rp']
+        values = resp.get('result', {}).get('value', [])
+        self.assertEqual(len(values), parameters['rp'], resp)
+
+        num = parameters['rp'] * (parameters['page'] + 1)
+        queried = resp.get('result', {}).get('queried', 0)
+        self.assertEqual(queried, num, resp)
+
+        # test for optional pagesize, which falls back to the pagesize of 15
+        parameters = {"username": "*", "page": 0}
+        response = self.app.get(url(controller='admin', action='userlist'),
+                                params=parameters)
+        self.assertTrue('"status": true,' in response, response)
+        resp = json.loads(response.body)
+        values = resp.get('result', {}).get('value', [])
+        self.assertEqual(len(values), 15, resp)
+
+        # test for ValueError Exception if page or rp is not of int
+        # though the returned data is a json response
+        parameters = {"username": "*", "page": 'page'}
+        response = self.app.get(url(controller='admin', action='userlist'),
+                                params=parameters)
+        # check that status is false
+        self.assertTrue('"status": false,' in response, response)
+        # check for valid json
+        resp = json.loads(response.body)
+        value = resp.get('result', {}).get('error', {}).get("code", 0)
+        self.assertEqual(value, 9876, resp)
+
+        return
 
     def test_enable(self):
         self.createToken()
@@ -310,12 +376,200 @@ class TestAdminController(TestController):
     def test_assign_umlaut(self):
         self.createTokenSHA256(serial="umlauttoken")
 
-        parameters = {"serial":"umlauttoken", "user":"kölbel" }
-        response = self.app.get(url(controller="admin", action="assign"), params=parameters)
-
+        parameters = {"serial": "umlauttoken", "user": "kölbel"}
+        response = self.app.get(url(controller="admin", action="assign"),
+                                params=parameters)
         self.assertTrue('"value": true' in response, response)
 
         self.removeTokenBySerial("umlauttoken")
+        return
+
+    def test_losttoken_email(self):
+        """
+        test for losttoken callback - to support email tokens as replacement
+
+        test with user hans, who has an email address
+        - is the old one deactivated
+        - is the new one active
+        - is the new one of type 'email'
+
+        remark:
+            other losttoken tests depend on policy definition and are
+            part of the test_policy.py
+
+        """
+        token_name = "verloren"
+        self.createTokenSHA256(serial=token_name)
+
+        parameters = {"serial": token_name, "user": "hans"}
+        response = self.app.get(url(controller="admin", action="assign"),
+                                params=parameters)
+        self.assertTrue('"value": true' in response, response)
+
+        parameters = {"serial": token_name, 'type': "email"}
+        response = self.app.get(url(controller="admin", action="losttoken"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+
+        resp = json.loads(response.body)
+        lost_token_name = resp.get('result', {}).get('value', {}).get('serial')
+
+        # first check if old token is not active
+        parameters = {"serial": token_name}
+        response = self.app.get(url(controller="admin", action="show"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+        resp = json.loads(response.body)
+        data = resp.get("result", {}).get('value', {}).get('data', [{}])[0]
+        active = data.get("LinOtp.Isactive", True)
+        self.assertFalse(active, response)
+        user = data.get("User.username", '')
+        self.assertEqual(user, 'hans', response)
+
+        # second check if new token is active
+        parameters = {"serial": lost_token_name}
+        response = self.app.get(url(controller="admin", action="show"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+        resp = json.loads(response.body)
+        data = resp.get("result", {}).get('value', {}).get('data', [{}])[0]
+        active = data.get("LinOtp.Isactive", False)
+        self.assertTrue(active, response)
+
+        user = data.get("User.username", '')
+        self.assertEqual(user, 'hans', response)
+
+        ttype = data.get("LinOtp.TokenType", '')
+        self.assertEqual(ttype, 'email', response)
+
+        self.removeTokenBySerial(token_name)
+        self.removeTokenBySerial(lost_token_name)
+        return
+
+    def test_losttoken_sms(self):
+        """
+        test for losttoken callback - to support sms tokens as replacement
+
+        test with user hans, who has a mobile number
+        - is the old one deactivated
+        - is the new one active
+        - is the new one of type 'sms'
+
+        remark:
+            other losttoken tests depend on policy definition and are
+            part of the test_policy.py
+
+        """
+        token_name = "verloren"
+        self.createTokenSHA256(serial=token_name)
+
+        parameters = {"serial": token_name, "user": "hans"}
+        response = self.app.get(url(controller="admin", action="assign"),
+                                params=parameters)
+        self.assertTrue('"value": true' in response, response)
+
+        parameters = {"serial": token_name, 'type': "sms"}
+        response = self.app.get(url(controller="admin", action="losttoken"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+
+        resp = json.loads(response.body)
+        lost_token_name = resp.get('result', {}).get('value', {}).get('serial')
+
+        # first check if old token is not active
+        parameters = {"serial": token_name}
+        response = self.app.get(url(controller="admin", action="show"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+        resp = json.loads(response.body)
+        data = resp.get("result", {}).get('value', {}).get('data', [{}])[0]
+        active = data.get("LinOtp.Isactive", True)
+        self.assertFalse(active, response)
+        user = data.get("User.username", '')
+        self.assertEqual(user, 'hans', response)
+
+        # second check if new token is active
+        parameters = {"serial": lost_token_name}
+        response = self.app.get(url(controller="admin", action="show"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+        resp = json.loads(response.body)
+        data = resp.get("result", {}).get('value', {}).get('data', [{}])[0]
+        active = data.get("LinOtp.Isactive", False)
+        self.assertTrue(active, response)
+
+        user = data.get("User.username", '')
+        self.assertEqual(user, 'hans', response)
+
+        ttype = data.get("LinOtp.TokenType", '')
+        self.assertEqual(ttype, 'sms', response)
+
+        self.removeTokenBySerial(token_name)
+        self.removeTokenBySerial(lost_token_name)
+        return
+
+    def test_losttoken_fail(self):
+        """
+        test for losttoken callback - which might fail
+
+        test with user horst, who has no mobile number and no email
+        - is the old one deactivated
+        - is the new one active
+        - is the new one of type 'pw'
+
+        remark:
+            other losttoken tests depend on policy definition and are
+            part of the test_policy.py
+        """
+        token_name = "verloren"
+        user_name = 'horst'
+
+        self.createTokenSHA256(serial=token_name)
+
+        parameters = {"serial": token_name, "user": user_name}
+        response = self.app.get(url(controller="admin", action="assign"),
+                                params=parameters)
+        self.assertTrue('"value": true' in response, response)
+
+        parameters = {"serial": token_name, 'type': "sms"}
+        response = self.app.get(url(controller="admin", action="losttoken"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+
+        resp = json.loads(response.body)
+        lost_token_name = resp.get('result', {}).get('value', {}).get('serial')
+
+        # first check if old token is not active
+        parameters = {"serial": token_name}
+        response = self.app.get(url(controller="admin", action="show"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+        resp = json.loads(response.body)
+        data = resp.get("result", {}).get('value', {}).get('data', [{}])[0]
+        active = data.get("LinOtp.Isactive", True)
+        self.assertFalse(active, response)
+        user = data.get("User.username", '')
+        self.assertEqual(user, user_name, response)
+
+        # second check if new token is active
+        parameters = {"serial": lost_token_name}
+        response = self.app.get(url(controller="admin", action="show"),
+                                params=parameters)
+        self.assertTrue('"status": true' in response, response)
+        resp = json.loads(response.body)
+        data = resp.get("result", {}).get('value', {}).get('data', [{}])[0]
+        active = data.get("LinOtp.Isactive", False)
+        self.assertTrue(active, response)
+
+        user = data.get("User.username", '')
+        self.assertEqual(user, user_name, response)
+
+        ttype = data.get("LinOtp.TokenType", '')
+        self.assertEqual(ttype, 'pw', response)
+
+        self.removeTokenBySerial(token_name)
+        self.removeTokenBySerial(lost_token_name)
+        return
 
     def test_enroll_umlaut(self):
 

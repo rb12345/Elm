@@ -1,6 +1,6 @@
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 # 
 #    This file is part of LinOTP authentication modules.
 # 
@@ -274,7 +274,7 @@ sub authenticate {
 
     my $ua     = LWP::UserAgent->new();
 	if ($check_ssl == false) {
-		$ua->ssl_opts( verify_hostname => 0 );
+		$ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0x00);
 	}
     my $response = $ua->post( $URL, \%params );
     my $content  = $response->decoded_content();

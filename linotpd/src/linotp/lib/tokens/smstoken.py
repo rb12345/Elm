@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -35,6 +35,8 @@ from linotp.lib.HMAC    import HmacOtp
 from linotp.lib.util    import getParam
 from linotp.lib.util    import required
 
+from linotp.lib.user import getUserDetail
+
 from linotp.lib.validate import check_pin
 from linotp.lib.validate import check_otp
 from linotp.lib.validate import split_pin_otp
@@ -45,13 +47,14 @@ from linotp.lib.config  import getFromConfig
 from linotp.lib.policy import getPolicyActionValue
 from linotp.lib.policy import getPolicy
 from linotp.lib.policy import get_auth_AutoSMSPolicy
+from linotp.lib.policy import trigger_sms
+
 
 import sys
 if sys.version_info[0:2] >= (2, 6):
     from json import loads, dumps
 else:
     from simplejson import loads, dumps
-
 
 from pylons.i18n.translation import _
 
@@ -74,10 +77,7 @@ keylen = {'sha1'    : 20,
           }
 
 
-
 ##################################################################
-
-
 def get_auth_smstext(user="", realm=""):
     '''
     this function checks the policy scope=authentication, action=smstext
@@ -90,8 +90,9 @@ def get_auth_smstext(user="", realm=""):
     ret = False
     smstext = "<otp>"
 
-    pol = getPolicy({'scope': 'authentication', 'realm': realm,
-                      "action" : "smstext" })
+    pol = getPolicy({'scope': 'authentication',
+                     'realm': realm,
+                     "action": "smstext"})
 
     if len(pol) > 0:
         smstext = getPolicyActionValue(pol, "smstext", String=True)
@@ -99,6 +100,30 @@ def get_auth_smstext(user="", realm=""):
         ret = True
 
     return ret, smstext
+
+
+def is_phone_editable(user=""):
+    '''
+    this function checks the policy scope=selfservice, action=edit_sms
+    This is a int policy, while the '0' is a deny
+    '''
+    # the default string is the OTP value
+    ret = True
+    realm = user.realm
+    login = user.login
+
+    policies = getPolicy({'scope': 'selfservice',
+                          'realm': realm,
+                          "action": "edit_sms",
+                          "user": login},
+                          )
+    if policies:
+        edit_sms = getPolicyActionValue(policies, "edit_sms")
+        if edit_sms == 0:
+            ret = False
+
+    return ret
+
 
 class SmsTokenClass(HmacTokenClass):
     '''
@@ -169,19 +194,22 @@ class SmsTokenClass(HmacTokenClass):
                                      },
                                     },
                                   },
-
-
-
+            'policy': {'selfservice':
+                       {'edit_sms':
+                        {'type': 'int',
+                         'value': [0, 1],
+                         'desc': _('define if the user should be allowed'
+                                    ' to define the sms')
+                         }}}
         }
 
-        if key is not None and res.has_key(key):
+        if key and key in res:
             ret = res.get(key)
         else:
             if ret == 'all':
                 ret = res
 
         return ret
-
 
     def update(self, param, reset_failcount=True):
         '''
@@ -198,11 +226,24 @@ class SmsTokenClass(HmacTokenClass):
 
         # specific - phone
         phone = getParam(param, "phone", required)
+
+        # in scope selfservice - check if edit_sms is allowed
+        # if not allowed to edit, check if the phone is the same
+        # as from the user data
+        if param.get('::scope::', {}).get('selfservice', False):
+            user = param['::scope::']['user']
+            if not is_phone_editable(user):
+                u_info = getUserDetail(user)
+                u_phone = u_info.get('mobile', u_info.get('phone', None))
+                if u_phone != phone:
+                    raise Exception(_('User is not allowed to '
+                                      'set phone number'))
+
         self.setPhone(phone)
 
-        ## in case of the sms token, only the server must know the otpkey
-        ## thus if none is provided, we let create one (in the TokenClass)
-        if not param.has_key('genkey') and not param.has_key('otpkey'):
+        # in case of the sms token, only the server must know the otpkey
+        # thus if none is provided, we let create one (in the TokenClass)
+        if 'genkey' not in param and 'otpkey' not in param:
             param['genkey'] = 1
 
         HmacTokenClass.update(self, param, reset_failcount)
@@ -226,19 +267,19 @@ class SmsTokenClass(HmacTokenClass):
         if "state" in options or "transactionid" in options:
             challenge_response = True
 
-        ## it as well might be a challenge response,
-        ## if the passw is longer than the pin
+        # # it as well might be a challenge response,
+        # # if the passw is longer than the pin
         if challenge_response == False:
             (res, pin, otpval) = split_pin_otp(self, passw, user=user,
                                                             options=options)
-            if res >= 0 :
+            if res >= 0:
                 res = check_pin(self, pin, user=user, options=options)
                 if res == True and len(otpval) > 0:
                     challenge_response = True
 
         return challenge_response
 
-### challenge interfaces starts here
+# ## challenge interfaces starts here
     def is_challenge_request(self, passw, user, options=None):
         '''
         check, if the request would start a challenge
@@ -255,8 +296,13 @@ class SmsTokenClass(HmacTokenClass):
         '''
 
         request_is_valid = False
-        ## do we need to call the
-        #(res, pin, otpval) = split_pin_otp(self, passw, user, options=options)
+        # # do we need to call the
+        # (res, pin, otpval) = split_pin_otp(self, passw, user, options=options)
+        realms = self.token.getRealmNames()
+        if trigger_sms(realms):
+            if 'check_s' in options.get('scope', {}) and 'challenge' in options:
+                request_is_valid = True
+                return request_is_valid
 
         pin_match = check_pin(self, passw, user=user, options=options)
         if pin_match is True:
@@ -264,9 +310,9 @@ class SmsTokenClass(HmacTokenClass):
 
         return request_is_valid
 
-    ##
+    # #
     ##!!! this function is to be called in the sms controller !!!
-    ##
+    # #
     def submitChallenge(self, options=None):
         '''
         submit the sms message - former method name was checkPin
@@ -277,12 +323,16 @@ class SmsTokenClass(HmacTokenClass):
         '''
         res = 0
         user = None
-        message = "<otp>"
 
-        ## it is configurable, if sms should be triggered by a valid pin
+        if options is None:
+            options = {}
+
+        message = options.get('challenge', None)
+
+        # it is configurable, if sms should be triggered by a valid pin
         send_by_PIN = getFromConfig("sms.sendByPin") or True
 
-        if self.isActive() == True and send_by_PIN == True :
+        if self.isActive() == True and send_by_PIN == True:
             counter = self.getOtpCount()
             log.debug("[submitChallenge] counter=%r" % counter)
             self.incOtpCounter(counter, reset=False)
@@ -293,17 +343,24 @@ class SmsTokenClass(HmacTokenClass):
 
                 if options is not None and type(options) == dict:
                     user = options.get('user', None)
-                    if user:
+                    # a given message overrules the policy defined message
+                    if user and not message:
                         _sms_ret, message = get_auth_smstext(
                                                 realm=user.realm)
+
+                if not message:
+                    message = "<otp>"
+
                 res, message = self.sendSMS(message=message)
+                if res is None:
+                    res = False
+                    message = "failed to submitt sms"
                 self.info['info'] = "SMS sent: %r" % res
 
             except Exception as e:
                 # The PIN was correct, but the SMS could not be sent.
                 self.info['info'] = unicode(e)
-                info = ("The PIN was correct, but the"
-                          " SMS could not be sent: %r" % e)
+                info = ("The SMS could not be sent: %r" % e)
                 log.warning("[submitChallenge] %s" % info)
                 res = False
                 message = info
@@ -311,7 +368,6 @@ class SmsTokenClass(HmacTokenClass):
             pass
 
         return res, message
-
 
     def initChallenge(self, transactionid, challenges=None, options=None):
         """
@@ -342,13 +398,13 @@ class SmsTokenClass(HmacTokenClass):
         for challenge in challenges:
             start = challenge.get('timestamp')
             expiry = start + datetime.timedelta(seconds=blocking_time)
-            ## check if there is already a challenge underway
+            # # check if there is already a challenge underway
             if now >= start and now <= expiry:
                 transid = challenge.getTransactionId()
                 message = 'sms with otp already submitted'
                 success = False
-                attributes = {'info' : 'challenge already submitted',
-                              'state' : transid}
+                attributes = {'info': 'challenge already submitted',
+                              'state': transid}
                 break
 
         return (success, transid, message, attributes)
@@ -369,7 +425,7 @@ class SmsTokenClass(HmacTokenClass):
         success = False
         sms = ""
         message = ""
-        attributes = {'state':transactionid}
+        attributes = {'state': transactionid}
 
         success, sms = self.submitChallenge(options=options)
 
@@ -377,20 +433,19 @@ class SmsTokenClass(HmacTokenClass):
             message = 'sms submitted'
             self.setValidUntil()
         else:
-            attributes = {'state' : ''}
+            attributes = {'state': ''}
             message = 'sending sms failed'
             if len('sms') > 0:
                 message = sms
 
-        ## after submit set validity time in readable
-        ## datetime format in the storeing data
+        # # after submit set validity time in readable
+        # # datetime format in the storeing data
         timeScope = self.loadLinOtpSMSValidTime()
         expiryDate = datetime.datetime.now() + \
                                     datetime.timedelta(seconds=timeScope)
-        data = {'valid_until' : "%s" % expiryDate }
+        data = {'valid_until': "%s" % expiryDate}
 
         return (success, message, data, attributes)
-
 
     def checkResponse4Challenge(self, user, passw, options=None, challenges=None):
         """
@@ -419,7 +474,7 @@ class SmsTokenClass(HmacTokenClass):
 
         otp_val = passw
 
-        ## fallback: do we have pin+otp ??
+        # # fallback: do we have pin+otp ??
         (res, pin, otp) = split_pin_otp(self, passw, user=user,
                                                             options=options)
 
@@ -431,7 +486,7 @@ class SmsTokenClass(HmacTokenClass):
         for challenge in challenges:
             otp_count = self.checkOtp(otp_val, counter, window,
                                                             options=options)
-            if otp_count > 0 :
+            if otp_count > 0:
                 matching.append(challenge)
                 break
 
@@ -449,7 +504,7 @@ class SmsTokenClass(HmacTokenClass):
         :rtype: int
         '''
 
-        log.debug("[checkOtp] begin. start to verify the otp value: anOtpVal:" +
+        log.debug("[checkOtp] begin. start to verify the otp value: anOtpVal:"
                   " %r, counter: %r, window: %r, options: %r "
                   % (anOtpVal, counter, window, options))
 
@@ -476,7 +531,6 @@ class SmsTokenClass(HmacTokenClass):
         log.debug("[checkOtp] end. %s ret: %r" % (msg, ret))
         return ret
 
-
     def getNextOtp(self):
         '''
         access the nex validf otp
@@ -487,7 +541,7 @@ class SmsTokenClass(HmacTokenClass):
         log.debug("[getNextOtp] begin. starting to look for the next otp")
 
         try:
-            ### TODO - replace tokenLen
+            # ## TODO - replace tokenLen
             otplen = int(self.token.LinOtpOtpLen)
         except ValueError as ex:
             log.error("[getNextOtp] ValueError %r" % ex)
@@ -496,17 +550,16 @@ class SmsTokenClass(HmacTokenClass):
         secret_obj = self.token.getHOtpKey()
         counter = self.token.getOtpCounter()
 
-        #log.debug("serial: %s",serialNum)
+        # log.debug("serial: %s",serialNum)
         hmac2otp = HmacOtp(secret_obj, counter, otplen)
         nextotp = hmac2otp.generate(counter + 1)
-
 
         log.debug("[getNextOtp] end. got the next otp value: nextOtp %r"
                                                                     % nextotp)
         return nextotp
 
-    ### in the SMS token we use the generic TokenInfo
-    ### to store the phone number
+    # ## in the SMS token we use the generic TokenInfo
+    # ## to store the phone number
     def setPhone(self, phone):
         '''
         setter for the phone number
@@ -554,10 +607,10 @@ class SmsTokenClass(HmacTokenClass):
 
         (_phone, until) = self.getSMSInfo()
 
-        ## suport for direct verification
+        # # suport for direct verification
         if until == 0:
             timeScope = self.loadLinOtpSMSValidTime()
-            until = int (time.time()) + timeScope
+            until = int(time.time()) + timeScope
         return until
 
     def setSMSInfo(self, key, value):
@@ -584,25 +637,19 @@ class SmsTokenClass(HmacTokenClass):
         :return: tuple of phone number and validity time in unix lifetime sec
         '''
         log.debug("[getSMSInfo] begin. get the sms token info")
-        phone = ""
-        until = 0
 
         info = self.getTokenInfo()
+        phone = info.get("phone", '')
+        until = info.get("until", 0)
 
-        if info.has_key("phone") == True:
-            phone = info.get("phone")
-
-        if info.has_key("until") == True:
-            until = info.get("until")
-
-        log.debug("[getSMSInfo] end. got the following token info: (phone: " +
+        log.debug("[getSMSInfo] end. got the following token info: (phone: "
                   " %r, until: %r)" % (phone, until))
         return (phone, until)
 
 
-    ### we take the countWindow.column to store the time
-    ##  in int format (cut off the .2 from the time() )
-    ###
+    # ## we take the countWindow.column to store the time
+    # #  in int format (cut off the .2 from the time() )
+    # ##
 
     def setValidUntil(self):
         '''
@@ -612,12 +659,12 @@ class SmsTokenClass(HmacTokenClass):
         '''
         log.debug("[setValidUntil] begin. set the due date")
         timeScope = self.loadLinOtpSMSValidTime()
-        dueDate = int (time.time()) + timeScope
+        dueDate = int(time.time()) + timeScope
         self.setUntil(dueDate)
-        #self.token.setCountWindow(dueDate)
+        # self.token.setCountWindow(dueDate)
 
-        log.debug("[setValidUntil] end. define the following due date:" +
-                                                      " dueDate %r" % (dueDate))
+        log.debug("[setValidUntil] end. define the following due date:"
+                                                    " dueDate %r" % (dueDate))
         return dueDate
 
     def isValid(self):
@@ -627,7 +674,7 @@ class SmsTokenClass(HmacTokenClass):
         :return: True or False
         :rtype: boolean
         '''
-        log.debug("[isValid] begin. check if challenge timeframe " +
+        log.debug("[isValid] begin. check if challenge timeframe "
                                                               "is still valid")
         ret = False
         dueDate = self.getUntil()
@@ -653,7 +700,7 @@ class SmsTokenClass(HmacTokenClass):
         :rtype: string
 
         '''
-        log.debug("[sendSMS] begin. process the submitting of " +
+        log.debug("[sendSMS] begin. process the submitting of "
                                               "the sms message %r" % (message))
 
         ret = None
@@ -683,7 +730,7 @@ class SmsTokenClass(HmacTokenClass):
             raise exc
 
         try:
-            ## now we need the config from the env
+            # # now we need the config from the env
             log.debug("[sendSMS] loading SMS configuration for class %s" % sms)
             config = self.loadLinOtpSMSProviderConfig()
             log.debug("[sendSMS] config: %r" % config)
@@ -697,14 +744,13 @@ class SmsTokenClass(HmacTokenClass):
         ret = sms.submitMessage(phone, message)
         log.debug("[sendSMS] message submitted")
 
-        ## after submit set validity time
+        # # after submit set validity time
         self.setValidUntil()
 
         # return OTP for selftest purposes
         log.debug("[sendSMS] end. sms message submitted: message %r"
                                                                 % (message))
         return ret, message
-
 
     def loadLinOtpSMSProvider(self):
         '''
@@ -713,23 +759,22 @@ class SmsTokenClass(HmacTokenClass):
         :return: tuple of SMSProvider and Provider Class as string
         :rtype: tuple of (string, string)
         '''
-        log.debug('[loadLinOtpSMSProvider] begin. get the SMS Provider ' +
-                                                             'class definition')
+        log.debug('[loadLinOtpSMSProvider] begin. get the SMS Provider '
+                                                            'class definition')
         smsProvider = getFromConfig("SMSProvider")
 
         if smsProvider is not None:
             (SMSProvider, SMSProviderClass) = smsProvider.rsplit(".", 1)
 
-        log.debug('[loadLinOtpSMSProvider] end. using the following ' +
+        log.debug('[loadLinOtpSMSProvider] end. using the following '
                    'SMS Provider class: (SMSProvider: %r,SMSProviderClass: %r)'
                   % (SMSProvider, SMSProviderClass))
         return (SMSProvider, SMSProviderClass)
 
-        #SMSProvider         = "smsprovider.HttpSMSProvider"
-        ##SMSProvider         = "HttpSMSProvider"
-        #SMSProviderClass    = "HttpSMSProvider"
-        #return (SMSProvider,SMSProviderClass)
-
+        # SMSProvider         = "smsprovider.HttpSMSProvider"
+        # #SMSProvider         = "HttpSMSProvider"
+        # SMSProviderClass    = "HttpSMSProvider"
+        # return (SMSProvider,SMSProviderClass)
 
     def loadLinOtpSMSProviderConfig(self):
         '''
@@ -738,17 +783,17 @@ class SmsTokenClass(HmacTokenClass):
         :return: dict of the sms provider definition
         :rtype: dict
         '''
-        log.debug('[loadLinOtpSMSProviderConfig] begin. load the sms ' +
+        log.debug('[loadLinOtpSMSProviderConfig] begin. load the sms '
                                                   'provider config definition')
 
-        ## get User realm
+        # # get User realm
         config = {}
 
         tConfig = getFromConfig("enclinotp.SMSProviderConfig", None)
         if tConfig is None:
             tConfig = getFromConfig("SMSProviderConfig", "{}")
 
-        ## fix the handling of multiline config entries
+        # # fix the handling of multiline config entries
         lconfig = []
         lines = tConfig.splitlines()
         for line in lines:
@@ -759,15 +804,18 @@ class SmsTokenClass(HmacTokenClass):
         tConfig = " ".join(lconfig)
         log.debug("[loadLinOtpSMSProviderConfig] providerconfig: %s"
                                                                     % tConfig)
+        try:
+            if tConfig is not None:
+                config = loads(tConfig)
+        except ValueError as exx:
+            raise ValueError('Failed to load provider config:%r %r'
+                             % (tConfig, exx))
 
-        if tConfig is not None:
-            config = loads(tConfig)
-
-        log.debug('[loadLinOtpSMSProviderConfig] sms provider config' +
+        log.debug('[loadLinOtpSMSProviderConfig] sms provider config'
                                                 ' found: config %r' % (config))
         return config
 
-        #config  = {'URL':'http://127.0.0.1:5001/validate/ok',
+        # config  = {'URL':'http://127.0.0.1:5001/validate/ok',
         #      'PARAMETER': {
         #                  'von':'OWN_NUMBER',
         #                  'passwort':'PASSWORD',
@@ -778,7 +826,7 @@ class SmsTokenClass(HmacTokenClass):
         #       'SMS_PHONENUMBER_KEY':'ziel',
         #       'HTTP_Method':'GET',
         #      }
-        #return config
+        # return config
 
     def loadLinOtpSMSValidTime(self):
         '''
@@ -799,5 +847,15 @@ class SmsTokenClass(HmacTokenClass):
                                                                    % (timeout))
         return timeout
 
-###eof#########################################################################
+    def getInitDetail(self, params, user=None):
+        '''
+        to complete the token normalisation, the response of the initialiastion
+        should be build by the token specific method, the getInitDetails
+        '''
+        response_detail = {}
 
+        response_detail['serial'] = self.getSerial()
+
+        return response_detail
+
+###eof#########################################################################

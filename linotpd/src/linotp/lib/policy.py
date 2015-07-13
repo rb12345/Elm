@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -28,7 +28,7 @@
 import logging
 
 import linotp.lib.token
-
+from pylons.i18n.translation import _
 from pylons import request, config, tmpl_context as c
 
 from linotp.lib.config import getLinotpConfig
@@ -79,6 +79,10 @@ MAP_TYPE_GETOTP_ACTION = {"dpw": "max_count_dpw",
                           "totp": "max_count_totp"}
 
 
+class PolicyWarning(Exception):
+    pass
+
+
 class PolicyException(LinotpError):
     def __init__(self, description="unspecified error!", id=410):
         LinotpError.__init__(self, description=description, id=id)
@@ -112,6 +116,7 @@ def getPolicyDefinitions(scope=""):
             'import': {'type': 'bool'},
             'remove': {'type': 'bool'},
             'userlist': {'type': 'bool'},
+            'tokenowner': {'type': 'bool'},
             'checkstatus': {'type': 'bool'},
             'manageToken': {'type': 'bool'},
             'getserial': {'type': 'bool'},
@@ -161,7 +166,10 @@ def getPolicyDefinitions(scope=""):
                 'desc': 'Allow the user to view his own token history'},
             'getserial': {
                 'type': 'bool',
-                'desc': 'Allow to search an unassigned token by OTP value.'}
+                'desc': 'Allow to search an unassigned token by OTP value.'},
+            'otpLogin': {
+                'type': 'bool',
+                'desc': 'Requires OTP for selfservice authentication'},
             },
         'system': {
             'read': {'type': 'bool'},
@@ -184,15 +192,21 @@ def getPolicyDefinitions(scope=""):
             'tokenlabel': {
                 'type': 'str',
                 'desc': 'the label for the google authenticator.'},
-            'autoassignment': {
-                'type': 'int',
-                'value': [6, 8],
-                'desc': 'users can assign a token just by using the '
-                        'unassigned token to authenticate.'},
+
+            'autoenrollment': {
+                'type': 'str',
+                'desc': 'users can enroll a token just by using the '
+                        'pin to authenticate and will an otp for authentication'},
+            'autoassignment_forward': {
+                'type': 'bool',
+                'desc': 'in case of an autoassignement with a remotetoken, '
+                        'the credentials are forwarded'},
             'autoassignment': {
 				'type': 'int',
                 'value': [6, 8, 32, 48],
-                'desc' : 'users can assign a token just by using the unassigned token to authenticate.'},
+                'desc': 'users can assign a token just by using the '
+                            'unassigned token to authenticate.'},
+
             'ignore_autoassignment_pin': {
 				'type': 'bool',
                 'desc' : "Do not set password from auto assignment as token pin."},
@@ -210,6 +224,10 @@ def getPolicyDefinitions(scope=""):
                         'token (in days).'},
             },
         'authentication': {
+            'trigger_sms': {
+                'type': 'bool',
+                'desc': 'should it be possible to trigger a sms challenge'
+                        'by check_s'},
             'smstext': {
                 'type': 'str',
                 'desc': 'The text that will be send via SMS for an SMS token. '
@@ -302,21 +320,21 @@ def getPolicyDefinitions(scope=""):
     for ttype in token_type_list:
         pol['admin']["init%s" % ttype.upper()] = {'type': 'bool'}
 
-        ## TODO: action=initETNG
-        ## Cornelius Kölbel        Apr 18 7: 31 PM
-        ##
-        ## Haben wir auch noch den die policy
-        ##
-        ## scope=admin, action=initETNG?
-        ##
-        ## Das ist nämlich eine spezialPolicy, die der HMAC-Token mitbringen
-        ## muss.
+        # TODO: action=initETNG
+        # Cornelius Kölbel        Apr 18 7: 31 PM
+        #
+        # Haben wir auch noch den die policy
+        #
+        # scope=admin, action=initETNG?
+        #
+        # Das ist nämlich eine spezialPolicy, die der HMAC-Token mitbringen
+        # muss.
 
-        ## todo: if all tokens are dynamic, the token init must be only shown
-        ## if there is a rendering section for:
-        ## conf = linotp.lib.token.getTokenConfig(ttype, section='init')
-        ## if len(conf) > 0:
-        ##    pol['admin']["init%s" % ttype.upper()]={'type': 'bool'}
+        # todo: if all tokens are dynamic, the token init must be only shown
+        # if there is a rendering section for:
+        # conf = linotp.lib.token.getTokenConfig(ttype, section='init')
+        # if len(conf) > 0:
+        #    pol['admin']["init%s" % ttype.upper()]={'type': 'bool'}
 
         conf = linotp.lib.token.getTokenConfig(ttype, section='selfservice')
         if 'enroll' in conf:
@@ -332,14 +350,16 @@ def getPolicyDefinitions(scope=""):
         pol_keys = pol.keys()
 
         for pol_section in policy.keys():
-            ## if we have a dyn token definition of this section type
-            ## add this to this section - and make sure, that it is
-            ## then token type prefixed
+            # if we have a dyn token definition of this section type
+            # add this to this section - and make sure, that it is
+            # then token type prefixed
             if pol_section in pol_keys:
                 pol_entry = policy.get(pol_section)
                 for pol_def in pol_entry:
                     set_def = pol_def
-                    if pol_def.startswith(ttype) is not True:
+                    # check if the token type is already part of
+                    # the policy name
+                    if ttype.lower() not in set_def.lower():
                         set_def = '%s_%s' % (ttype, pol_def)
 
                     pol[pol_section][set_def] = pol_entry.get(pol_def)
@@ -373,7 +393,12 @@ def setPolicy(param):
     user = param.get('user')
     time = param.get('time')
     client = param.get('client')
-    active = param.get('active', True)
+    active = param.get('active', "True")
+
+    # before storing the policy, we have to check the impact:
+    # if there is a problem, we will raise an exception with a warning
+    check_policy_impact(**param)
+
     ret["action"] = storeConfig("Policy.%s.action" % name,
                                 action, "", "a policy definition")
     ret["scope"] = storeConfig("Policy.%s.scope" % name,
@@ -390,6 +415,79 @@ def setPolicy(param):
                                 active, "", "a policy definition")
 
     return ret
+
+
+def check_policy_impact(scope='', action='', active='True', client='',
+                        realm='', time=None, user=None, name='',
+                        enforce=False):
+    """
+    check if applying the policy will lock the user out
+    """
+
+    # Currently only system policies are checked
+    if scope.lower() not in ['system']:
+        return
+
+    reason = ''
+    no_system_write_policy = True
+    active_system_policy = False
+
+    pol = {'scope': scope,
+           'action': action,
+           'active': active,
+           'client': client,
+           'realm': realm,
+           'user': user,
+           'time': time
+           }
+
+    policies = getPolicies()
+
+    # in case of a policy change exclude this one from comparison
+    if name in policies:
+        del policies[name]
+
+    # add the new policy and check the constrains
+    policies[name] = pol
+
+    for policy in policies.values():
+
+        # do we have a system policy that is active?
+        p_scope = policy['scope'].lower()
+        p_active = policy['active'].lower()
+
+        if p_scope == 'system' and p_active == 'true':
+            active_system_policy = True
+
+            # get the policy actions
+            p_actions = []
+            for act in policy.get('action', '').split(','):
+                p_actions.append(act.strip())
+
+            #check if there is a write in the actions
+            if '*' in p_actions or 'write' in p_actions:
+                no_system_write_policy = False
+                break
+
+    # for any system policy:
+    # if no user is defined defined this can as well result in a lockout
+    if not user.strip():
+        reason = "no user defined for system policy %s!" % name
+    # same for empty realm
+    if not realm.strip():
+        reason = "no realm defined for system policy %s!" % name
+
+    # if there has been no system policy with write option
+    # and there are active system policy left
+    if no_system_write_policy and active_system_policy:
+        reason = "no active system policy with 'write' permission defined!"
+
+    if reason and enforce is False:
+        raise PolicyWarning("Warning: potential lockout due to policy "
+                "defintion: %s" % reason)
+
+    # admin policy could as well result in lockout
+    return
 
 
 def create_policy_export_file(policy, filename):
@@ -417,56 +515,70 @@ def create_policy_export_file(policy, filename):
     return filename
 
 
-def getPolicy(param, display_inactive=False):
-    '''
-    Function to retrieve the list of policies.
-
-    attributes:
-        name:   (optional) will only return the policy with the name
-        user:   (optional) will only return the policies for this user
-        realm:  (optional) will only return the policies of this realm
-        scope:  (optional) will only return the policies within this scope
-        action: (optional) will only return the policies with this action
-                The action can also be something like "otppin" and will
-                return policies containing "otppin = 2"
-
-    returns:
-         a dictionary with the policies. The name of the policy being the key
-    '''
-    Policies = {}
-
-    #log.debug("[getPolicy] params %s" % str(param))
-
+def getPolicies(config=None):
     # First we load ALL policies from the Config
-    lConfig = getLinotpConfig()
+    if not config:
+        lConfig = getLinotpConfig()
+    else:
+        lConfig = config
+
+    Policies = {}
     for entry in lConfig:
         if entry.startswith("linotp.Policy."):
             #log.debug("[getPolicy] entry: %s" % entry )
             policy = entry.split(".", 4)
             if len(policy) == 4:
-                # check if we should return this named policy
-                insert_this = True
-                if param.get('name', None) is not None:
-                    # If a named policy was requested, we do not want to add
-                    # the policy if the name does not match!
-                    insert_this = bool(param['name'].lower()
-                                       == policy[2].lower())
+                name = policy[2]
+                key = policy[3]
+                value = lConfig.get(entry)
 
-                if insert_this:
-                    name = policy[2]
-                    key = policy[3]
-                    value = lConfig.get(entry)
-                    #log.debug("[getPolicy] found POL: %s, KEY: %s, VAL: %s"
-                    #          %(name, key, value))
+                # prepare the value to be at least an empty string
+                if value is None and key in ('user', 'client', 'realm'):
+                    value = ''
+                if key == "realm":
+                    value = value.lower()
 
-                    if name in Policies:
-                        if key == "realm":
-                            if value is not None:
-                                value = value.lower()
-                        Policies[name][key] = value
-                    else:
-                        Policies[name] = {key: value}
-                    #log.debug( Policies )
+                if name in Policies:
+                    Policies[name][key] = value
+                else:
+                    Policies[name] = {key: value}
+
+    return Policies
+
+
+def getPolicy(param, display_inactive=False):
+    '''
+    Function to retrieve the list of policies.
+
+    attributes:
+
+    - name:   (optional) will only return the policy with the name
+    - user:   (optional) will only return the policies for this user
+    - realm:  (optional) will only return the policies of this realm
+    - scope:  (optional) will only return the policies within this scope
+    - action: (optional) will only return the policies with this action
+         The action can also be something like "otppin" and will
+         return policies containing "otppin = 2"
+
+    :return: a dictionary with the policies. The name of the policy being
+             the key
+    '''
+    #log.debug("[getPolicy] params %s" % str(param))
+    Policies = {}
+
+    # First we load ALL policies from the Config
+    lConfig = getLinotpConfig()
+    lPolicies = getPolicies(lConfig)
+
+    if param.get('name', None):
+        # If a named policy was requested, we add
+        # the policy if the name does match case insensitiv
+        p_name = param['name'].lower()
+        for pol_name in lPolicies:
+            if pol_name.lower() == p_name:
+                Policies[pol_name] = lPolicies[pol_name]
+    else:
+        Policies = lPolicies
 
     # Now we need to clean up policies, that are inactive
     if not display_inactive:
@@ -517,6 +629,7 @@ def getPolicy(param, display_inactive=False):
     if param.get('action', None) is not None:
         #log.debug("[getPolicy] cleanup acccording to action %s"
         #          % param["action"])
+        param_action = param['action'].strip().lower()
         for polname, policy in Policies.items():
             delete_it = True
             #log.debug("[getPolicy] evaluating policy %s: %s"
@@ -527,15 +640,20 @@ def getPolicy(param, display_inactive=False):
                                lower().split(',')]
                 #log.debug("[getPolicy] actions in policy %s: %s "
                 #          % (polname, str(pol_actions) ))
-                # so even if there is an action like otppin=XXX,
-                # it will finde the action "otppin"
-                for a in [pa.split("=")[0].strip() for pa in pol_actions]:
-                    # if the action in the policy is '*' it fits all actions!
-                    #log.debug( "[getPolicy] Action: %s" % a )
-                    if a.lower() == param['action'].lower() or a == "*":
-                        #log.debug( "[getPolicy] Setting delete_it to false.
-                        #So we are using policy: %s" % str(polname))
+                for policy_action in pol_actions:
+                    if policy_action == '*' or policy_action == param_action:
+                        # If any action (*) or the exact action we are looking
+                        # for matches, then keep the policy
+                        # e.g. otppin=1 matches when we search for 'otppin=1'
                         delete_it = False
+                    elif policy_action.split('=')[0].strip() == param_action:
+                        # If the first part of the action matches then keep the
+                        # policy
+                        # e.g. otppin=1 matches when we search for 'otppin'
+                        delete_it = False
+                    else:
+                        # No match, delete_it = True
+                        pass
             if delete_it:
                 pol2delete.append(polname)
         for polname in pol2delete:
@@ -543,19 +661,26 @@ def getPolicy(param, display_inactive=False):
 
     pol2delete = []
     if param.get('user', None) is not None:
-        #log.debug("[getPolicy] cleanup acccording to user %s" % param["user"])
+        # log.debug("[getPolicy] cleanup acccording to user %s" % param["user"])
         for polname, policy in Policies.items():
-            pol_users = [p.strip()
-                         for p in policy.get('user').lower().split(',')]
-            #log.debug("[getPolicy] users in policy %s: %s"
-            #          % (polname, str(pol_users) ))
+            if policy.get('user'):
+                pol_users = [p.strip()
+                             for p in policy.get('user').lower().split(',')]
+                # log.debug("[getPolicy] users in policy %s: %s"
+                #          % (polname, str(pol_users) ))
+            else:
+                log.error("Empty userlist in policy '%s' not supported!" % polname)
+                raise Exception("Empty userlist in policy '%s' not supported!" % polname)
+
             delete_it = True
             for u in pol_users:
-                #log.debug("[getPolicy] User: %s" % u )
-                if u == param['user'].lower():
-                    #log.debug("[getPolicy] setting delete_it to false."
+                # log.debug("[getPolicy] User: %s" % u )
+                if u == param['user'].lower() or u == '*':
+                    # log.debug("[getPolicy] setting delete_it to false."
                     #          "We are using policy %s" % str(polname))
                     delete_it = False
+                    break
+
             if delete_it:
                 pol2delete.append(polname)
         for polname in pol2delete:
@@ -566,7 +691,7 @@ def getPolicy(param, display_inactive=False):
     return Policies
 
 
-def deletePolicy(name):
+def deletePolicy(name, enforce=False):
     '''
     Function to delete one named policy
 
@@ -579,6 +704,17 @@ def deletePolicy(name):
                           "characters a-zA-Z0-9_", id=8888)
 
     Config = getLinotpConfig()
+
+    # check if due to delete of the policy a lockout could happen
+    policies = getPolicies(config=Config)
+    param = policies.get(name)
+    # delete is same as inactive ;-)
+    if param:
+        param['active'] = "False"
+        param['name'] = name
+        param['enforce'] = enforce
+        check_policy_impact(**param)
+
     delEntries = []
     for entry in Config:
         if entry.startswith("linotp.Policy.%s." % name):
@@ -594,26 +730,28 @@ def deletePolicy(name):
 
 
 def getPolicyActionValue(policies, action, max=True, String=False):
-    '''
+    """
     This function retrieves the int value of an action from a list of policies
     input
-        policies: list of policies as returned from config.getPolicy
-              This is a list of dictionaries
-        action: an action, to be searched
-        max: if True, it will return the highest value, if there are
-              multiple policies
-              if False, it will return the lowest value, if there
-              are multiple policies
-        String: if True, the value is a string and not an integer
 
-            pol10: {
-            * action: "maxtoken = 10"
-            * scope: "enrollment"
-            * realm: "realm1"
-            * user: ""
-            * time: ""
+    :param policies: list of policies as returned from config.getPolicy
+        This is a list of dictionaries
+    :param action: an action, to be searched
+    :param max: if True, it will return the highest value, if there are
+        multiple policies if False, it will return the lowest value, if there
+        are multiple policies
+    :param String: if True, the value is a string and not an integer
+
+    Example policy::
+
+        pol10: {
+            action: "maxtoken = 10",
+            scope: "enrollment",
+            realm: "realm1",
+            user: "",
+            time: ""
            }
-    '''
+    """
     ret = -1
     if String:
         ret = ""
@@ -652,11 +790,12 @@ def getAdminPolicies(action, lowerRealms=False):
                       be lower case.
 
     :return: a dictionary with the following keys:
-        active (if policies are used)
-        realms (the realms, in which the admin is allowed to do this action)
-        resolvers    (the resolvers in which the admin is allowed to perform
-                     this action)
-        admin      (the name of the authenticated admin user)
+
+        - active (if policies are used)
+        - realms (the realms, in which the admin is allowed to do this action)
+        - resolvers (the resolvers in which the admin is allowed to perform
+          this action)
+        - admin (the name of the authenticated admin user)
     """
     active = True
     # check if we got admin policies at all
@@ -795,8 +934,10 @@ def checkAdminAuthorization(policies, serial, user, fitAllRealms=False):
 
         return fitAllRealms
 
-    # in case we got a user
-    if user.login != "":
+    # in case of the admin policies - no user name is verified:
+    # the username could be empty (not dummy) which prevents an
+    # unnecessar resolver lookup
+    if user.realm:
         # default realm user
         if user.realm == "" and user.conf == "":
             return getDefaultRealm() in policies['realms']
@@ -918,11 +1059,13 @@ def checkTokenNum(user=None, realm=None):
 def checkTokenAssigned(user):
     '''
     This internal function checks the number of assigned tokens to a user
-    Therefor it checks the policy
+    Therefore it checks the policy::
+
         "scope = enrollment", action = "maxtoken = <number>"
 
-    returns FALSE, if the user has to many tokens assigned
-    returns TRUE, if more tokens may be assigned to the user
+    :return: False, if the user has to many tokens assigned True, if more
+        tokens may be assigned to the user
+    :rtype: bool
     '''
     if user is None:
         return True
@@ -963,10 +1106,11 @@ def get_tokenlabel(user="", realm="", serial=""):
     '''
     This internal function returns the naming of the token as defined in policy
     scope = enrollment, action = tokenname = <string>
-    The string can have the following varaibles:
-        <u>: user
-        <r>: realm
-        <s>: token serial
+    The string can have the following variables:
+
+    - <u>: user
+    - <r>: realm
+    - <s>: token serial
 
     This function is used by the creation of googleauthenticator url
     '''
@@ -1015,6 +1159,46 @@ def get_autoassignment(user):
 
     return ret, otplen
 
+
+def get_auto_enrollment(user):
+    '''
+    this function checks the policy scope=enrollment, action=autoenrollment
+    This policy policy returns the tokentyp: sms or email 
+    The function returns true, if autoenrollment is defined.
+    '''
+    ret = False
+    token_typ = ''
+
+    pol = get_client_policy(get_client(), scope='enrollment',
+                            realm=user.realm, user=user.login, userObj=user)
+
+    if len(pol) > 0:
+        t_typ = getPolicyActionValue(pol, "autoenrollment", String=True)
+        log.debug("[get_autoenrollment] got the token type = %s" % t_typ)
+        if type(t_typ) in [str, unicode] and t_typ.lower() in ['sms', 'email']:
+            ret = True
+            token_typ = t_typ.lower()
+
+    return ret, token_typ
+
+def autoassignment_forward(user):
+    '''
+    this function checks the policy scope=enrollment, action=autoassignment
+    This is a boolean policy.
+    The function returns true, if autoassignment is defined.
+    '''
+    ret = False
+
+    pol = get_client_policy(get_client(), scope='enrollment',
+                            action="autoassignment_forward",
+                            realm=user.realm, user=user.login, userObj=user)
+
+    if len(pol) > 0:
+        ret = True
+
+    return ret
+
+
 def ignore_autoassignment_pin(user):
     '''
     This function checks the policy
@@ -1044,8 +1228,9 @@ def getRandomOTPPINLength(user):
     maxOTPPINLength = -1
 
     for R in Realms:
-        pol = get_client_policy(get_client(), scope='enrollment', realm=R,
-                                user=user.login, userObj=user)
+        pol = get_client_policy(get_client(),
+                                scope='enrollment', action='otp_pin_random',
+                                realm=R, user=user.login, userObj=user)
         if len(pol) == 0:
             log.debug("[getRandomOTPPINLength] there is no scope=enrollment "
                       "policy for Realm %r" % R)
@@ -1091,12 +1276,14 @@ def getOTPPINPolicies(user, scope="selfservice"):
     This internal function returns the PIN policies for a realm.
     These policies can either be in the scope "selfservice" or "admin"
     The policy define when resettng an OTP PIN:
-     - what should be the length of the otp pin
-     - what should be the contents of the otp pin
-       by the actions:
-            otp_pin_minlength =
-            otp_pin_maxlength =
-            otp_pin_contents = [cns] (character, number, special character)
+
+    - what should be the length of the otp pin
+    - what should be the contents of the otp pin by the actions:
+
+      - otp_pin_minlength =
+      - otp_pin_maxlength =
+      - otp_pin_contents = [cns] (character, number, special character)
+
     :return: dictionary like {contents: "cns", min: 7, max: 10}
     '''
     log.debug("[getOTPPINPolicies]")
@@ -1158,15 +1345,15 @@ def checkOTPPINPolicy(pin, user):
     if pol['min'] != -1:
         if pol['min'] > len(pin):
             return {'success': False,
-                    'error': 'The provided PIN is too short. It should be at '
-                             'least %i characters.' % pol['min']}
+                    'error': _('The provided PIN is too short. It should be '
+                               'at least %i characters.') % pol['min']}
 
     log.debug("[checkOTPPINPolicy] checking for otp_pin_maxlength")
     if pol['max'] != -1:
         if pol['max'] < len(pin):
             return {'success': False,
-                    'error': ('The provided PIN is too long. It should not '
-                              'be longer than %i characters.' % pol['max'])}
+                    'error': (_('The provided PIN is too long. It should not '
+                              'be longer than %i characters.') % pol['max'])}
 
     log.debug("[checkOTPPINPolicy] checking for otp_pin_contents")
     if pol['contents']:
@@ -1205,54 +1392,54 @@ def checkOTPPINPolicy(pin, user):
                     (not policy_n and contains_n) or
                     (not policy_o and contains_other))):
                 return {'success': False,
-                        'error': "The provided PIN does not contain characters"
+                        'error': _("The provided PIN does not contain characters"
                                  " of the group or it does contains "
-                                 "characters that are not in the group %s"
+                                 "characters that are not in the group %s")
                                  % pol['contents']}
         else:
             log.debug("[checkOTPPINPolicy] normal check: %s" % pol['contents'])
             if (policy_c and not contains_c):
                 return {'success': False,
-                        'error': 'The provided PIN does not contain any ' +
-                                 'letters. Check policy otp_pin_contents.'}
+                        'error': _('The provided PIN does not contain any '
+                                 'letters. Check policy otp_pin_contents.')}
             if (policy_n and not contains_n):
                 return {'success': False,
-                        'error': 'The provided PIN does not contain any ' +
-                                 'numbers. Check policy otp_pin_contents.'}
+                        'error': _('The provided PIN does not contain any ' 
+                                 'numbers. Check policy otp_pin_contents.')}
             if (policy_s and not contains_s):
                 return {'success': False,
-                        'error': 'The provided PIN does not contain any '
+                        'error': _('The provided PIN does not contain any '
                                  'special characters. It should contain '
                                  'some of these characters like '
                                  '.: ,;-_<>+*~!/()=?$. Check policy '
-                                 'otp_pin_contents.'}
+                                 'otp_pin_contents.')}
             if (policy_o and not contains_other):
                 return {'success': False,
-                        'error': 'The provided PIN does not contain any '
+                        'error': _('The provided PIN does not contain any '
                                  'other characters. It should contain some of'
                                  ' these characters that are not contained '
                                  'in letters, digits and the defined special '
-                                 'characters. Check policy otp_pin_contents.'}
+                                 'characters. Check policy otp_pin_contents.')}
             # Additionally: in case of -cn the PIN must not contain "s" or "o"
             if '-' == pol['contents'][0]:
                 if (not policy_c and contains_c):
                     return {'success': False,
-                            'error': "The PIN contains letters, although it "
-                                     "should not! (%s)" % pol['contents']}
+                            'error': _("The PIN contains letters, although it "
+                                     "should not! (%s)") % pol['contents']}
                 if (not policy_n and contains_n):
                     return {'success':  False,
-                            'error': "The PIN contains digits, although it "
-                                     "should not! (%s)" % pol['contents']}
+                            'error': _("The PIN contains digits, although it "
+                                     "should not! (%s)") % pol['contents']}
                 if (not policy_s and contains_s):
                     return {'success': False,
-                            'error': "The PIN contains special characters, "
+                            'error': _("The PIN contains special characters, "
                                      "although it should not! "
-                                     "(%s)" % pol['contents']}
+                                     "(%s)") % pol['contents']}
                 if (not policy_o and contains_other):
                     return {'success': False,
-                            'error': "The PIN contains other characters, "
+                            'error': _("The PIN contains other characters, "
                                      "although it should not! "
-                                     "(%s)" % pol['contents']}
+                                     "(%s)") % pol['contents']}
 
     return {'success': True,
             'error': ''}
@@ -1270,6 +1457,245 @@ def getRandomPin(randomPINLength):
 
 
 ##### Pre and Post checks
+def checkPolicyPreSelfservice(method, param={}, authUser=None, user=None):
+    '''
+    This function will check for all policy definition for a certain
+    controller/method It is run directly before doing the action in the
+    controller. I will raise an exception, if it fails.
+
+    :param param: This is a dictionary with the necessary parameters.
+
+    :return: dictionary with the necessary results. These depend on
+             the controller.
+    '''
+    ret = {}
+    controller = 'selfservice'
+    log.debug("[checkPolicyPre] entering controller %s" % controller)
+
+    if 'max_count' == method[0: len('max_count')]:
+        ret = 0
+        serial = getParam(param, "serial", optional)
+        ttype = linotp.lib.token.getTokenType(serial).lower()
+        urealm = authUser.realm
+        pol_action = MAP_TYPE_GETOTP_ACTION.get(ttype, "")
+        if pol_action == "":
+            raise PolicyException(_("There is no policy selfservice/"
+                                  "max_count definable for the token "
+                                  "type %s.") % ttype)
+
+        policies = get_client_policy(get_client(), scope='selfservice',
+                                     realm=urealm, user=authUser.login,
+                                     userObj=authUser)
+        log.debug("[checkPolicyPre][seflservice][max_count] got a policy: "
+                  " %r" % policies)
+        if policies == {}:
+            raise PolicyException(_("There is no policy selfservice/"
+                                  "max_count defined for the tokentype "
+                                  "%s in realm %s.") % (ttype, urealm))
+
+        value = getPolicyActionValue(policies, pol_action)
+        log.debug("[checkPolicyPre][seflservice][max_count] "
+                  "got all policies: %r: %r" % (policies, value))
+        ret = value
+
+    elif 'usersetpin' == method:
+
+        if not 'setOTPPIN' in getSelfserviceActions(authUser):
+            log.warning("[usersetpin] user %s@%s is not allowed to call "
+                        "this function!" % (authUser.login,
+                                            authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'userreset' == method:
+
+        if not 'reset' in getSelfserviceActions(authUser):
+            log.warning("[userreset] user %s@%s is not allowed to call "
+                        "this function!" % (authUser.login,
+                                            authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'userresync' == method:
+
+        if not 'resync' in getSelfserviceActions(authUser):
+            log.warning("[userresync] user %s@%s is not allowed to call "
+                        "this function!" % (authUser.login,
+                                            authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'usersetmpin' == method:
+
+        if not 'setMOTPPIN' in getSelfserviceActions(authUser):
+            log.warning("[usersetmpin] user %r@%r is not allowed to call "
+                        "this function!" % (authUser.login,
+                                            authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'useractivateocratoken' == method:
+        user_selfservice_actions = getSelfserviceActions(authUser)
+        typ = param.get('type').lower()
+        if (typ == 'ocra'
+                and 'activateQR' not in user_selfservice_actions):
+            log.warning("[activateQR] user %r@%r is not allowed to call "
+                        "this function!" % (authUser.login,
+                                            authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'useractivateocra2token' == method:
+        user_selfservice_actions = getSelfserviceActions(authUser)
+        typ = param.get('type').lower()
+        if (typ == 'ocra2'
+                and 'activateQR2' not in user_selfservice_actions):
+            log.warning("[activateQR2 user %r@%r is not allowed to call "
+                        "this function!" % (authUser.login,
+                                            authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'userassign' == method:
+
+        if not 'assign' in getSelfserviceActions(authUser):
+            log.warning("[userassign] user %r@%r is not allowed to call "
+                        "this function!" % (authUser.login,
+                                            authUser.realm))
+            raise PolicyException(_('The policy settings do not allow '
+                                  'you to issue this request!'))
+
+        # Here we check, if the tokennum exceeds the tokens
+        if not checkTokenNum():
+            log.error("[init] The maximum token number "
+                      "is reached!")
+            raise PolicyException(_("You may not enroll any more tokens. "
+                                  "Your maximum token number "
+                                  "is reached!"))
+
+        if not checkTokenAssigned(authUser):
+            log.warning("[assign] the maximum number of allowed tokens is"
+                        " exceeded. Check the policies")
+            raise PolicyException(_("The maximum number of allowed tokens "
+                                  "is exceeded. Check the policies"))
+
+    elif 'usergetserialbyotp' == method:
+
+        if not 'getserial' in getSelfserviceActions(authUser):
+            log.warning("[usergetserialbyotp] user %s@%s is not allowed to"
+                        " call this function!" % (authUser.login,
+                                                  authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you to'
+                                  ' request a serial by OTP!'))
+
+    elif 'userdisable' == method:
+
+        if not 'disable' in getSelfserviceActions(authUser):
+            log.warning("[userdisable] user %r@%r is not allowed to call "
+                        "this function!"
+                        % (authUser.login, authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'userenable' == method:
+
+        if not 'enable' in getSelfserviceActions(authUser):
+            log.warning("[userenable] user %s@%s is not allowed to call "
+                        "this function!"
+                        % (authUser.login, authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you to'
+                                  ' issue this request!'))
+
+    elif 'userunassign' == method:
+
+        if not 'unassign' in getSelfserviceActions(authUser):
+            log.warning("[userunassign] user %r@%r is not allowed to call "
+                        "this function!"
+                        % (authUser.login, authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'userdelete' == method:
+
+        if not 'delete' in getSelfserviceActions(authUser):
+            log.warning("[userdelete] user %r@%r is not allowed to call "
+                        "this function!"
+                        % (authUser.login, authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'userwebprovision' == method:
+        user_selfservice_actions = getSelfserviceActions(authUser)
+        typ = param.get('type').lower()
+        if ((typ == 'oathtoken'
+                and 'webprovisionOATH' not in user_selfservice_actions)
+            or (typ == 'googleauthenticator_time'and
+                'webprovisionGOOGLEtime' not in user_selfservice_actions)
+            or (typ == 'googleauthenticator'
+                and 'webprovisionGOOGLE' not in user_selfservice_actions)):
+            log.warning("[userwebprovision] user %r@%r is not allowed to "
+                        "call this function!" % (authUser.login,
+                                                 authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+        # Here we check, if the tokennum exceeds the allowed tokens
+        if not checkTokenNum():
+            log.error("[userwebprovision] The maximum token "
+                      "number is reached!")
+            raise PolicyException(_("You may not enroll any more tokens. "
+                                  "Your maximum token number "
+                                  "is reached!"))
+
+        if not checkTokenAssigned(authUser):
+            log.warning("[userwebprovision] the maximum number of allowed "
+                        "tokens is exceeded. Check the policies")
+            raise PolicyException(_("The maximum number of allowed tokens "
+                                  "is exceeded. Check the policies"))
+
+    elif 'userhistory' == method:
+        if not 'history' in getSelfserviceActions(authUser):
+            log.warning("[userhistory] user %r@%r is not allowed to call "
+                        "this function!"
+                        % (authUser.login, authUser.realm))
+            raise PolicyException(_('The policy settings do not allow you '
+                                  'to issue this request!'))
+
+    elif 'userinit' == method:
+
+        allowed_actions = getSelfserviceActions(authUser)
+        typ = param['type'].lower()
+        meth = 'enroll' + typ.upper()
+
+        if meth not in allowed_actions:
+            log.warning("[userinit] user %r@%r is not allowed to "
+                        "enroll %s!" % (authUser.login,
+                                        authUser.realm, typ))
+            raise PolicyException(_('The policy settings do not allow '
+                                  'you to issue this request!'))
+
+        # Here we check, if the tokennum exceeds the allowed tokens
+        if not checkTokenNum():
+            log.error("[userinit] The maximum token "
+                      "number is reached!")
+            raise PolicyException(_("You may not enroll any more tokens. "
+                                  "Your maximum token number "
+                                  "is reached!"))
+
+        if not checkTokenAssigned(authUser):
+            log.warning("[userinit] the maximum number of allowed tokens "
+                        "is exceeded. Check the policies")
+            raise PolicyException(_("The maximum number of allowed tokens "
+                                  "is exceeded. Check the policies"))
+
+    else:
+        log.error("[checkPolicyPre] Unknown method in "
+                  "selfservice: %s" % method)
+        raise PolicyException(_("Unknown method in selfservice: %s") % method)
+
+    return ret
+
+
 def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
     '''
     This function will check for all policy definition for a certain
@@ -1306,8 +1732,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             if policies['active'] and 0 == len(policies['realms']):
                 log.error("[checkPolicyPre] The admin >%s< has no rights in "
                           "any realms!" % policies['admin'])
-                raise PolicyException("You do not have any rights in any "
-                                      "realm! Check the policies.")
+                raise PolicyException(_("You do not have any rights in any "
+                                      "realm! Check the policies."))
             return {'realms': policies['realms'], 'admin': policies['admin']}
 
         elif 'remove' == method:
@@ -1323,9 +1749,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "token %s for user %s@%s"
                             % (policies['admin'], serial,
                                user.login, user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to remove token %s. Check the "
-                                      "policies." % serial)
+                                      "policies.") % serial)
 
         elif 'enable' == method:
             policies = getAdminPolicies("enable")
@@ -1335,16 +1761,16 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "token %s for user %s@%s"
                             % (policies['admin'], serial,
                                user.login, user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to enable token %s. Check the "
-                                      "policies." % serial)
+                                      "policies.") % serial)
 
             if not checkTokenNum():
                 log.error("[enable] The maximum token number "
                           "is reached!")
-                raise PolicyException("You may not enable any more tokens. "
+                raise PolicyException(_("You may not enable any more tokens. "
                                       "Your maximum token number is "
-                                      "reached!")
+                                      "reached!"))
 
             # We need to check which realm the token will be in.
             realmList = linotp.lib.token.getTokenRealms(serial)
@@ -1352,9 +1778,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 if not checkTokenNum(realm=r):
                     log.warning("[enable] the maximum tokens for the realm "
                                 "%s is exceeded." % r)
-                    raise PolicyException("You may not enable any more tokens "
+                    raise PolicyException(_("You may not enable any more tokens "
                                           "in realm %s. Check the policy "
-                                          "'tokencount'" % r)
+                                          "'tokencount'") % r)
 
         elif 'disable' == method:
             policies = getAdminPolicies("disable")
@@ -1364,9 +1790,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "disable token %s for user %s@%s"
                             % (policies['admin'], serial,
                                user.login, user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to disable token %s. Check the "
-                                      "policies." % serial)
+                                      "policies.") % serial)
 
         elif 'copytokenpin' == method:
             policies = getAdminPolicies("copytokenpin")
@@ -1376,9 +1802,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "copy token pin of token %s for user %s@%s"
                             % (policies['admin'], serial,
                                user.login, user.realm))
-                raise PolicyException("You do not have the administrative "
-                                      "right to copy pin of token %s. Check "
-                                      "the policies." % serial)
+                raise PolicyException(_("You do not have the administrative "
+                                      "right to copy PIN of token %s. Check "
+                                      "the policies.") % serial)
 
         elif 'copytokenuser' == method:
             policies = getAdminPolicies("copytokenuser")
@@ -1388,9 +1814,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "copy token user of token %s for user %s@%s"
                             % (policies['admin'], serial,
                                user.login, user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to copy user of token %s. Check "
-                                      "the policies." % serial)
+                                      "the policies.") % serial)
 
         elif 'losttoken' == method:
             policies = getAdminPolicies("losttoken")
@@ -1400,10 +1826,10 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "the losttoken workflow for token %s for "
                             "user %s@%s" % (policies['admin'], serial,
                                             user.login, user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to run the losttoken workflow "
                                       "for token %s. Check the "
-                                      "policies." % serial)
+                                      "policies.") % serial)
 
         elif 'getotp' == method:
             policies = getAdminPolicies("getotp")
@@ -1413,9 +1839,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "the getotp workflow for token %s for user %s@%s"
                             % (policies['admin'], serial, user.login,
                                user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to run the getotp workflow for "
-                                      "token %s. Check the policies." % serial)
+                                      "token %s. Check the policies.") % serial)
 
         elif 'getserial' == method:
             policies = getAdminPolicies("getserial")
@@ -1431,9 +1857,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[getserial] the admin >%s< is not allowed to get "
                             "serials for user %s@%s"
                             % (policies['admin'], user.login, user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to get serials by OTPs in "
-                                      "this realm!")
+                                      "this realm!"))
 
         elif 'init' == method:
             ttype = getParam(param, "type", optional)
@@ -1465,8 +1891,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                     policies = {}
                     log.error("[checkPolicyPre] Unknown token type:"
                               " %s" % ttype)
-                    raise Exception("The tokentype '%s' could not be "
-                                    "found." % ttype)
+                    raise Exception(_("The tokentype '%s' could not be "
+                                    "found.") % ttype)
 
             """
             We need to assure, that an admin does not enroll a token into a
@@ -1484,9 +1910,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             % (policies['admin'], serial, ttype,
                                user.login, user.realm))
 
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to init token %s of type %s to "
-                                      "user %s@%s. Check the policies."
+                                      "user %s@%s. Check the policies.")
                                       % (serial, ttype, user.login,
                                          user.realm))
 
@@ -1496,9 +1922,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[init] the admin >%s< is not allowed to enroll "
                             "a token at all."
                             % (policies['admin']))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to enroll tokens. Check the "
-                                      "policies.")
+                                      "policies."))
 
             # the token is assigned to a user, not in the realm of the admin!
             # we only need to check this, if the token already exists. If
@@ -1509,8 +1935,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                     log.warning("[init] the admin >%s< is not allowed to "
                                 "enroll token %s of type %s."
                                 % (policies['admin'], serial, ttype))
-                    raise PolicyException("You do not have the administrative "
-                                          "right to init token %s of type %s."
+                    raise PolicyException(_("You do not have the administrative "
+                                          "right to init token %s of type %s.")
                                           % (serial, ttype))
 
             # Here we check, if the tokennum exceeded
@@ -1518,9 +1944,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             if not checkTokenNum():
                 log.error("[init] The maximum token number "
                           "is reached!")
-                raise PolicyException("You may not enroll any more tokens. "
+                raise PolicyException(_("You may not enroll any more tokens. "
                                       "Your maximum token number "
-                                      "is reached!")
+                                      "is reached!"))
 
             # if a policy restricts the tokennumber for a realm
             log.debug("[checkPolicyPre] checking tokens in realms "
@@ -1530,12 +1956,12 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                     log.warning("[init] the admin >%s< is not allowed to "
                                 "enroll any more tokens for the realm %s"
                                 % (policies['admin'], R))
-                    raise PolicyException("The maximum allowed number of "
+                    raise PolicyException(_("The maximum allowed number of "
                                           "tokens for the realm %s was "
                                           "reached. You can not init any more "
                                           "tokens. Check the policies "
                                           "scope=enrollment, "
-                                          "action=tokencount." % R)
+                                          "action=tokencount.") % R)
 
             log.debug("[checkPolicyPre] checking tokens in realm for "
                       "user %s" % user)
@@ -1543,21 +1969,21 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[init] the admin >%s< is not allowed to enroll "
                             "any more tokens for the realm %s"
                             % (policies['admin'], user.realm))
-                raise PolicyException("The maximum allowed number of tokens "
+                raise PolicyException(_("The maximum allowed number of tokens "
                                       "for the realm %s was reached. You can "
                                       "not init any more tokens. Check the "
                                       "policies scope=enrollment, "
-                                      "action=tokencount." % user.realm)
+                                      "action=tokencount.") % user.realm)
 
             log.debug("[checkPolicyPre] checking tokens of user")
             # if a policy restricts the tokennumber for the user in a realm
             if not checkTokenAssigned(user):
                 log.warning("[init] the maximum number of allowed tokens per "
                             "user is exceeded. Check the policies")
-                raise PolicyException("the maximum number of allowed tokens "
+                raise PolicyException(_("The maximum number of allowed tokens "
                                       "per user is exceeded. Check the "
                                       "policies scope=enrollment, "
-                                      "action=maxtoken")
+                                      "action=maxtoken"))
             # ==== End of policy check 'init' ======
             ret['realms'] = policies['realms']
 
@@ -1569,9 +1995,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "unassign token %s for user %s@%s"
                             % (policies['admin'], serial, user.login,
                                user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to unassign token %s. Check the "
-                                      "policies." % serial)
+                                      "policies.") % serial)
 
         elif 'assign' == method:
             policies = getAdminPolicies("assign")
@@ -1581,9 +2007,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                     checkAdminAuthorization(policies, serial, "")):
                 log.warning("[assign] the admin >%s< is not allowed to assign "
                             "token %s. " % (policies['admin'], serial))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to assign token %s. "
-                                      "Check the policies." % (serial))
+                                      "Check the policies.") % (serial))
 
             # The user, the token should be assigned to,
             # is not in the admins realm
@@ -1593,27 +2019,27 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "token %s for user %s@%s" % (policies['admin'],
                                                          serial, user.login,
                                                          user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to assign token %s. Check the "
-                                      "policies." % serial)
+                                      "policies.") % serial)
 
             # if a policy restricts the tokennumber for the realm/user
             if not checkTokenNum(user):
                 log.warning("[init] the admin >%s< is not allowed to assign "
                             "any more tokens for the realm %s(%s)"
                             % (policies['admin'], user.realm, user.conf))
-                raise PolicyException("The maximum allowed number of tokens "
+                raise PolicyException(_("The maximum allowed number of tokens "
                                       "for the realm %s (%s) was reached. You "
                                       "can not assign any more tokens. Check "
-                                      "the policies."
+                                      "the policies.")
                                       % (user.realm, user.conf))
 
             # check the number of assigned tokens
             if not checkTokenAssigned(user):
                 log.warning("[assign] the maximum number of allowed tokens "
                             "is exceeded. Check the policies")
-                raise PolicyException("the maximum number of allowed tokens "
-                                      "is exceeded. Check the policies")
+                raise PolicyException(_("the maximum number of allowed tokens "
+                                      "is exceeded. Check the policies"))
 
         elif 'setPin' == method:
 
@@ -1631,9 +2057,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                     log.warning("[setPin] the admin >%s< is not allowed to "
                                 "set MOTP PIN/SC UserPIN for token %s."
                                 % (policies['admin'], serial))
-                    raise PolicyException("You do not have the administrative "
+                    raise PolicyException(_("You do not have the administrative "
                                           "right to set MOTP PIN/ SC UserPIN "
-                                          "for token %s. Check the policies."
+                                          "for token %s. Check the policies.")
                                           % serial)
 
             if "sopin" in param:
@@ -1646,9 +2072,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                     log.warning("[setPin] the admin >%s< is not allowed to "
                                 "setPIN for token %s."
                                 % (policies['admin'], serial))
-                    raise PolicyException("You do not have the administrative "
+                    raise PolicyException(_("You do not have the administrative "
                                           "right to set Smartcard PIN for "
-                                          "token %s. Check the policies."
+                                          "token %s. Check the policies.")
                                           % serial)
 
         elif 'set' == method:
@@ -1661,9 +2087,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                                 "OTP PIN for token %s for user %s@%s"
                                 % (policies['admin'], serial, user.login,
                                    user.realm))
-                    raise PolicyException("You do not have the administrative "
+                    raise PolicyException(_("You do not have the administrative "
                                           "right to set OTP PIN for token %s. "
-                                          "Check the policies." % serial)
+                                          "Check the policies.") % serial)
 
             if ("MaxFailCount".lower() in param or
                     "SyncWindow".lower() in param or
@@ -1676,9 +2102,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                                 "token properites for %s for user %s@%s"
                                 % (policies['admin'], serial,
                                    user.login, user.realm))
-                    raise PolicyException("You do not have the administrative "
+                    raise PolicyException(_("You do not have the administrative "
                                           "right to set token properties for "
-                                          "%s. Check the policies." % serial)
+                                          "%s. Check the policies.") % serial)
 
         elif 'resync' == method:
 
@@ -1689,9 +2115,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "token %s for user %s@%s"
                             % (policies['admin'], serial,
                                user.login, user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to resync token %s. Check the "
-                                      "policies." % serial)
+                                      "policies.") % serial)
 
         elif 'userlist' == method:
             policies = getAdminPolicies("userlist")
@@ -1701,8 +2127,20 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userlist] the admin >%s< is not allowed to list"
                             " users in realm %s(%s)!"
                             % (policies['admin'], user.realm, user.conf))
-                raise PolicyException("You do not have the administrative"
-                                      " right to list users in realm %s(%s)."
+                raise PolicyException(_("You do not have the administrative"
+                                      " right to list users in realm %s(%s).")
+                                      % (user.realm, user.conf))
+
+        elif 'tokenowner' == method:
+            policies = getAdminPolicies("tokenowner")
+            # check if the admin may view the users in this realm
+            if (policies['active'] and
+                    not checkAdminAuthorization(policies, "", user)):
+                log.warning("[tokenowner] the admin >%s< is not allowed to get"
+                            " the token owner in realm %s(%s)!"
+                            % (policies['admin'], user.realm, user.conf))
+                raise PolicyException(_("You do not have the administrative"
+                                      " right to get the token owner in realm %s(%s).")
                                       % (user.realm, user.conf))
 
         elif 'checkstatus' == method:
@@ -1713,10 +2151,10 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[checkstatus] the admin >%s< is not allowed to "
                             "show status of token challenges in realm %s(%s)!"
                             % (policies['admin'], user.realm, user.conf))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to show status of token "
                                       "challenges in realm "
-                                      "%s(%s)." % (user.realm, user.conf))
+                                      "%s(%s).") % (user.realm, user.conf))
 
         elif 'tokenrealm' == method:
             log.debug("[checkPolicyPre] entering method %s" % method)
@@ -1737,9 +2175,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                     log.warning("[tokenrealm] the admin >%s< is not allowed "
                                 "to manage tokens in realm %s"
                                 % (policies['admin'], r))
-                    raise PolicyException("You do not have the administrative "
+                    raise PolicyException(_("You do not have the administrative "
                                           "right to remove tokens from realm "
-                                          "%s. Check the policies." % r)
+                                          "%s. Check the policies.") % r)
 
             for r in realmNewList:
                 if (policies['active'] and not
@@ -1748,16 +2186,16 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                     log.warning("[tokenrealm] the admin >%s< is not allowed "
                                 "to manage tokens in realm %s"
                                 % (policies['admin'], r))
-                    raise PolicyException("You do not have the administrative "
+                    raise PolicyException(_("You do not have the administrative "
                                           "right to add tokens to realm %s. "
-                                          "Check the policies." % r)
+                                          "Check the policies.") % r)
 
                 if not checkTokenNum(realm=r):
                     log.warning("[tokenrealm] the maximum tokens for the "
                                 "realm %s is exceeded." % r)
-                    raise PolicyException("You may not put any more tokens in "
+                    raise PolicyException(_("You may not put any more tokens in "
                                           "realm %s. Check the policy "
-                                          "'tokencount'" % r)
+                                          "'tokencount'") % r)
 
         elif 'reset' == method:
 
@@ -1768,9 +2206,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "token %s for user %s@%s" % (policies['admin'],
                                                          serial, user.login,
                                                          user.realm))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to reset token %s. Check the "
-                                      "policies." % serial)
+                                      "policies.") % serial)
 
         elif 'import' == method:
             policies = getAdminPolicies("import")
@@ -1781,9 +2219,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                             "to import a token at all."
                             % (policies['admin']))
 
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to import tokens. Check the "
-                                      "policies.")
+                                      "policies."))
             ret['realms'] = policies['realms']
 
         elif 'loadtokens' == method:
@@ -1793,23 +2231,23 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[loadtokens] the admin >%s< is not allowed to "
                             "import token files to realm %s: %s"
                             % (policies['admin'], tokenrealm, policies))
-                raise PolicyException("You do not have the administrative "
+                raise PolicyException(_("You do not have the administrative "
                                       "right to import token files to realm %s"
-                                      ". Check the policies." % tokenrealm)
+                                      ". Check the policies.") % tokenrealm)
 
             if not checkTokenNum(realm=tokenrealm):
                 log.warning("[loadtokens] the maximum tokens for the realm "
                             "%s is exceeded." % tokenrealm)
-                raise PolicyException("The maximum number of allowed tokens "
+                raise PolicyException(_("The maximum number of allowed tokens "
                                       "in realm %s is exceeded. Check policy "
-                                      "tokencount!" % tokenrealm)
+                                      "tokencount!") % tokenrealm)
 
         else:
             # unknown method
             log.error("[checkPolicyPre] an unknown method "
                       "<<%s>> was passed." % method)
-            raise PolicyException("Failed to run checkPolicyPre. "
-                                  "Unknown method: %s" % method)
+            raise PolicyException(_("Failed to run checkPolicyPre. "
+                                  "Unknown method: %s") % method)
 
     elif 'gettoken' == controller:
         if 'max_count' == method[0: len('max_count')]:
@@ -1820,9 +2258,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             pol_action = MAP_TYPE_GETOTP_ACTION.get(ttype, "")
             admin_user = getUserFromRequest(request)
             if pol_action == "":
-                raise PolicyException("There is no policy gettoken/"
+                raise PolicyException( _("There is no policy gettoken/"
                                       "max_count definable for the "
-                                      "tokentype %r" % ttype)
+                                      "tokentype %r") % ttype)
 
             policies = {}
             for realm in trealms:
@@ -1845,15 +2283,15 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[audit view] the admin >%r< is not allowed to "
                             "view the audit trail" % auth['admin'])
 
-                ret = ("You do not have the administrative right to view the "
+                ret = _("You do not have the administrative right to view the "
                        "audit trail. You are missing a policy "
                        "scope=audit, action=view")
                 raise PolicyException(ret)
         else:
             log.error("[checkPolicyPre] an unknown method was passed in :"
                       " %s" % method)
-            raise PolicyException("Failed to run checkPolicyPre. Unknown "
-                                  "method: %s" % method)
+            raise PolicyException(_("Failed to run checkPolicyPre. Unknown "
+                                  "method: %s") % method)
 
     elif 'manage' == controller:
         log.debug("[checkPolicyPre] entering controller %s" % controller)
@@ -1868,9 +2306,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             urealm = authUser.realm
             pol_action = MAP_TYPE_GETOTP_ACTION.get(ttype, "")
             if pol_action == "":
-                raise PolicyException("There is no policy selfservice/"
+                raise PolicyException(_("There is no policy selfservice/"
                                       "max_count definable for the token "
-                                      "type %s." % ttype)
+                                      "type %s.") % ttype)
 
             policies = get_client_policy(get_client(), scope='selfservice',
                                          realm=urealm, user=authUser.login,
@@ -1878,9 +2316,9 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             log.debug("[checkPolicyPre][seflservice][max_count] got a policy: "
                       " %r" % policies)
             if policies == {}:
-                raise PolicyException("There is no policy selfservice/"
+                raise PolicyException(_("There is no policy selfservice/"
                                       "max_count defined for the tokentype "
-                                      "%s in realm %s." % (ttype, urealm))
+                                      "%s in realm %s.") % (ttype, urealm))
 
             value = getPolicyActionValue(policies, pol_action)
             log.debug("[checkPolicyPre][seflservice][max_count] "
@@ -1893,8 +2331,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[usersetpin] user %s@%s is not allowed to call "
                             "this function!" % (authUser.login,
                                                 authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'userreset' == method:
 
@@ -1902,8 +2340,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userreset] user %s@%s is not allowed to call "
                             "this function!" % (authUser.login,
                                                 authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'userresync' == method:
 
@@ -1911,8 +2349,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userresync] user %s@%s is not allowed to call "
                             "this function!" % (authUser.login,
                                                 authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'usersetmpin' == method:
 
@@ -1920,8 +2358,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[usersetmpin] user %r@%r is not allowed to call "
                             "this function!" % (authUser.login,
                                                 authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'useractivateocratoken' == method:
             user_selfservice_actions = getSelfserviceActions(authUser)
@@ -1931,8 +2369,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[activateQR] user %r@%r is not allowed to call "
                             "this function!" % (authUser.login,
                                                 authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'useractivateocra2token' == method:
             user_selfservice_actions = getSelfserviceActions(authUser)
@@ -1942,8 +2380,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[activateQR2 user %r@%r is not allowed to call "
                             "this function!" % (authUser.login,
                                                 authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'userassign' == method:
 
@@ -1951,22 +2389,22 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userassign] user %r@%r is not allowed to call "
                             "this function!" % (authUser.login,
                                                 authUser.realm))
-                raise PolicyException('The policy settings do not allow '
-                                      'you to issue this request!')
+                raise PolicyException(_('The policy settings do not allow '
+                                      'you to issue this request!'))
 
             # Here we check, if the tokennum exceeds the tokens
             if not checkTokenNum():
                 log.error("[init] The maximum token number "
                           "is reached!")
-                raise PolicyException("You may not enroll any more tokens. "
+                raise PolicyException(_("You may not enroll any more tokens. "
                                       "Your maximum token number "
-                                      "is reached!")
+                                      "is reached!"))
 
             if not checkTokenAssigned(authUser):
                 log.warning("[assign] the maximum number of allowed tokens is"
                             " exceeded. Check the policies")
-                raise PolicyException("The maximum number of allowed tokens "
-                                      "is exceeded. Check the policies")
+                raise PolicyException(_("The maximum number of allowed tokens "
+                                      "is exceeded. Check the policies"))
 
         elif 'usergetserialbyotp' == method:
 
@@ -1974,8 +2412,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[usergetserialbyotp] user %s@%s is not allowed to"
                             " call this function!" % (authUser.login,
                                                       authUser.realm))
-                raise PolicyException('The policy settings do not allow you to'
-                                      ' request a serial by OTP!')
+                raise PolicyException(_('The policy settings do not allow you to'
+                                      ' request a serial by OTP!'))
 
         elif 'userdisable' == method:
 
@@ -1983,8 +2421,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userdisable] user %r@%r is not allowed to call "
                             "this function!"
                             % (authUser.login, authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'userenable' == method:
 
@@ -1992,8 +2430,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userenable] user %s@%s is not allowed to call "
                             "this function!"
                             % (authUser.login, authUser.realm))
-                raise PolicyException('The policy settings do not allow you to'
-                                      ' issue this request!')
+                raise PolicyException(_('The policy settings do not allow you to'
+                                      ' issue this request!'))
 
         elif 'userunassign' == method:
 
@@ -2001,8 +2439,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userunassign] user %r@%r is not allowed to call "
                             "this function!"
                             % (authUser.login, authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'userdelete' == method:
 
@@ -2010,8 +2448,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userdelete] user %r@%r is not allowed to call "
                             "this function!"
                             % (authUser.login, authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'userwebprovision' == method:
             user_selfservice_actions = getSelfserviceActions(authUser)
@@ -2035,23 +2473,23 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             if not checkTokenNum():
                 log.error("[userwebprovision] The maximum token "
                           "number is reached!")
-                raise PolicyException("You may not enroll any more tokens. "
+                raise PolicyException(_("You may not enroll any more tokens. "
                                       "Your maximum token number "
-                                      "is reached!")
+                                      "is reached!"))
 
             if not checkTokenAssigned(authUser):
                 log.warning("[userwebprovision] the maximum number of allowed "
                             "tokens is exceeded. Check the policies")
-                raise PolicyException("The maximum number of allowed tokens "
-                                      "is exceeded. Check the policies")
+                raise PolicyException(_("The maximum number of allowed tokens "
+                                      "is exceeded. Check the policies"))
 
         elif 'userhistory' == method:
             if not 'history' in getSelfserviceActions(authUser):
                 log.warning("[userhistory] user %r@%r is not allowed to call "
                             "this function!"
                             % (authUser.login, authUser.realm))
-                raise PolicyException('The policy settings do not allow you '
-                                      'to issue this request!')
+                raise PolicyException(_('The policy settings do not allow you '
+                                      'to issue this request!'))
 
         elif 'userinit' == method:
 
@@ -2063,27 +2501,27 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                 log.warning("[userinit] user %r@%r is not allowed to "
                             "enroll %s!" % (authUser.login,
                                             authUser.realm, typ))
-                raise PolicyException('The policy settings do not allow '
-                                      'you to issue this request!')
+                raise PolicyException(_('The policy settings do not allow '
+                                      'you to issue this request!'))
 
             # Here we check, if the tokennum exceeds the allowed tokens
             if not checkTokenNum():
                 log.error("[userinit] The maximum token "
                           "number is reached!")
-                raise PolicyException("You may not enroll any more tokens. "
+                raise PolicyException(_("You may not enroll any more tokens. "
                                       "Your maximum token number "
-                                      "is reached!")
+                                      "is reached!"))
 
             if not checkTokenAssigned(authUser):
                 log.warning("[userinit] the maximum number of allowed tokens "
                             "is exceeded. Check the policies")
-                raise PolicyException("The maximum number of allowed tokens "
-                                      "is exceeded. Check the policies")
+                raise PolicyException(_("The maximum number of allowed tokens "
+                                      "is exceeded. Check the policies"))
 
         else:
             log.error("[checkPolicyPre] Unknown method in "
                       "selfservice: %s" % method)
-            raise PolicyException("Unknown method in selfservice: %s" % method)
+            raise PolicyException(_("Unknown method in selfservice: %s") % method)
 
     elif 'system' == controller:
         actions = {
@@ -2113,8 +2551,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
         if not method in actions:
             log.error("[checkPolicyPre] an unknown method was passed "
                       "in system: %s" % method)
-            raise PolicyException("Failed to run checkPolicyPre. "
-                                  "Unknown method: %s" % method)
+            raise PolicyException(_("Failed to run checkPolicyPre. "
+                                  "Unknown method: %s") % method)
 
         auth = getAuthorization('system', actions[method])
 
@@ -2123,8 +2561,8 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
                         " Missing policy scope=system, action=%s"
                         % (auth['admin'], method, actions[method]))
 
-            raise PolicyException("Policy check failed. You are not allowed "
-                                  "to %s system config." % actions[method])
+            raise PolicyException(_("Policy check failed. You are not allowed "
+                                  "to %s system config.") % actions[method])
 
     elif controller == 'ocra':
 
@@ -2140,15 +2578,15 @@ def checkPolicyPre(controller, method, param={}, authUser=None, user=None):
             log.warning("[request] the admin >%r< is not allowed to do an ocra"
                         "/%r" % (admin_user.get('login'),
                                  method_map.get(method)))
-            raise PolicyException("You do not have the administrative right to"
-                                  " do an ocra/%s" % method_map.get(method))
+            raise PolicyException(_("You do not have the administrative right to"
+                                  " do an ocra/%s") % method_map.get(method))
 
     else:
         # unknown controller
         log.error("[checkPolicyPre] an unknown controller "
                   "<<%r>> was passed." % controller)
-        raise PolicyException("Failed to run getPolicyPre. Unknown "
-                              "controller: %s" % controller)
+        raise PolicyException(_("Failed to run getPolicyPre. Unknown "
+                              "controller: %s") % controller)
 
     return ret
 
@@ -2183,7 +2621,7 @@ def checkPolicyPost(controller, method, param=None, user=None):
         if user is None:
             user = getUserFromParam(param, optional)
 
-        if 'init' == method:
+        if method in ['init', 'assign', 'setPin']:
             # check if we are supposed to genereate a random OTP PIN
             randomPINLength = getRandomOTPPINLength(user)
             if randomPINLength > 0:
@@ -2203,14 +2641,14 @@ def checkPolicyPost(controller, method, param=None, user=None):
                                             User('', '', ''))):
                 log.warning("[getserial] the admin >%s< is not allowed to get "
                             "serial of token %s" % (policies['admin'], serial))
-                raise PolicyException("You do not have the administrative "
-                                      "right to get serials from this realm!")
+                raise PolicyException(_("You do not have the administrative "
+                                      "right to get serials from this realm!"))
         else:
             # unknown method
             log.error("[checkPolicyPost] an unknown method <<%s>>"
                       " was passed." % method)
-            raise PolicyException("Failed to run getPolicyPost. "
-                                  "Unknown method: %s" % method)
+            raise PolicyException(_("Failed to run getPolicyPost. "
+                                  "Unknown method: %s") % method)
 
     elif 'system' == controller:
         log.debug("[cehckPolicyPost] entering controller %s" % controller)
@@ -2245,17 +2683,38 @@ def checkPolicyPost(controller, method, param=None, user=None):
                               "The admin >%s< is not allowed to read system "
                               "config and has not realm administrative rights!"
                               % auth['admin'])
-                    raise PolicyException("You do not have system config read "
+                    raise PolicyException(_("You do not have system config read "
                                           "rights and not realm admin "
-                                          "policies.")
+                                          "policies."))
             ret['realms'] = res
+
+    elif 'selfservice' == controller:
+        log.debug("[checkPolicyPost] entering controller %s" % controller)
+        log.debug("[checkPolicyPost] entering method %s" % method)
+        log.debug("[checkPolicyPost] using params %s" % param)
+        serial = getParam(param, "serial", optional)
+
+        if user is None:
+            user = getUserFromParam(param, optional)
+
+        if 'enroll' == method:
+            # check if we are supposed to genereate a random OTP PIN
+            randomPINLength = getRandomOTPPINLength(user)
+            if randomPINLength > 0:
+                newpin = getRandomPin(randomPINLength)
+                log.debug("[init] setting random pin for token with serial "
+                          "%s and user: %s" % (serial, user))
+                linotp.lib.token.setPin(newpin, None, serial)
+                log.debug("[init] pin set")
+                # TODO: This random PIN could be processed and
+                # printed in a PIN letter
 
     else:
         # unknown controller
         log.error("[checkPolicyPost] an unknown constroller <<%s>> "
                   "was passed." % controller)
-        raise PolicyException("Failed to run getPolicyPost. "
-                              "Unknown controller: %s" % controller)
+        raise PolicyException(_("Failed to run getPolicyPost. "
+                              "Unknown controller: %s") % controller)
     return ret
 
 
@@ -2510,6 +2969,31 @@ def get_auth_passOnNoToken(user):
     return ret
 
 
+def trigger_sms(realms=None):
+    """
+    returns true, if a check_s should be allowed to trigger an sms
+    """
+    client = get_client()
+    user = getUserFromParam(request.params, optional)
+    login = user.login
+    if realms is None:
+        realm = user.realm or getDefaultRealm()
+        realms = [realm]
+
+    ret = False
+    for realm in realms:
+        pol = get_client_policy(client, scope="authentication",
+                                action="trigger_sms", realm=realm,
+                                user=login, userObj=user)
+
+        if len(pol) > 0:
+            log.debug("[get_auth_AutoSMSPolicy] found policy in "
+                      "realm %s" % realm)
+            ret = True
+
+    return ret
+
+
 def get_auth_AutoSMSPolicy(realms=None):
     '''
     Returns true, if the autosms policy is set in one of the realms
@@ -2587,13 +3071,14 @@ def get_auth_PinPolicy(realm=None, user=None):
     Returns the PIN policy, that defines, how the OTP PIN is to be verified
     within the given realm
 
-    return:
-        0    - verify against fixed OTP PIN
-        1    - verify the password component against the
-                      UserResolver (LPAP Password etc.)
-        2    - verify no OTP PIN at all! Only OTP value!
+    :return:
+        - 0 verify against fixed OTP PIN
+        - 1 verify the password component against the
+          UserResolver (LPAP Password etc.)
+        - 2 verify no OTP PIN at all! Only OTP value!
 
-    The policy is defined via
+    The policy is defined via::
+
         scope : authentication
         realm : ....
         action: otppin=0/1/2
@@ -2683,8 +3168,8 @@ def check_auth_tokentype(serial, exception=False, user=None):
     if len(toks) > 1:
         log.error("[check_auth_tokentype] multiple tokens with serial %s found"
                   " - cannot get OTP!" % serial)
-        raise PolicyException("multiple tokens found - "
-                              "cannot determine tokentype!")
+        raise PolicyException(_("multiple tokens found - "
+                              "cannot determine tokentype!"))
     elif len(toks) == 1:
         log.debug("[check_auth_tokentype] found one token with "
                   "serial %s" % serial)

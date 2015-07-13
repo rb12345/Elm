@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -454,10 +454,10 @@ class SQLStorage(object):
         This function sets the token of the user. This is the token,
         that is also stored in the cookie
 
-        params:
-            user -      the username
-            expire -    the time in seconds, how long this token is valid.
-                        This corresponds to the cookie lifetime.
+        :param user: the username
+
+        :param expire: the time in seconds, how long this token is valid.
+            This corresponds to the cookie lifetime.
         '''
         token = self._create_token(user)
 

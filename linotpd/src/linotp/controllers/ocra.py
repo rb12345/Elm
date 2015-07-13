@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -264,7 +264,7 @@ class OcraController(BaseController):
     def check_t(self):
         """
         method:
-            orcra/check_t
+            ocra/check_t
 
         description:
             verify the response of the ocra token
@@ -378,7 +378,7 @@ class OcraController(BaseController):
     def checkstatus(self):
         """
         method:
-            orcra/checkstatus
+            ocra/checkstatus
 
         description:
             Methode zur assynchronen Ueberpruefungen eines Challenge Response Valiadation requests
@@ -523,7 +523,7 @@ class OcraController(BaseController):
     def getActivationCode(self):
         '''
         method:
-            orcra/getActivationCode
+            ocra/getActivationCode
 
         description:
             returns an valid example activcation code

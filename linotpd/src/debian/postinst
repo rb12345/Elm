@@ -23,7 +23,51 @@ RAND_DEVICE=/dev/urandom
 FAKE_PASSWORD=This_is_not_the_real_password_we_just_do_not_want_to_be_asked_again_in_case_of_updating_the_package
 LSB_RELEASE=`which lsb_release || true`
 
-echo "postinst: $1"
+NEW_VERSION=2.8.1~0dev0-1
+
+DOING_NEW_INSTALLATION=false
+DOING_RE_INSTALLATION=false
+DOING_RECONFIGURE=false
+if [ -n "$2" ]; then
+	INSTALLED_VERSION=${2}
+	dpkg --compare-versions "${NEW_VERSION}" eq "${INSTALLED_VERSION}" && VERSION_EQUAL=true
+	dpkg --compare-versions "${NEW_VERSION}" gt "${INSTALLED_VERSION}" && VERSION_UPGRADE=true
+	dpkg --compare-versions "${NEW_VERSION}" lt "${INSTALLED_VERSION}" && VERSION_DOWNGRADE=true
+fi
+# Currently debconf's postinst script does not use the 'reconfigure' parameter
+# but instead sets DEBCONF_RECONFIGURE to 1. The recommended method for dealing
+# with this and being future proof is supporting both. See debconf-devel
+# manpage for details.
+if [ "$1" = "reconfigure" ] || [ "${DEBCONF_RECONFIGURE}" = 1 ]; then
+	DOING_RECONFIGURE=true
+elif [ "$1" = "configure" ]; then
+	if [ -n "${INSTALLED_VERSION}" ]; then
+		DOING_RE_INSTALLATION=true
+		# RE_INSTALLATION is set in 3 cases:
+		#   * Package upgrade
+		#   * Package downgrade
+		#   * 'apt-get remove' followed by 'apt-get install' at some point, even
+		#     with a different version (up or downgrade). Incidentally if the
+		#     package is removed with 'purge' then installing it again is like
+		#     a NEW_INSTALLATION.
+	else
+		DOING_NEW_INSTALLATION=true
+	fi
+fi
+
+print_timestamp() {
+    date +"%Y/%m/%d - %T"
+}
+
+# Always print to stderr, otherwise debconf can get confused
+echo `print_timestamp` "INFO [linotp postinst] Installing new package?: ${DOING_NEW_INSTALLATION}" >&2
+echo `print_timestamp` "INFO [linotp postinst] Re-installing package?: ${DOING_RE_INSTALLATION}" >&2
+echo `print_timestamp` "INFO [linotp postinst] Reconfiguring package?: ${DOING_RECONFIGURE}" >&2
+echo `print_timestamp` "INFO [linotp postinst] Currently installed version: ${INSTALLED_VERSION}" >&2
+echo `print_timestamp` "INFO [linotp postinst] New version: ${NEW_VERSION}" >&2
+echo `print_timestamp` "INFO [linotp postinst] Version equal: ${VERSION_EQUAL}" >&2
+echo `print_timestamp` "INFO [linotp postinst] Version upgrade: ${VERSION_UPGRADE}" >&2
+echo `print_timestamp` "INFO [linotp postinst] Version downgrade: ${VERSION_DOWNGRADE}" >&2
 
 ####################################################################
 #
@@ -204,14 +248,15 @@ evaluate_answers() {
 		CREATEDB=$RET
 		# As we also delete the rootpassword from the debian db, we can
 		# not create the database in successive runs.
-		db_reset linotp/mysql/ask_createdb
+		db_set linotp/mysql/ask_createdb false
 		if [ "$CREATEDB" = "true" ]; then
 			db_get linotp/mysql/ask_rootpw
 			ROOTPW=$RET
-			db_reset linotp/mysql/ask_rootpw
+			db_set linotp/mysql/ask_rootpw false
 		fi
 		db_get linotp/mysql/ask_createtables || true
 		CREATE_TABLES=$RET
+		db_set linotp/mysql/ask_createtables false
 	fi
 }
 
@@ -317,6 +362,29 @@ configure)
 			chown -R linotp $LOGDIR
 		fi
 		if ! check_apache_disabled; then
+			# Copy linotp2 VirtualHost from /etc/linotp2 to /etc/apache2 . Depending on
+			# the Apache version a different file is used.
+			APACHE2_VERSION=`dpkg -s apache2 | grep Version | cut -f2 -d' '`
+			dpkg --compare-versions ${APACHE2_VERSION} ge 2.4 && APV_RC=$? || APV_RC=$?
+			if [ ${APV_RC} == 0 ]
+			then
+				echo `print_timestamp` "INFO [linotp postinst] Using Apache 2.4 config" >&2
+				if [ ! -f /etc/apache2/sites-available/linotp2.conf ]
+				then
+					cp /etc/linotp2/apache2.4-example/linotp2.conf /etc/apache2/sites-available/
+				else
+					echo `print_timestamp` "INFO [linotp postinst] Apache linotp2.conf already present. Doing nothing." >&2
+				fi
+			else
+				echo `print_timestamp` "INFO [linotp postinst] Using Apache 2.2 config" >&2
+				if [ ! -f /etc/apache2/sites-available/linotp2 ]
+				then
+					cp /etc/linotp2/apache2.2-example/linotp2 /etc/apache2/sites-available/
+				else
+					echo `print_timestamp` "INFO [linotp postinst] Apache linotp2 already present. Doing nothing." >&2
+				fi
+			fi
+
 			a2ensite linotp2
 			a2enmod auth_digest
 			a2enmod wsgi
@@ -334,7 +402,7 @@ configure)
 		invoke-rc.d apache2 reload
 		echo "LinOTP2: done setting up apache with ssl"
 	else
-		a2dissite linotp2
+		a2dissite linotp2 || echo `print_timestamp` "WARNING [linotp postinst] Could not disable Apache linotp2 host (possibly it doesn't exist)" >&2
 	fi
 
 	########################################################################
@@ -378,6 +446,24 @@ configure)
 				echo $GRANT_STRING2 >> /etc/linotp2/linotpcreatedb.sql
 				cp /etc/rc.local /etc/rc.local.linotp-dpkg
 				echo "#!/bin/sh -e" > /etc/rc.local
+
+				# In debian jessie, a MySQL systemd service file does not exist. Therefore, we
+				# cannot ensure that the rc.local script is executed after MySQL is successfully
+				# started. That's why we poll for MySQL.
+				DEBIAN_VERSION=`cat /etc/debian_version`
+				dpkg --compare-versions ${DEBIAN_VERSION} ge 8.0 && DEB_VER_GE_8=$? || DEB_VER_GE_8=$?
+				dpkg --compare-versions ${DEBIAN_VERSION} lt 9.0 && DEB_VER_LT_9=$? || DEB_VER_LT_9=$?
+				if [ ${DEB_VER_GE_8} == 0 ] && [ ${DEB_VER_LT_9} == 0 ]; then
+					echo "while ! mysqladmin ping --host=$DBHOST --user=root --password=${ROOTPW}; do" >> /etc/rc.local
+					echo "echo \"MySQL is not running, yet. Waiting...\"" >> /etc/rc.local
+					echo "sleep 1" >> /etc/rc.local
+					echo "done" >> /etc/rc.local
+				elif [ ${DEB_VER_LT_9} != 0 ]; then
+					# We are on debian 9 or higher. Since we don't know whether we will have a systemd
+					# service file or not (or whether debian 9 will ship MySQL at all) we log a warning.
+					echo `print_timestamp` "ERROR [linotp postinst] TODO: Check MySQL and systemd on debian 9 appliance install!" >&2
+				fi
+
 				echo "mysql --host=$DBHOST --user=root --password=\"${ROOTPW}\" --execute=\"create database $DBNAME;\" || true" >> /etc/rc.local
 				echo "mysql --host=$DBHOST --user=root --password=\"${ROOTPW}\" < /etc/linotp2/linotpcreatedb.sql || true" >> /etc/rc.local
 				echo "rm /etc/linotp2/linotpcreatedb.sql" >> /etc/rc.local

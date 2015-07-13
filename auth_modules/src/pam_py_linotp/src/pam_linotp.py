@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 #   LinOTP - the open source solution for two factor authentication
-#   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #   This file is part of LinOTP authentication modules.
 #
@@ -135,13 +135,6 @@ def pam_sm_authenticate( pamh, flags, argv ):
         if debug:
             syslog.syslog( "start pam_linotp.py authentication: %s, %s" %
                                                              ( flags, argv ) )
-
-        #log_debug("got user %s", user);
-        try:
-            pwd.getpwnam( pamh.user )
-        except  KeyError:
-            return pamh.PAM_USER_UNKNOWN
-
 
         ## get the password of the user:
         ##     either from the pam handle or request this

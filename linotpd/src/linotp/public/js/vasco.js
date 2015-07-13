@@ -1,6 +1,6 @@
 /*!
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -27,17 +27,17 @@
 function create_vasco_dialog() {
      var $dialog = $('#dialog_import_vasco').dialog({
         autoOpen: false,
-        title: 'Vasco dpx file',
+        title: 'Vasco DPX File',
         width: 600,
         modal: true,
         buttons: {
-            'load dpx file': { click: function(){
+            'Load DPX File': { click: function(){
                 $('#loadtokens_session_vasco').val(getsession());
                 load_tokenfile('vasco');
                 $(this).dialog('close');
                 },
                 id: "button_vasco_load",
-                text: "load dpx file"
+                text: "Load DPX File"
                 },
             Cancel: {click: function(){
                 $(this).dialog('close');
@@ -48,6 +48,7 @@ function create_vasco_dialog() {
         },
         open: function(){
             translate_import_vasco();
+            _fill_realms($('#vasco_realm'),1);
             do_dialog_icons();
         }
        });

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -69,10 +69,15 @@ def realm2Objects(realmList):
     :return: list of realmObjects
     :rtype:  list
     '''
-
+    realm_set = set()
     realmObjList = []
     if realmList is not None:
+
+        # make the requested realms uniq
         for r in realmList:
+            realm_set.add(r)
+
+        for r in list(realm_set):
             realmObj = getRealmObject(name=r)
             if realmObj is not None:
                 log.debug("[setRealms] added realm %s to realmObjList" % realmObj)
@@ -176,6 +181,12 @@ def _initalGetRealms():
 
             ##resids          = env.config[entry]
             resids = getFromConfig(entry)
+
+            # we adjust here the *ee resolvers from the config
+            # so we only have to deal with the un-ee resolvers in the server
+            # which match the available resolver classes
+
+            resids = resids.replace("useridresolveree.", "useridresolver.")
             r["useridresolver"] = resids.split(",")
 
             Realms[theRealm] = r

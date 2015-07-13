@@ -3,7 +3,7 @@
 <!--
  *
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -30,8 +30,6 @@
 <html>
 <head>
 <title>LinOTP 2 User self service</title>
-<meta name="author" content="Cornelius Kölbel">
-<meta name="date" content="2010-07-05T23:23:25+0200">
 <meta name="copyright" content="LSE Leading Security Experts GmbH">
 <meta name="keywords" content="LinOTP 2, self service">
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
@@ -54,21 +52,18 @@ $(document).ready(function() {
 
 <div id="wrap">
 
-<div id="header">
-	<div id="logo">
-	</div>
-	
-	<div class="float_right">
-	Open Source Edition<br>
-	<span class=portalname>${_("Selfservice Portal")}</span>
-	</div>
-</div>
+    <div id="header">
+        <div class="header">
+            <span class="portalname float_left">${_("Selfservice Portal")}</span>
+        </div>
+        <div id="logo" class="float_right"> </div>
+    </div>
 
 
 <div id="sidebar">
 
 <P>
-${_("This is the LinOTP self service portal. You may login here with your username and realm.")} 
+${_("This is the LinOTP self service portal. You may login here with your username and realm.")}
 </P>
 <P>
 ${_("Within the self service portal you may reset the PINs of your tokens, assign new tokens or resync your tokens.")}
@@ -85,26 +80,34 @@ ${_("If you lost a token, you may also disable this token.")}
       <table>
         <tr><td><label for=login>${_("Username")}:</label></td>
         <td><input type="text" id="login" name="login" value="" /></td></tr>
-		%if c.realmbox:
-        	<tr>
+        %if c.realmbox:
+            <tr>
+              <td>${_("Realm")}:</td>
+              <td>
+                <select name="realm">
+                    % for realm in c.realmArray:
+                    %if c.defaultRealm == realm:
+                    <option value="${realm}" selected>${realm}</option>
+                    %else:
+                    <option value="${realm}">${realm}</option>
+                    %endif
+                    %endfor
+                </select>
+             </td>
+          </tr>
         %else:
-			<tr style="display:none;">
-		%endif
-		<td>${_("Realm")}:</td>
-        <td>
-	    <select name="realm">
-	        % for realm in c.realmArray:
-	        %if c.defaultRealm == realm:
-	        <option value="${realm}" selected>${realm}</option>
-	        %else:
-	        <option value="${realm}">${realm}</option>
-	        %endif
-	        %endfor
-        </select>
-        </td></tr>
+            <tr style="display:none;">
+              <td>${_("Realm")}:</td>
+              <td><input type="text" id="realm" name="realm"
+                  value='' /></td>
+            </tr>
+        %endif
+        <tr style="display:none;">
+            <td><input type="hidden" name="realmbox" value="${c.realmbox}"/></td>
+            <td><input type="hidden" name="defaultRealm" value="${c.defaultRealm}"/></td></tr>
         <tr><td><label for=password>${_("Password")}:</label></td>
         <td><input autocomplete="off" type="password" id="password" name="password" value ="" /></td></tr>
-        <tr><td></td>
+        <tr><td> </td>
         <td>   <input type="submit" value="Login" /></td></tr>
       </table>
     </form>
@@ -117,7 +120,7 @@ ${_("If you lost a token, you may also disable this token.")}
 </div>  <!-- end of main-->
 
 <div id="footer">
-	${c.version} --- ${c.licenseinfo}
+    ${c.version} --- &copy; ${c.licenseinfo}
 </div>
 </div>  <!-- end of wrap -->
 </body>

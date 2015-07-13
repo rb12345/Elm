@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -187,6 +187,10 @@ class Token(object):
                 value = linotp.lib.crypt.udecode(value)
             else:
                 value = ""
+        # port of the 2.6. resolver to 2.7
+        if name in ['LinOtpIdResClass']:
+            if value[:len('useridresolveree.')] == 'useridresolveree.':
+                value = "useridresolver.%s" % value[len('useridreseolveree.') - 1:]
 
         return value
 
@@ -521,6 +525,14 @@ class Token(object):
             if secretObj.compare(otpKey) == False:
                 log.debug('update token OtpKey - counter reset')
                 self.setHKey(otpKey)
+
+    # TODO: check if this needs to deal with the Elm encryption
+    def updateToken(self, tokenDesc, otpKey, pin):
+        log.debug('updateToken()')
+
+        self.setDescription(tokenDesc)
+        self._setPin(pin)
+        self.updateOtpKey(otpKey)
 
     def getRealms(self):
         return self.realms or ''

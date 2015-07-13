@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -30,7 +30,7 @@ import time
 import requests
 from requests.auth import HTTPDigestAuth
 
-from linotputils.clientutils import linotpclient
+from linotpadminclientcli.clientutils import linotpclient
 from linotp_selenium_helper import TestCase, LdapUserIdResolver, Realm
 from linotp_selenium_helper.user_view import UserView
 from linotp_selenium_helper.token_view import TokenView
@@ -125,7 +125,7 @@ gYzNiYwtvAu74Q+eTC6R5Uf0hOlFig==
         self.assertTrue(r1['result']['value'], "Error enrolling Yubikey")
 
         driver = self.driver
-        driver.get(self.base_url + "/manage/")
+        driver.get(self.base_url + "/manage")
 
         user_view = UserView(driver, self.base_url, self.realm_name)
         user_view.select_user(self.user_name)

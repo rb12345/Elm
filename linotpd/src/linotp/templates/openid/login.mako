@@ -3,7 +3,7 @@
 <!--
  *
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -34,11 +34,11 @@
       <table>
         <tr><td>Username:</td>
         %if "" != c.user:
-        	<td><input type="hidden" name="user" value="${c.user}" />
-        	${c.p["openid.claimed_id"]}
-        	</td></tr>
+            <td><input type="hidden" name="user" value="${c.user}" />
+            ${c.p["openid.claimed_id"]}
+            </td></tr>
         %else:
-        	<td><input type="text" name="user" value="" /></td></tr>
+            <td><input type="text" name="user" value="" /></td></tr>
         %endif
         <tr><td>One Time Password:</td>
         <td><input autocomplete="off" type="password" name="pass" value ="" /></td></tr>

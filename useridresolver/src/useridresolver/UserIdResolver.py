@@ -2,7 +2,7 @@
 
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP userid resolvers.
 #
@@ -25,10 +25,10 @@
 #    Support: www.lsexperts.de
 #
 """
-    This module implements the communication interface for resolvin user
-    info to the user base:
+This module implements the communication interface for resolvin user
+info to the user base:
 
-    UserIdResolver Interface class.
+UserIdResolver Interface class.
 
 Defines the rough interface for a UserId Resolver
 
@@ -41,6 +41,8 @@ Defines the rough interface for a UserId Resolver
 
 """
 
+class ResolverLoadConfigError(Exception):
+    pass
 
 class UserIdResolver(object):
 

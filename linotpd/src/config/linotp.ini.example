@@ -1,6 +1,6 @@
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -152,6 +152,16 @@ radius.nas_identifier = LinOTP
 [app:main]
 use = egg:LinOTP
 
+#service.manage = False
+#service.ocra = False
+#service.selfservice = False
+#service.validate = False
+#service.openid = False
+#linotpGetotp.active = True
+
+alembic.ini = %(here)s/alembic.ini
+#alembic.writeback = True
+#alembic.auto_update = False
 
 
 ## define location of the LinOTP Token Database
@@ -162,6 +172,7 @@ sqlalchemy.pool_recycle = 3600
 who.config_file = %(here)s/who.ini
 who.log_level = warning
 who.log_file = /var/log/linotp/linotp.log
+#who.generate_random_secret = true
 
 
 full_stack = true
@@ -186,7 +197,7 @@ custom_templates = %(here)s/custom-templates/
 ##############################################################################
 ## Logging Configuration:
 ## ----------------------
-## Note: You should change the Logging Level from DEBUG to WARN
+## Note: For more detailed log messages change the level to INFO or DEBUG
 ##
 
 
@@ -197,12 +208,12 @@ keys = root, linotp, sqlalchemy
 
 ## root module logging definition:
 [logger_root]
-level = DEBUG
+level = WARN
 handlers = file
 
 ## linotp module logging definition:
 [logger_linotp]
-level = DEBUG
+level = WARN
 handlers = file
 qualname = linotp
 
@@ -223,7 +234,7 @@ class = handlers.RotatingFileHandler
 # Make the logfiles 10 MB
 # and rotate 4  files
 args = ('/var/log/linotp/linotp.log','a', 10000000, 4)
-level = INFO
+level = WARN
 formatter = generic
 
 [formatters]

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -61,7 +61,7 @@ from pylons.templating import render_mako as render
 from webob.exc import HTTPBadRequest
 
 
-from linotp.lib.token import checkUserPass
+from linotp.lib.token import TokenHandler
 from linotp.lib.reply import sendError
 from linotp.model.meta import Session
 
@@ -522,9 +522,9 @@ class OpenidController(BaseController):
 
             c.audit['user'] = user.login
             c.audit['realm'] = user.realm or getDefaultRealm()
-
+            th = TokenHandler()
             if same_user is True:
-                (ok, opt) = checkUserPass(user, passw)
+                (ok, opt) = th.checkUserPass(user, passw)
 
             c.audit['success'] = ok
 

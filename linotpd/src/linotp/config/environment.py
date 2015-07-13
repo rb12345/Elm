@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -26,6 +26,8 @@
 """  Pylons environment configuration """
 
 import os
+from os import listdir
+
 
 from mako.lookup import TemplateLookup
 from pylons import config
@@ -47,6 +49,7 @@ import pkg_resources
 import warnings
 warnings.filterwarnings(action='ignore', category=DeprecationWarning)
 
+
 def _uniqify_list(input_list):
     """
     Returns a list containing only unique elements from input_list whilst
@@ -62,6 +65,7 @@ def _uniqify_list(input_list):
         result.append(item)
     return result
 
+
 def fxn():
     warnings.warn("deprecated", DeprecationWarning)
 
@@ -72,6 +76,7 @@ with warnings.catch_warnings():
 import logging
 
 log = logging.getLogger(__name__)
+
 
 def load_environment(global_conf, app_conf):
     """
@@ -86,30 +91,29 @@ def load_environment(global_conf, app_conf):
                  static_files=os.path.join(root, 'public'),
                  templates=[app_conf.get('custom_templates',
                                          os.path.join(root, 'templates')),
-                            os.path.join(root, 'templates') ])
+                            os.path.join(root, 'templates')])
 
     # Initialize config with the basic options
     config.init_app(global_conf, app_conf, package='linotp', paths=paths)
 
     config['linotp.root'] = root
-    config['routes.map'] = make_map()
+    config['routes.map'] = make_map(global_conf, app_conf)
     config['pylons.app_globals'] = app_globals.Globals()
     config['pylons.h'] = linotp.lib.helpers
 
-
-    ## add per token a location for the mako template lookup
-    ## @note: the location is defined in the .ini file by
-    ##  the entry [linotpTokenModules]
+    # add per token a location for the mako template lookup
+    # @note: the location is defined in the .ini file by
+    # the entry [linotpTokenModules]
 
     directories = paths['templates']
 
-    ## add a template path for every token
+    # add a template path for every token
     modules = get_token_module_list()
     for module in modules:
         mpath = os.path.dirname(module.__file__)
         directories.append(mpath)
 
-    ## add a template path for every resolver
+    # add a template path for every resolver
     modules = get_resolver_module_list()
     for module in modules:
         mpath = os.path.dirname(module.__file__)
@@ -128,7 +132,7 @@ def load_environment(global_conf, app_conf):
     # Setup the SQLAlchemy database engine
     # If we load the linotp.model here, the pylons.config is loaded with
     # the entries from the config file. if it is loaded at the top of the file,
-    #the pylons.config does not contain the config file, yet.
+    # the pylons.config does not contain the config file, yet.
     from linotp.model import init_model
     engine = engine_from_config(config, 'sqlalchemy.')
     init_model(engine)
@@ -140,7 +144,7 @@ def load_environment(global_conf, app_conf):
     audit = getAudit()
     config['audit'] = audit
 
-    ## setup Security provider definition
+    # setup Security provider definition
     try:
         log.debug('[load_environment] loading token list definition')
         g = config['pylons.app_globals']
@@ -149,7 +153,7 @@ def load_environment(global_conf, app_conf):
         log.error("Failed to load security provider definition: %r" % e)
         raise e
 
-    ## load the list of tokenclasses
+    # load the list of tokenclasses
     try:
         log.debug('[load_environment] loading token list definition')
         (tcl, tpl) = get_token_class_list()
@@ -164,12 +168,12 @@ def load_environment(global_conf, app_conf):
         log.error("Failed to load token class list: %r" % e)
         raise e
 
-    ## load the list of resolvers
+    # load the list of resolvers
     try:
         log.debug('[load_environment] loading resolver list definition')
         (rclass, rname) = get_resolver_class_list()
 
-        ## make this globaly avaliable
+        # make this globaly avaliable
         g.setResolverClasses(rclass)
         g.setResolverTypes(rname)
 
@@ -177,39 +181,20 @@ def load_environment(global_conf, app_conf):
         log.error("Faild to load the list of resolvers: %r" % exx)
         raise exx
 
-    ## get the help url
+    # get the help url
     url = config.get("linotpHelp.url", None)
-
-    ## this is a quick hack for the test setup :-(
-    ## the big one should handle the timeout when help button
-    ## is pressed
-    version = pkg_resources.get_distribution("linotp").version
-    if not(url) and 'dev' in version:
-        url = "file:///usr/share/doc/linotpdoc/html/"
-
-    if url == None:
+    if url is None:
         version = pkg_resources.get_distribution("linotp").version
-        offline_url = "file:///usr/share/doc/linotpdoc/html/"
         # First try to get the help for this specific version
         url = "http://linotp.org/doc/%s/index.html" % version
-        try:
-            ## Try to open the online url with a timeout of 5 seconds
-            ## If the system is definitively offline the request will return immediately
-            urllib2.urlopen(url, timeout=5)
-        except urllib2.HTTPError:
-            # it seems the version does not exist, we set the latest
-            url = "http://linotp.org/doc/latest/index.html"
-            log.info("the Help URL for the version %s is not available, using the latest one: %s" % (version, url))
-        except urllib2.URLError:
-            # it seems we are offline, using an offline url
-            log.warning("it seems we are offline, so using the offline url %s" % offline_url)
-            url = offline_url
     config['help_url'] = url
 
     log.debug("[load_environment] done")
-    return
+    return config
 
 #######################################
+
+
 def get_token_list():
     '''
     returns the list of the modules
@@ -218,32 +203,19 @@ def get_token_list():
     '''
     module_list = []
 
-    ## append our derfault list so this will overwrite in
-    ## the loaded classes finally
+    # append our derfault list so this will overwrite in
+    # the loaded classes finally
     module_list.append("linotp.lib.tokenclass")
 
-    fallback_tokens = "linotp.lib.tokens.hmactoken, \
-                        linotp.lib.tokens.smstoken, \
-                        linotp.lib.tokens.totptoken, \
-                        linotp.lib.tokens.motptoken, \
-                        linotp.lib.tokens.radiustoken, \
-                        linotp.lib.tokens.remotetoken, \
-                        linotp.lib.tokens.vascotoken, \
-                        linotp.lib.tokens.passwordtoken, \
-                        linotp.lib.tokens.spasstoken, \
-                        linotp.lib.tokens.tagespassworttoken, \
-                        linotp.lib.tokens.yubicotoken, \
-                        linotp.lib.tokens.yubikeytoken, \
-                        linotp.lib.tokens.ocra2token, \
-                        linotp.lib.tokens.emailtoken"
+    fallback_tokens = get_default_tokens()
 
-    config_modules = config.get("linotpTokenModules", fallback_tokens)
+    config_modules = config.get("linotpTokenModules", ",".join(fallback_tokens))
     log.debug("[get_module_list] %s " % config_modules)
     if config_modules:
-        ## in the config *.ini files we have some line continuation slashes,
-        ## which will result in ugly module names, but as they are followed by
-        ## \n they could be separated as single entries by the following two
-        ## lines
+        # in the config *.ini files we have some line continuation slashes,
+        # which will result in ugly module names, but as they are followed by
+        # \n they could be separated as single entries by the following two
+        # lines
         lines = config_modules.splitlines()
         coco = ",".join(lines)
         for module in coco.split(','):
@@ -253,6 +225,26 @@ def get_token_list():
     return module_list
 
 
+def get_default_tokens():
+    """
+    get the list of the linotp default tokens from linotp.lib.tokens
+
+    :return: array of all token module names like
+             ["linotp.lib.tokens.smstoken", ..]
+    """
+    token_modules = []
+
+    import linotp.lib.tokens
+    module_loaction = linotp.lib.tokens.__file__
+    idx = module_loaction.rfind(os.sep)
+    base_dir = module_loaction[:idx]
+
+    for file_name in listdir(base_dir):
+        if file_name[-3:] == '.py' and file_name != '__init__.py':
+            token_modules.append("linotp.lib.tokens.%s" % file_name[:-3])
+
+    return token_modules
+
 def get_token_module_list():
     '''
     return the list of the available token classes like hmac, spass, totp
@@ -260,7 +252,7 @@ def get_token_module_list():
     :return: list of token modules
     '''
 
-    ## def load_token_modules
+    # def load_token_modules
     module_list = get_token_list()
     log.debug("[get_token_class_list] using the module list: %s" % module_list)
 
@@ -269,27 +261,24 @@ def get_token_module_list():
         if mod_name == '\\' or len(mod_name.strip()) == 0:
             continue
 
-        ## load all token class implementations
-        if sys.modules.has_key(mod_name):
-            module = sys.modules[mod_name]
-            log.debug('module %s loaded' % (mod_name))
-        else:
+        # load all token modules if not already loaded
+        if mod_name not in sys.modules:
             try:
-                ## module = imp.load_module(mod_name,
-                ##                            *imp.find_module(mod_name,pp))
-                log.debug("[get_token_class_list] import module: %s" % mod_name)
-                exec("import %s" % mod_name)
-                module = eval(mod_name)
-
+                log.debug("import module: %s" % mod_name)
+                __import__(mod_name)
             except Exception as exx:
                 module = None
                 log.debug('unable to load token module : %r (%r)'
-                                                            % (mod_name, exx))
+                          % (mod_name, exx))
                 raise Exception('unable to load token module : %r (%r)'
-                                                            % (mod_name, exx))
+                                % (mod_name, exx))
 
+        module = sys.modules[mod_name]
         if module is not None:
             modules.append(module)
+            log.debug('module %s loaded' % (mod_name))
+        else:
+            log.error('module %s failed to load!' % (mod_name))
 
     return modules
 
@@ -304,7 +293,7 @@ def get_token_class_list():
     '''
     modules = get_token_module_list()
 
-    ## load_token_classes
+    # load_token_classes
     tokenclass_dict = {}
     tokenprefix_dict = {}
 
@@ -337,6 +326,8 @@ def get_token_class_list():
     return (tokenclass_dict, tokenprefix_dict)
 
 ###############################################################################
+
+
 def get_resolver_list():
     '''
     get the list of the resolvers
@@ -349,14 +340,15 @@ def get_resolver_list():
     module_list.add("useridresolver.SQLIdResolver")
     # Load the Oak ID resolver.
     module_list.add("useridresolver.OakIdResolver")
+    module_list.add("useridresolver.HTTPIdResolver")
 
     config_modules = config.get("linotpResolverModules", '')
     log.debug("[get_resolver_module_list] %s " % config_modules)
     if config_modules:
-        ## in the config *.ini files we have some line continuation slashes,
-        ## which will result in ugly module names, but as they are followed by
-        ## \n they could be separated as single entries by the following two
-        ## lines
+        # in the config *.ini files we have some line continuation slashes,
+        # which will result in ugly module names, but as they are followed by
+        # \n they could be separated as single entries by the following two
+        # lines
         lines = config_modules.splitlines()
         coco = ",".join(lines)
         for module in coco.split(','):
@@ -373,36 +365,34 @@ def get_resolver_module_list():
     :return: list of resolver modules
     '''
 
-    ## def load_resolver_modules
+    # def load_resolver_modules
     module_list = get_resolver_list()
-    log.debug("[get_resolver_module_list] using the module list: %s" % module_list)
+    log.debug("using the module list: %s" % module_list)
 
     modules = []
     for mod_name in module_list:
         if mod_name == '\\' or len(mod_name.strip()) == 0:
             continue
 
-        ## load all token class implementations
-        if sys.modules.has_key(mod_name):
-            module = sys.modules[mod_name]
-            log.debug('module %s loaded' % (mod_name))
-        else:
+        # load all resolver class implementations, if not already loaded
+        if mod_name not in sys.modules:
             try:
-                ## module = imp.load_module(mod_name,
-                ##                            *imp.find_module(mod_name,pp))
-                log.debug("[get_token_class_list] import module: %s" % mod_name)
-                exec("import %s" % mod_name)
-                module = eval(mod_name)
-
+                log.debug("import module: %s" % mod_name)
+                __import__(mod_name)
             except Exception as exx:
                 module = None
-                log.warning('unable to load token module : %r (%r)'
-                           % (mod_name, exx))
+                log.warning('unable to load resolver module : %r (%r)'
+                            % (mod_name, exx))
 
+        module = sys.modules[mod_name]
         if module is not None:
             modules.append(module)
+            log.debug('module %s loaded' % (mod_name))
+        else:
+            log.error('module %s failed to load!' % (mod_name))
 
     return modules
+
 
 def get_resolver_class_list():
     '''
@@ -422,7 +412,7 @@ def get_resolver_class_list():
                     rtyp = repr(obj)
                     # check if this is a resolver class
                     if (issubclass(obj, UserIdResolver) and
-                        base_class_repr not in rtyp):
+                            base_class_repr not in rtyp):
                         # we index the resolver object under:
                         # useridresolver.PasswdIdResolver.IdResolver
                         # in the token.db the resolver refer to:
@@ -446,4 +436,3 @@ def get_resolver_class_list():
     return (resolverclass_dict, resolverprefix_dict)
 
 ###eof#########################################################################
-

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -253,7 +253,7 @@ class Ocra2TokenClass(TokenClass):
 
         }
 
-        if key is not None and res.has_key(key):
+        if key and key in res:
             ret = res.get(key)
         else:
             if ret == 'all':
@@ -891,6 +891,17 @@ class Ocra2TokenClass(TokenClass):
         (res, pin, otpval) = self.splitPinPass(passw)
         res = self.checkPin(pin)
 
+        if res == False:
+            if 'transactionid' in options or 'state' in options:
+                transactionid = options.get('state', options.get('transactionid'))
+                for challenge in challenges:
+                    transid = challenge.get('transid', None)
+                    if transid == transactionid:
+                        res = True
+                        pin = None
+                        otpval = passw
+                        break
+
         if res == True:
             window = self.getCounterWindow()
             counter = self.getOtpCount()
@@ -1431,13 +1442,29 @@ class Ocra2TokenClass(TokenClass):
         response_detail = {}
 
         info = self.getInfo()
+        # add : app_import, serial and sharedsecret
         response_detail.update(info)
 
+        otpkey = None
+        if 'otpkey' in info:
+            otpkey = info.get('otpkey')
+
+        if otpkey != None:
+            response_detail["otpkey"] = {
+                        "order"      : '1',
+                        "description": _("OTP seed"),
+                        "value"      :  "seed://%s" % otpkey,
+                        "img"        :  create_img(otpkey, width=200),
+                        }
+
         ocra_url = info.get('app_import')
+
         response_detail["ocraurl"] = {
-               "description" : _("URL for OCRA token"),
-               "value" : ocra_url,
-               "img"   : create_img(ocra_url, width=250)}
+                    "order"      : '0',
+                    "description" : _("URL for OCRA2 token"),
+                    "value" : ocra_url,
+                    "img"   : create_img(ocra_url, width=250)
+                    }
 
         return response_detail
 

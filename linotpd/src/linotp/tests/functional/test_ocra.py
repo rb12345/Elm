@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -32,6 +32,7 @@
 import logging
 import binascii
 import random
+import traceback
 
 from linotp.lib.ext.pbkdf2 import PBKDF2
 
@@ -334,9 +335,17 @@ class OcraTest(TestController):
 
     def setUp(self):
         TestController.setUp(self)
+        self.set_config_selftest()
+        self.__createResolvers__()
+        self.__createRealms__()
         self.removeTokens()
         self.setupPolicies()
         self.setupOcraPolicy()
+
+    def tearDown(self):
+        self.__deleteAllRealms__()
+        self.__deleteAllResolvers__()
+        TestController.tearDown(self)
 
     def setupOcraPolicy(self):
         '''
@@ -489,19 +498,13 @@ class OcraTest(TestController):
         return
 
     def randOTP(self, otp):
-        ''' randomly change the chars in an otp - to gen a wron otp '''
+        ''' randomly change the chars in an otp - to gen a wrong otp '''
         rotp = otp
-        lenotp = len(unicode(otp))
-        if lenotp > 1:
-            while rotp == otp:
-                for i in range(0, 3):
-                    idx1 = random.randint(0, lenotp - 1)
-                    idx2 = random.randint(0, lenotp - 1)
-                    if idx1 != idx2:
-                        c1 = rotp[idx1]
-                        c2 = rotp[idx2]
-                        rotp = rotp[:idx1] + c2 + rotp[idx1 + 1:]
-                        rotp = rotp[:idx2] + c1 + rotp[idx2 + 1:]
+        text = list(otp)
+        while rotp == otp:
+            random.shuffle(text)
+            rotp = ''.join(text)
+
         return rotp
 
     def init_0_QR_Token(self, tokentype='ocra', ocrapin='', pin='pin', user='root', description='QRTestToken',
@@ -3040,7 +3043,7 @@ This is a very long message text, which should be used as the data for the chall
 
         for i in range(1, 3):
             (response, challenge, transid) = self.get_challenge(ocra.serial)
-            otp = ocra.callcOtp(challenge , counter=counter)
+            otp = ocra.callcOtp(challenge, counter=counter)
             counter += 1
 
             response = self.check_otp(transid, otp)
@@ -3049,8 +3052,6 @@ This is a very long message text, which should be used as the data for the chall
         self.removeTokens(serial=ocra.serial)
 
         return
-
-
 
     def test_QR_rollout_w_2_retries(self):
         '''
@@ -3118,10 +3119,10 @@ This is a very long message text, which should be used as the data for the chall
         wrongactivationkey = self.randOTP(activationkey)
 
         (response2, activationkey) = self.init_1_QR_Token(user='root', message='TestTTT', activationkey=wrongactivationkey)
-        print "response2:" , response2
         assert '"status": false' in response2
-        assert '"message": "Non-base32 digit found",' or 'activation code checksum error' in response2
-
+        stat = ('Non-base32 digit found' in response2 or
+                'activation code checksum error' in response2)
+        self.assertTrue(stat, response2)
 
         activationkey = createActivationCode()
         (response2, activationkey) = self.init_1_QR_Token(user='root', message='TestTTT', activationkey=activationkey)

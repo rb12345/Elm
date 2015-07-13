@@ -1,14 +1,34 @@
 # -*- coding: utf-8 -*-
+#
+#    LinOTP - the open source solution for two factor authentication
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
+#
+#    This file is part of LinOTP server.
+#
+#    This program is free software: you can redistribute it and/or
+#    modify it under the terms of the GNU Affero General Public
+#    License, version 3, as published by the Free Software Foundation.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the
+#               GNU Affero General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+#    E-mail: linotp@lsexperts.de
+#    Contact: www.linotp.org
+#    Support: www.lsexperts.de
+#
 
 import logging
 import unittest
 import binascii
 from mock import MagicMock, patch
 from Crypto.Cipher import AES
-
-from linotp.lib.tokens.yubikeytoken import YubikeyTokenClass
-import linotp.lib.crypt
-import linotp.model
 
 
 def _aes_decrypt_constructor(hex_key):
@@ -36,6 +56,8 @@ class YubikeyTokenClassTestCase(unittest.TestCase):
     requiring an installed server.
     """
     def setUp(self):
+        from linotp.lib.tokens.yubikeytoken import YubikeyTokenClass
+        import linotp.lib.crypt
         # Without this logging in the tested class fails
         logging.basicConfig()
 
@@ -161,6 +183,7 @@ class YubikeyTokenClassTestCase(unittest.TestCase):
         """
         Verify the simple classmethods getClassType and getClassPrefix
         """
+        from linotp.lib.tokens.yubikeytoken import YubikeyTokenClass
         self.assertEqual(YubikeyTokenClass.getClassType(), "yubikey")
         self.assertEqual(YubikeyTokenClass.getClassPrefix(), "UBAM")
 
@@ -168,6 +191,7 @@ class YubikeyTokenClassTestCase(unittest.TestCase):
         """
         Test the classmethod getClassInfo
         """
+        from linotp.lib.tokens.yubikeytoken import YubikeyTokenClass
         full_class_info = {
             'selfservice': {},
             'description': 'Yubico token to run the AES OTP mode.',

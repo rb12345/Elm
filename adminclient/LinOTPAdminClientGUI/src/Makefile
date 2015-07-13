@@ -75,11 +75,10 @@ ppa-preprocess:
 	rm -f ../*.dsc
 	rm -f ../*.changes
 	rm -f ../*.upload
-	DEBEMAIL="LSE LinOTP2 Packaging <linotp2@lsexperts.de>" dch -i
 	rm -f ../linotp-adminclient-gui_*_source.changes
 	debuild -S
 
-ppa-dev:
-	make ppa-preprocess
-	dput ppa:linotp/unstable ../linotp-adminclient-gui*_source.changes
-
+wine:
+	mkdir -p ../build
+	wine c:\\python26\\python setup.py bdist --format=wininst
+	mv dist/LinOTPAdminClientGUI*.win32.exe ../build/

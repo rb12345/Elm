@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -23,9 +23,9 @@
 #    Contact: www.linotp.org
 #    Support: www.lsexperts.de
 #
-""" the security provider is a dynamic handler for the security
-    relevant tasks like
-       random, crypt, decrypt, sign
+"""
+The security provider is a dynamic handler for security relevant tasks like
+random, crypt, decrypt, sign
 """
 
 import thread

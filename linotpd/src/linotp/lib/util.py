@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -25,31 +25,32 @@
 #
 """ contains utility functions """
 
-from linotp.lib.error import ParameterError
-from linotp.lib.config import getFromConfig
+import binascii
+import string
+import re
+import netaddr
+import time
 
 from pylons import request
 from pylons import config
 from pylons.controllers.util import abort
 
-import binascii
-import os
-import time
+from linotp.lib.crypt import (urandom,
+                              geturandom
+                              )
 
-import string
-from linotp.lib.crypt import urandom
-from linotp.lib.crypt import geturandom
+from linotp.lib.selftest import isSelfTest
+from linotp.lib.error import ParameterError
+from linotp.lib.config import getFromConfig
 
-import pkg_resources
-
+from linotp import (__version__ as linotp_version,
+                    __copyright__ as linotp_copyright,
+                    __product__ as linotp_product,
+                    )
+SESSION_KEY_LENGTH = 32
 
 import logging
 log = logging.getLogger(__name__)
-from linotp.lib.selftest import isSelfTest
-from netaddr import IPAddress, IPNetwork
-import re
-
-SESSION_KEY_LENGTH = 32
 
 optional = True
 required = False
@@ -58,20 +59,19 @@ def get_version_number():
     '''
     returns the linotp version
     '''
-    return pkg_resources.get_distribution("linotp").version
+    return linotp_version
 
 def get_version():
     '''
     This returns the version, that is displayed in the WebUI and self service portal.
     '''
-    version = get_version_number()
-    return "LinOTP %s" % version
+    return "%s %s" % (linotp_product, linotp_version)
 
 def get_copyright_info():
     '''
     This returns the copyright information displayed in the WebUI and selfservice portal.
     '''
-    return "(c) 2010-2014 LSE Leading Security Experts GmbH"
+    return linotp_copyright
 
 def getParam(param, which, optional=True):
     """
@@ -133,8 +133,10 @@ def generate_otpkey(key_size=20):
     return binascii.hexlify(geturandom(key_size))
 
 
-def generate_password(size=6, characters=string.ascii_lowercase + string.ascii_uppercase + string.digits):
-    return ''.join(urandom.choice(characters) for x in range(size))
+def generate_password(size=6, characters=None):
+    if not characters:
+        characters = string.ascii_lowercase + string.ascii_uppercase + string.digits
+    return ''.join(urandom.choice(characters) for _x in range(size))
 
 def check_session():
     '''
@@ -145,14 +147,18 @@ def check_session():
         return
 
     # check if the client is in the allowed IP range
-    no_session_clients = [c.strip() for c in config.get("linotpNoSessionCheck", "").split(",")]
+    no_session_clients = []
+    for no_session_client in config.get("linotpNoSessionCheck", "").split(","):
+        no_session_clients.append(no_session_client.strip())
+
     client = request.environ.get('REMOTE_ADDR', None)
-    log.debug("[check_session] checking %s in %s" % (client, no_session_clients))
+    log.debug("[check_session] checking %s in %s"
+              % (client, no_session_clients))
     for network in no_session_clients:
         if not network:
             continue
         try:
-            if IPAddress(client) in IPNetwork(network):
+            if netaddr.IPAddress(client) in netaddr.IPNetwork(network):
                 log.debug("[check_session] skipping session check since client %s in allowed: %s" % (client, no_session_clients))
                 return
         except Exception as ex:
@@ -171,7 +177,7 @@ def check_session():
             abort(401, "You have no valid session!")
             pass
 
-def check_selfservice_session():
+def check_selfservice_session(url, path, cookies, params):
     '''
     This function checks the session cookie for the
     selfservcice session
@@ -182,7 +188,7 @@ def check_selfservice_session():
     log.debug(request.path.lower())
     # All functions starting with /selfservice/user are data functions and protected
     # by the session key
-    if request.path.lower()[:17] != "/selfservice/user":
+    if path.lower()[:17] != "/selfservice/user":
         log.debug('[check_selfservice_session] nothing to check')
     else:
         # Check the WebAuth token instead of LinOTP internal auth.
@@ -221,8 +227,52 @@ def get_client_from_request():
     This is the very HTTP client, that contacts the LinOTP server.
     '''
     client = request.environ.get('REMOTE_ADDR', None)
+
+    x_forwarded_for = config.get('client.X_FORWARDED_FOR', '')
+    if x_forwarded_for.lower().strip() == 'true':
+        # check, if the request passed by a qualified proxy
+        remote_addr = request.environ.get('REMOTE_ADDR', None)
+        x_forwarded_proxy = config.get('client.FORWARDED_PROXY', None)
+        if x_forwarded_proxy and x_forwarded_proxy == remote_addr:
+            ref_clients = request.environ.get('HTTP_X_FORWARDED_FOR', '')
+            for ref_client in ref_clients.split(','):
+                # the first ip in the list is the originator
+                client = ref_client.strip()
+                break
+
+    """
+    "Forwarded" Header
+
+    In 2014 RFC 7239 standardized a new Forwarded header with similar purpose
+    but more features compared to XFF.[28] An example of a Forwarded header
+    syntax:
+
+    Forwarded: for=192.0.2.60; proto=http; by=203.0.113.43
+    """
+    forwarded = config.get('client.FORWARDED', '')
+    if forwarded.lower().strip() == 'true':
+        # check, if the request passed by a qaulified proxy
+        remote_addr = request.environ.get('REMOTE_ADDR', None)
+        forwarded_proxy = config.get('client.FORWARDED_PROXY', None)
+        if forwarded_proxy and forwarded_proxy == remote_addr:
+            # example is:
+            # "Forwarded: for=192.0.2.43, for=198.51.100.17"
+            entries = request.environ.get('HTTP_FORWARDED', '')
+            forwarded_dict = {}
+            entries = entries.replace("Forwarded:", "")
+            for entry in entries.split(';'):
+                key, value = entry.split('=', 1)
+                forwarded_dict[key.strip().lower()] = value.strip()
+            if 'for' in forwarded_dict:
+                client = forwarded_dict.get('for')
+                # support for multiple 'for' format
+                # but we only take the first client
+                if 'for' in client and ',' in client:
+                    client = client.split(',', 1)[0]
+
     log.debug("[get_client_from_request] got the client %s" % client)
     return client
+
 
 def get_client_from_param():
     '''
@@ -268,7 +318,7 @@ def normalize_activation_code(activationcode, upper=True, convert_o=True, conver
     This normalizes the activation code.
     1. lower letters are capitaliezed
     2. Oh's in the last two characters are turned to zeros
-    3. zeros in in the first-2 characters are turned to Ohs
+    3. zeros before the last 2 characters are turned to Ohs
     '''
     if upper:
         activationcode = activationcode.upper()
@@ -296,14 +346,13 @@ def is_valid_fqdn(hostname, split_port=False):
 
 def remove_empty_lines(doc):
     '''
-        remove empty lines from the input document
+    remove empty lines from the input document
 
-        @param doc: documemt containing long multiline text
-        @type  doc: string
+    :param doc: documemt containing long multiline text
+    :type  doc: string
 
-        @return: data without empty lines
-        @rtype:  string
-
+    :return: data without empty lines
+    :rtype:  string
     '''
     data = '\n'.join([line for line in doc.split('\n') if line.strip() != ''])
     return data
@@ -340,3 +389,34 @@ def checksum(msg):
             if n != 0:
                 crc = crc ^ 0x8408
     return crc
+
+
+def str2unicode(input_str):
+    """
+    convert as binary string into a unicode string
+    :param input_str: input binary string
+    :return: unicode output
+    """
+    output_str = input_str
+    conversions = [{}, {'encoding':'utf-8'}]
+    for param in conversions:
+        try:
+            output_str = unicode(output_str, **param)
+            break
+        except UnicodeDecodeError as exx:
+            if param == conversions[-1]:
+                log.info('no unicode conversion found for %r' % input_str)
+                raise exx
+
+    return output_str
+
+
+def unicode_compare(x, y):
+    """
+    locale and unicode aware comparison operator - for usage in sorted()
+
+    :param x: left value
+    :param y: right value
+    :return: the locale aware comparison result
+    """
+    return cmp(str2unicode(x), str2unicode(y))

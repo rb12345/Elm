@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -78,10 +78,8 @@ from linotp.model       import OcraChallenge
 
 from linotp.model.meta  import Session
 from linotp.lib.reply   import create_img
-from linotp.lib.apps    import create_google_authenticator_url
-from linotp.lib.apps    import create_oathtoken_url
 
-from linotp.lib.validate import check_pin
+from linotp.lib.validate import check_pin, is_same_transaction
 from linotp.lib.validate import check_otp
 from linotp.lib.validate import split_pin_otp
 
@@ -420,7 +418,7 @@ class TokenClass(object):
         ## check if the transactionid is in the list of challenges
         if transid is not None:
             for challenge in challenges:
-                if challenge.getTransactionId() == transid:
+                if is_same_transaction(challenge, transid):
                     matching = challenge
                     break
             if matching is not None:
@@ -501,8 +499,6 @@ class TokenClass(object):
         Session.commit()
         return
 
-
-
     def update(self, param, reset_failcount=True):
 
         tdesc = getParam(param, "description", optional)
@@ -554,8 +550,8 @@ class TokenClass(object):
                 storeHashed = False
             self.token.setPin(pin, storeHashed)
 
-        otplen = getParam(param, 'otplen', optional)
-        if otplen is not None:
+        otplen = param.get('otplen', None)
+        if otplen:
             self.setOtpLen(otplen)
 
         self.resetTokenInfo()
@@ -604,6 +600,12 @@ class TokenClass(object):
     def getUser(self):
         uidResolver = self.token.LinOtpIdResolver or ''
         uidResolverClass = self.token.LinOtpIdResClass or ''
+
+        # we adjust the token-resolver-class-info to match
+        # to the available un-ee resolvers, which makes the live
+        # alot easier
+        if 'useridresolveree.' in uidResolverClass:
+            uidResolverClass = uidResolverClass.replace('useridresolveree.', 'useridresolver.')
         uuserid = self.token.LinOtpUserid or ''
         return (uuserid, uidResolver, uidResolverClass)
 
@@ -806,6 +808,12 @@ class TokenClass(object):
         if key in info:
             ret = info.get(key)
         return ret
+
+    def removeFromTokenInfo(self, key):
+        info = self.getTokenInfo()
+        if key in info:
+            del info[key]
+            self.setTokenInfo(info)
 
     # FIXME: we could store the
     #   count_auth_success_max
@@ -1018,7 +1026,7 @@ class TokenClass(object):
         return self.token.LinOtpCount
 
 
-    def check_otp_exist(self, otp, window=None):
+    def check_otp_exist(self, otp, window=None, user=None, autoassign=False):
         '''
         checks if the given OTP value is/are values of this very token.
         This is used to autoassign and to determine the serial number of
@@ -1126,33 +1134,11 @@ class TokenClass(object):
 
         if otpkey != None:
             response_detail["otpkey"] = {
+                  "order"      : '1',
                   "description": _("OTP seed"),
                   "value"      :  "seed://%s" % otpkey,
                   "img"        :  create_img(otpkey, width=200),
                      }
-            if user is not None:
-                try:
-
-                    goo_url = create_google_authenticator_url(user.login,
-                                                  user.realm, otpkey,
-                                                  tok_type.lower(),
-                                                  serial=self.getSerial())
-                    response_detail["googleurl"] = {
-                          "description": _("URL for google Authenticator"),
-                          "value" :     goo_url,
-                          "img"   :     create_img(goo_url, width=250)
-                          }
-
-                    oath_url = create_oathtoken_url(user.login, user.realm,
-                                                    otpkey, tok_type,
-                                                    serial=self.getSerial())
-                    response_detail["oathurl"] = {
-                          "description" : _("URL for OATH token"),
-                           "value" : oath_url,
-                           "img"   : create_img(oath_url, width=250)
-                           }
-                except Exception as ex:
-                    log.info('failed to set oath or google url: %r' % ex)
 
         return response_detail
 
@@ -1175,7 +1161,7 @@ class TokenClass(object):
 
 
 class OcraTokenClass(TokenClass):
-    '''
+    """
     OcraTokenClass  implement an ocra compliant token
 
     used from Config
@@ -1185,49 +1171,46 @@ class OcraTokenClass(TokenClass):
         QrOcraDefaultSuite        - if none :'OCRA-1:HOTP-SHA256-8:C-QA64'
 
 
-    algorithm Ocra Token Rollout: tow phases of rollout
+    algorithm Ocra Token Rollout: two phases of rollout::
 
-    1. https://linotpserver/admin/init?
-        type=ocra&
-        genkey=1&
-        sharedsecret=1&
-        user=BENUTZERNAME&
-        session=SESSIONKEY
+        1. https://linotpserver/admin/init?
+            type=ocra&
+            genkey=1&
+            sharedsecret=1&
+            user=BENUTZERNAME&
+            session=SESSIONKEY
 
-        =>> "serial" : SERIENNUMMER, "sharedsecret" : DATAOBJECT, "app_import" : IMPORTURL
-        - genSharedSecret - vom HSM oder urandom ?
-        - app_import : + linotp://
-                       + ocrasuite ->> default aus dem config: (DefaultOcraSuite)
-                       + sharedsecret (Länge wie ???)
-                       + seriennummer
-        - seriennummer: uuid
-        - token wird angelegt ist aber nicht aktiv!!! (counter == 0)
-
-
-    2. https://linotpserver/admin/init?
-        type=ocra&
-        genkey=1&
-        activationcode=AKTIVIERUNGSCODE&
-        user=BENUTZERNAME&
-        message=MESSAGE&
-        session=SESSIONKEY
-
-        =>> "serial" : SERIENNUMMER, "nonce" : DATAOBJECT, "transactionid" : "TRANSAKTIONSID, "app_import" : IMPORTURL
-
-        - nonce - von HSM oder random ?
-        - pkcs5 - kdf2
-        - es darf zur einer Zeit nur eine QR Token inaktiv (== im Ausrollzustand) sein !!!!!
-          der Token wird über den User gefunden
-        - seed = pdkdf2(nonce + activcode + shared secret)
-        - challenge generiern - von urandom oder HSM
-
-    3. check_t
-        - counter ist > nach der ersten Transaktion
-        - if counter >= 1: delete sharedsecret löschen
+            =>> "serial" : SERIENNUMMER, "sharedsecret" : DATAOBJECT, "app_import" : IMPORTURL
+            - genSharedSecret - vom HSM oder urandom ?
+            - app_import : + linotp://
+                        + ocrasuite ->> default aus dem config: (DefaultOcraSuite)
+                        + sharedsecret (Länge wie ???)
+                        + seriennummer
+            - seriennummer: uuid
+            - token wird angelegt ist aber nicht aktiv!!! (counter == 0)
 
 
-    '''
+        2. https://linotpserver/admin/init?
+            type=ocra&
+            genkey=1&
+            activationcode=AKTIVIERUNGSCODE&
+            user=BENUTZERNAME&
+            message=MESSAGE&
+            session=SESSIONKEY
 
+            =>> "serial" : SERIENNUMMER, "nonce" : DATAOBJECT, "transactionid" : "TRANSAKTIONSID, "app_import" : IMPORTURL
+
+            - nonce - von HSM oder random ?
+            - pkcs5 - kdf2
+            - es darf zur einer Zeit nur eine QR Token inaktiv (== im Ausrollzustand) sein !!!!!
+            der Token wird über den User gefunden
+            - seed = pdkdf2(nonce + activcode + shared secret)
+            - challenge generiern - von urandom oder HSM
+
+        3. check_t
+            - counter ist > nach der ersten Transaktion
+            - if counter >= 1: delete sharedsecret löschen
+    """
 
 
     @classmethod
@@ -2411,19 +2394,29 @@ class OcraTokenClass(TokenClass):
         response_detail = {}
 
         info = self.getInfo()
+        # add : app_import, serial and sharedsecret
         response_detail.update(info)
 
         otpkey = None
         if 'otpkey' in info:
             otpkey = info.get('otpkey')
-        response_detail["otpkey"] = otpkey
+
+        if otpkey != None:
+            response_detail["otpkey"] = {
+                        "order"      : '1',
+                        "description": _("OTP seed"),
+                        "value"      :  "seed://%s" % otpkey,
+                        "img"        :  create_img(otpkey, width=200),
+                        }
 
         ocra_url = info.get('app_import')
+
         response_detail["ocraurl"] = {
-               "description": _("URL for OCRA token"),
-               "value": ocra_url,
-                "img": create_img(ocra_url, width=250),
-               }
+                    "order"      : '0',
+                    "description": _("URL for OCRA token"),
+                    "value": ocra_url,
+                    "img": create_img(ocra_url, width=250),
+                   }
 
         return response_detail
 

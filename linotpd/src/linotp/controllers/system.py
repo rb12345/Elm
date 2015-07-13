@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -35,6 +35,8 @@ except ImportError:
 import re
 import webob
 import binascii
+
+from useridresolver.UserIdResolver import ResolverLoadConfigError
 
 from linotp.lib.selftest import isSelfTest
 from pylons import request, response, config, tmpl_context as c
@@ -595,6 +597,13 @@ class SystemController(BaseController):
             Session.commit()
             return sendResult(response, res, 1)
 
+        except ResolverLoadConfigError as exx:
+            log.error("Failed to load resolver definition %r \n %r"
+                      % (exx, param))
+            log.error("[setResolver] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, exx)
+
         except Exception as exx:
             log.error("[setResolver] error saving config: %r" % exx)
             log.error("[setResolver] %s" % traceback.format_exc())
@@ -886,7 +895,8 @@ class SystemController(BaseController):
                 (res, realm_resolver) = checkResolverType(resolver)
                 if res == False:
                     raise Exception("unknown resolver %r  or invalid resolver "
-                                    "class specification " % resolver)
+                                    "class specification: %r "
+                                    % (resolver, realm_resolver))
                 realm_resolvers.append(realm_resolver)
 
             resolvers = ",".join(realm_resolvers)
@@ -1026,9 +1036,10 @@ class SystemController(BaseController):
 
             # check that the name does not contain a .
             if not re.match('^[a-zA-Z0-9_]*$', name):
-                raise Exception (_("The name of the policy may only contain the characters a-zA-Z0-9_"))
+                raise Exception(_("The name of the policy may only contain "
+                                   "the characters a-zA-Z0-9_"))
             if not name:
-                raise Exception (_("The name of the policy must not be empty"))
+                raise Exception(_("The name of the policy must not be empty"))
 
             action = getParam(param, "action", required)
             scope = getParam(param, "scope", required)
@@ -1036,21 +1047,26 @@ class SystemController(BaseController):
             user = getParam(param, "user", optional)
             time = getParam(param, "time", optional)
             client = getParam(param, "client", optional)
-            active = getParam(param, "active", optional)
+            active = param.get("active", 'True')
 
-            p_param = { 'name': name,
-                      'action' : action,
-                      'scope' : scope,
-                      'realm' : realm,
-                      'user' : user,
-                      'time' : time,
+            p_param = {'name': name,
+                      'action': action,
+                      'scope': scope,
+                      'realm': realm,
+                      'user': user,
+                      'time': time,
                       'client': client,
-                      'active' : active}
+                      'active': active
+                      }
+
+            enforce = param.get('enforce', 'False')
+            if enforce.lower() == 'true':
+                enforce = True
+                p_param['enforce'] = enforce
 
             c.audit['action_detail'] = unicode(param)
 
             if len(name) > 0 and len(action) > 0:
-
                 log.debug("[setPolicy] saving policy %r" % p_param)
                 ret = setPolicy(p_param)
                 log.debug("[setPolicy] policy %s successfully saved." % name)
@@ -1403,6 +1419,8 @@ class SystemController(BaseController):
         arguments:
             * realm - (optional) will return all policies in the given realm
             * name  - (optional) will only return the policy with the given name
+            * action  (optional) will only return the policy with the given action
+            * user    (optional) will only return the policy for this user
             * scope - (optional) will only return the policies within the given scope
             * export - (optional) The filename needs to be specified as the third part of the URL like /system/getPolicy/policy.cfg. It
                     will then be exported to this file.
@@ -1424,11 +1442,17 @@ class SystemController(BaseController):
         export = None
 
         # config settings from here
-
+        action = None
+        user = None
         try:
             name = getParam(param, "name", optional)
             realm = getParam(param, "realm", optional)
             scope = getParam(param, "scope", optional)
+            if 'action' in param:
+                action = param.get('action') or None
+            if 'user' in param:
+                user = param.get('user') or None
+
             display_inactive = getParam(param, "display_inactive", optional)
             if display_inactive:
                 display_inactive = True
@@ -1441,10 +1465,30 @@ class SystemController(BaseController):
             pol = {}
             if name != None:
                 for nam in name.split(','):
-                    poli = getPolicy({'name':nam, 'realm':realm, 'scope': scope}, display_inactive=display_inactive)
+                    search_param = {'name':nam, 'realm':realm, 'scope': scope}
+                    if action:
+                        search_param['action'] = action
+                    poli = getPolicy(search_param, display_inactive=display_inactive)
                     pol.update(poli)
             else:
-                pol = getPolicy({'name':name, 'realm':realm, 'scope': scope}, display_inactive=display_inactive)
+                search_param = {'name':name, 'realm':realm, 'scope': scope}
+                if action:
+                    search_param['action'] = action
+                pol = getPolicy(search_param, display_inactive=display_inactive)
+
+            # due to bug in getPolicy we have to post check if user is in policy!
+            if user:
+                rpol = {}
+                for p_name, policy in pol.items():
+                    if policy['user'] == None:
+                        rpol[p_name] = policy
+                    else:
+                        users = policy['user'].split(',')
+                        for use in users:
+                            if use.strip() == user.strip() or use.strip() == '*':
+                                rpol[p_name] = policy
+                pol = rpol
+
 
             c.audit['success'] = True
             c.audit['info'] = "name = %s, realm = %s, scope = %s" \
@@ -1489,14 +1533,25 @@ class SystemController(BaseController):
 
         """
         res = {}
+        ret = {}
+        param = {}
         try:
-            param = getLowerParams(request.params)
+            param.update(request.params)
             log.info("[delPolicy] deleting policy: %r" % param)
 
-            name = getParam(param, "name", required)
+            # support the ignoring of policy impact check
+            enforce = param.get("enforce", 'False')
+            if enforce.lower() == 'true':
+                enforce = True
+            else:
+                enforce = False
 
-            log.debug("[delPolicy] trying to delete policy %s" % name)
-            ret = deletePolicy(name)
+            name_param = param["name"]
+            names = name_param.split(',')
+            for name in names:
+                log.debug("[delPolicy] trying to delete policy %s" % name)
+                ret.update(deletePolicy(name, enforce))
+
             res["delPolicy"] = {"result": ret}
 
             c.audit['success'] = ret
@@ -1608,8 +1663,7 @@ class SystemController(BaseController):
 
         finally:
             Session.close()
-            log.debug("[getSupportInfo] done")
-
+            log.error("[getSupportInfo] done")
 
     def isSupportValid(self):
         """

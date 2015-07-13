@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -286,7 +286,7 @@ class TimeHmacTokenClass(HmacTokenClass):
         log.debug("[update]  end. Processing the initialization parameters done.")
         return
 
-    def check_otp_exist(self, otp, window=10):
+    def check_otp_exist(self, otp, window=10, user=None, autoassign=False):
         '''
         checks if the given OTP value is/are values of this very token.
         This is used to autoassign and to determine the serial number of
@@ -398,7 +398,7 @@ class TimeHmacTokenClass(HmacTokenClass):
         '''
 
         log.debug("[checkOtp] begin. Validate the token otp: anOtpVal: %r ,\
-                    counter: %r,window: %r, options: %r" %
+                    counter: %r,window: %r, options: %r " %
                     (anOtpVal, counter, window, options))
 
         try:
@@ -406,7 +406,7 @@ class TimeHmacTokenClass(HmacTokenClass):
         except ValueError as e:
             raise e
 
-        secretHOtp = self.token.getHOtpKey(pin)
+        secretHOtp = self.token.getHOtpKey()
         self.hashlibStr = self.getFromTokenInfo("hashlib", self.hashlibStr)
 
         timeStepping = int(self.getFromTokenInfo("timeStep", self.timeStep))

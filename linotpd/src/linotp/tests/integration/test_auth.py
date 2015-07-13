@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -65,7 +65,7 @@ class TestAuth(TestCase):
 
         # Enroll HOTP token
         # Seed and OTP values: https://tools.ietf.org/html/rfc4226#appendix-D
-        driver.get(self.base_url + "/manage/")
+        driver.get(self.base_url + "/manage")
         time.sleep(2)
         user_view = UserView(driver, self.base_url, realm_name)
         username = "susi"

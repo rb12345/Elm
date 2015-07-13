@@ -2,7 +2,7 @@
 
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP userid resolvers.
 #
@@ -36,6 +36,8 @@ except ImportError:
 import os
 import sys
 
+from useridresolver import __version__
+
 # Taken from kennethreitz/requests/setup.py
 package_directory = os.path.realpath(os.path.dirname(__file__))
 
@@ -53,7 +55,7 @@ def get_file_contents(file_path):
 
 setup(
     name='LinOtpUserIdResolver',
-    version='2.7.1.dev0',
+    version=__version__,
     description='LinOTP2 modules for resolving usernames',
     author='LSE Leading Security Experts GmbH',
     author_email='linotp@lsexperts.de',

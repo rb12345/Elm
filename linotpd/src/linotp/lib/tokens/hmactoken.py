@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -36,7 +36,12 @@ from linotp.lib.tokenclass import TokenClass
 
 from linotp.lib.validate import check_pin
 from linotp.lib.validate import check_otp
-from linotp.lib.validate import split_pin_otp
+from linotp.lib.validate import split_pin_otp, is_same_transaction
+
+from linotp.lib.reply   import create_img
+from linotp.lib.apps    import create_google_authenticator
+from linotp.lib.apps    import NoOtpAuthTokenException
+from linotp.lib.apps    import create_oathtoken_url
 
 
 optional = True
@@ -249,14 +254,12 @@ class HmacTokenClass(TokenClass):
 
         if 'transactionid' in options or 'state' in options:
             ## fetch the transactionid
-            transid = options.get('transactionid', None)
-            if transid is None:
-                transid = options.get('state', None)
+            transid = options.get('transactionid', options.get('state', None))
 
-        ## check if the transactionid is in the list of challenges
+        # check if the transactionid is in the list of challenges
         if transid is not None:
             for challenge in challenges:
-                if challenge.getTransactionId() == transid:
+                if is_same_transaction(challenge, transid):
                     matching = challenge
                     break
             if matching is not None:
@@ -335,7 +338,7 @@ class HmacTokenClass(TokenClass):
         log.debug("[checkOtp] end. otp verification result was: res %r" % (res))
         return res
 
-    def check_otp_exist(self, otp, window=10):
+    def check_otp_exist(self, otp, window=10, user=None, autoassign=False):
         '''
         checks if the given OTP value is/are values of this very token.
         This is used to autoassign and to determine the serial number of
@@ -590,18 +593,76 @@ class HmacTokenClass(TokenClass):
         except ValueError as ex:
             log.error("[get_multi_otp]: Could not convert otplen - value error %r " % (ex))
             raise Exception(ex)
-
+        s_count = self.getOtpCount()
         secretHOtp = self.token.getHOtpKey()
-        hmac2Otp = HmacOtp(secretHOtp, self.getOtpCount(), otplen, self.getHashlib(self.hashlibStr))
+        hmac2Otp = HmacOtp(secretHOtp, s_count, otplen, self.getHashlib(self.hashlibStr))
         log.debug("[get_multi_otp] retrieving %i OTP values for token %s" % (count, hmac2Otp))
 
         if count > 0:
             for i in range(count):
-                otpval = hmac2Otp.generate(self.getOtpCount() + i, inc_counter=False)
-                otp_dict["otp"][i] = otpval
+                otpval = hmac2Otp.generate(s_count + i, inc_counter=False)
+                otp_dict["otp"][s_count + i] = otpval
             ret = True
 
         log.debug("[get_multi_otp] end. dictionary of multiple future OTP is: otp_dict: %r - status: %r - error %r" % (ret, error, otp_dict))
         return (ret, error, otp_dict)
 
+    def getInitDetail(self, params , user=None):
+        '''
+        to complete the token normalisation, the response of the initialiastion
+        should be build by the token specific method, the getInitDetails
+        '''
+        response_detail = {}
+
+        info = self.getInfo()
+        response_detail.update(info)
+        response_detail['serial'] = self.getSerial()
+
+        tok_type = self.type.lower()
+
+        otpkey = None
+        if 'otpkey' in info:
+            otpkey = info.get('otpkey')
+
+        if otpkey != None:
+            response_detail["otpkey"] = {
+                  "order"      : '1',
+                  "description": _("OTP seed"),
+                  "value"      :  "seed://%s" % otpkey,
+                  "img"        :  create_img(otpkey, width=200),
+                     }
+            try:
+                p = {}
+                p.update(params)
+                p['otpkey'] = otpkey
+                p['serial'] = self.getSerial()
+                # label
+                goo_url = create_google_authenticator(p, user=user)
+
+                response_detail["googleurl"] = {
+                      "order"      : '0',
+                      "description": _("OTPAuth Url"),
+                      "value" :     goo_url,
+                      "img"   :     create_img(goo_url, width=250)
+                      }
+
+            except NoOtpAuthTokenException as exx:
+                log.warning("%r" % exx)
+
+            if user is not None:
+                try:
+
+                    oath_url = create_oathtoken_url(user.login, user.realm,
+                                                    otpkey, tok_type,
+                                                    serial=self.getSerial())
+                    response_detail["oathurl"] = {
+                           "order"      : '2',
+                           "description" : _("URL for OATH token"),
+                           "value" : oath_url,
+                           "img"   : create_img(oath_url, width=250)
+                           }
+                except Exception as ex:
+                    log.info('failed to set oath or google url: %r' % ex)
+
+        return response_detail
 

@@ -1,6 +1,6 @@
 /*!
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -56,6 +56,25 @@ function cb_changed(checkbox_id,arry){
             $('#'+sid).show();
     }
 }
+function cb_changed_deactivate(checkbox_id,arry){
+/*
+ * cb_changed - dependent on the checkbox state,
+ * show all entries (identified by their id), which are listed in the array
+ */
+    var checked = $('#'+checkbox_id).is(':checked');
+
+    for (i=0; i<arry.length; i++) {
+        var sid = arry[i];
+        if  ( checked ) {
+            $('#'+sid).prop('disabled', true);
+            $('#'+sid).addClass('disabled');
+        } else {
+            $('#'+sid).prop('disabled', false);
+            $('#'+sid).removeClass('disabled');
+        }
+    }
+}
+
 
 function show_waiting() {
     $('#do_waiting').show();

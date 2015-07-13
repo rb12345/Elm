@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -30,6 +30,8 @@
 
 
 import logging
+import os
+
 try:
     import json
 except ImportError:
@@ -38,6 +40,7 @@ except ImportError:
 from linotp.tests import TestController, url
 
 log = logging.getLogger(__name__)
+
 
 class TestManageController(TestController):
 
@@ -49,21 +52,28 @@ class TestManageController(TestController):
         token: token1 (r1), token2 (r1), token3 (r2)
         '''
 
+        TestController.setUp(self)
+        self.set_config_selftest()
+
         ## remove all other tokens
         self.deleteAllTokens()
 
+        fixture_path = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            'fixtures',
+            )
         # create resolvers
         response = self.app.get(url(controller='system', action='setResolver'),
                                 params={'name':'reso1',
                                         'type': 'passwdresolver',
-                                        'fileName': 'my-passwd'})
+                                        'fileName': os.path.join(fixture_path, 'my-passwd')})
         print response
         assert '"value": true' in response
 
         response = self.app.get(url(controller='system', action='setResolver'),
                                 params={'name':'reso2',
                                         'type': 'passwdresolver',
-                                        'fileName': 'my-pass2'})
+                                        'fileName': os.path.join(fixture_path, 'my-pass2')})
         print response
         assert '"value": true' in response
 
@@ -123,8 +133,8 @@ class TestManageController(TestController):
         '''
         response = self.app.get(url(controller='manage', action='index'),
                                 params={})
-        print "index response: %r" % response.testbody
-        assert '<title>LinOTP 2 Management</title>' in response.testbody
+        print "index response: %r" % response
+        assert '<title>LinOTP 2 Management</title>' in response
 
 
     def test_policies(self):
@@ -133,10 +143,10 @@ class TestManageController(TestController):
         '''
         response = self.app.get(url(controller='manage', action='policies'),
                                 params={})
-        print "policies response: %r" % response.testbody
-        assert '<a id=policy_export>' in response.testbody
-        assert '<button id=policy_import>' in response.testbody
-        assert '<button  id=button_policy_delete>' in response.testbody
+        print "policies response: %r" % response
+        assert '<a id=policy_export>' in response
+        assert '<button id=policy_import>' in response
+        assert '<button id="button_policy_delete">' in response
 
     def test_audit(self):
         '''
@@ -144,9 +154,9 @@ class TestManageController(TestController):
         '''
         response = self.app.get(url(controller='manage', action='audittrail'),
                                 params={})
-        print "audit response: %r" % response.testbody
-        assert 'table id="audit_table"' in response.testbody
-        assert 'view_audit();' in response.testbody
+        print "audit response: %r" % response
+        assert 'table id="audit_table"' in response
+        assert 'view_audit();' in response
 
     def test_tokenview(self):
         '''
@@ -154,14 +164,14 @@ class TestManageController(TestController):
         '''
         response = self.app.get(url(controller='manage', action='tokenview'),
                                 params={})
-        print "token response: %r" % response.testbody
-        assert 'button_losttoken' in response.testbody
-        assert 'button_tokeninfo' in response.testbody
-        assert 'button_resync' in response.testbody
-        assert 'button_tokenrealm' in response.testbody
-        assert 'table id="token_table"' in response.testbody
-        assert 'view_token();' in response.testbody
-        assert 'tokenbuttons();' in response.testbody
+        print "token response: %r" % response
+        assert 'button_losttoken' in response
+        assert 'button_tokeninfo' in response
+        assert 'button_resync' in response
+        assert 'button_tokenrealm' in response
+        assert 'table id="token_table"' in response
+        assert 'view_token();' in response
+        assert 'tokenbuttons();' in response
 
     def test_userview(self):
         '''
@@ -169,9 +179,9 @@ class TestManageController(TestController):
         '''
         response = self.app.get(url(controller='manage', action='userview'),
                                 params={})
-        print "user response: %r" % response.testbody
-        assert 'table id="user_table"' in response.testbody
-        assert 'view_user();' in response.testbody
+        print "user response: %r" % response
+        assert 'table id="user_table"' in response
+        assert 'view_user();' in response
 
     def test_tokenflexi(self):
         '''
@@ -181,7 +191,7 @@ class TestManageController(TestController):
                                 params={})
 
         testbody = response.body.replace('\n', ' ').replace('\r', '').replace("  ", " ")
-        print "token flexi response 1: %r" % response.testbody
+        print "token flexi response 1: %r" % response
         assert '"total": 3' in testbody
         assert '"token1",       true,       "heinz"' in testbody
         assert '"token2",       true,       "nick"' in testbody
@@ -192,7 +202,7 @@ class TestManageController(TestController):
                                 params={'qtype' : 'loginname',
                                         'query' : 'renate'})
         testbody = response.body.replace('\n', ' ').replace('\r', '').replace("  ", " ")
-        print "token flexi response 2: %r" % response.testbody
+        print "token flexi response 2: %r" % response
         assert '"total": 1' in testbody
         assert '"token3",       true,       "renate"' in testbody
 
@@ -200,8 +210,8 @@ class TestManageController(TestController):
         response = self.app.get(url(controller='manage', action='tokenview_flexi'),
                                 params={'qtype' : 'realm',
                                         'query' : 'realm1'})
-        print "token flexi response 3: %r" % response.testbody
-        assert '"total": 2' in response.testbody
+        print "token flexi response 3: %r" % response
+        assert '"total": 2' in response
         testbody = response.body.replace('\n', ' ').replace('\r', '').replace("  ", " ")
         assert '"token1",       true,       "heinz"' in testbody
         assert '"token2",       true,       "nick"' in testbody
@@ -210,8 +220,8 @@ class TestManageController(TestController):
         response = self.app.get(url(controller='manage', action='tokenview_flexi'),
                                 params={'qtype' : 'all',
                                         'query' : 'token2'})
-        print "token flexi response 4: %r" % response.testbody
-        assert '"total": 1' in response.testbody
+        print "token flexi response 4: %r" % response
+        assert '"total": 1' in response
         testbody = response.body.replace('\n', ' ').replace('\r', '').replace("  ", " ")
         assert '"token2",       true,       "nick"' in testbody
 
@@ -222,8 +232,8 @@ class TestManageController(TestController):
         # No realm, no user
         response = self.app.get(url(controller='manage', action='userview_flexi'),
                                 params={})
-        print "user flexi response 1: %r" % response.testbody
-        assert '"total": 0' in response.testbody
+        print "user flexi response 1: %r" % response
+        assert '"total": 0' in response
 
         # No realm, no user
 
@@ -235,8 +245,8 @@ class TestManageController(TestController):
                                         "query": "",
                                         "qtype": "username",
                                         "realm": "realm1"})
-        print "user flexi response 2: %r" % response.testbody
-        assert '"id": "heinz"' in response.testbody
+        print "user flexi response 2: %r" % response
+        assert '"id": "heinz"' in response
 
 
         response = self.app.get(url(controller='manage', action='userview_flexi'),
@@ -247,8 +257,8 @@ class TestManageController(TestController):
                                         "query": "",
                                         "qtype": "username",
                                         "realm": "realm2"})
-        print "user flexi response 3: %r" % response.testbody
-        assert '"id": "renate"' in response.testbody
+        print "user flexi response 3: %r" % response
+        assert '"id": "renate"' in response
 
 
     def test_tokeninfo(self):
@@ -257,11 +267,11 @@ class TestManageController(TestController):
         '''
         response = self.app.get(url(controller='manage', action='tokeninfo'),
                                 params={"serial" : "token1"})
-        print "tokeninfo response: %r" % response.testbody
-        assert 'class=tokeninfoOuterTable' in response.testbody
-        assert 'Heinz Hirtz' in response.testbody
-        assert 'Heinz Hirtz' in response.testbody
-        assert '<td class=tokeninfoOuterTable>LinOtp.TokenSerialnumber</td>\n    \t<!-- middle column -->\n    <td class=tokeninfoOuterTable>\n    \ttoken1\n    </td>\n        \t<!-- right column -->' in response.testbody
+        print "tokeninfo response: %r" % response
+        assert 'class=tokeninfoOuterTable' in response
+        assert 'Heinz Hirtz' in response
+        assert 'Heinz Hirtz' in response
+        assert '<td class=tokeninfoOuterTable>LinOtp.TokenSerialnumber</td> <!-- middle column --> <td class=tokeninfoOuterTable> token1 </td> <!-- right column -->' in response
 
 
     def test_logout(self):
@@ -270,6 +280,6 @@ class TestManageController(TestController):
         '''
         response = self.app.get(url(controller='manage', action='logout'),
                                 params={})
-        print "logout response: %r" % response.testbody
-        assert '302 Found\n\nThe resource was found at' in response.testbody
+        print "logout response: %r" % response
+        assert '302 Found The resource was found at' in response
 

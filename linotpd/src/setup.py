@@ -8,6 +8,8 @@ except ImportError:
 import os
 import sys
 
+from linotp import __version__
+
 # Taken from kennethreitz/requests/setup.py
 package_directory = os.path.realpath(os.path.dirname(__file__))
 
@@ -37,22 +39,22 @@ def get_debian_package():
 
 setup(
     name='LinOTP',
-    version='2.7.1.dev0',
+    version=__version__,
     description='LinOTP Service',
     author='LSE Leading Security Experts GmbH',
     license='AGPL v3, (C) LSE Leading Security Experts GmbH',
     author_email='linotp@lsexperts.de',
     url='http://www.linotp.org',
     install_requires=[
-        "Pylons>=0.9.7,<=1.0",
+        "Pylons>=0.9.7",
         "WebOb<1.4",
-        "SQLAlchemy>=0.6",
+        "SQLAlchemy>=0.6,<=0.9.99",
         "docutils>=0.4",
         "simplejson>=2.0",
         "pycrypto>=1.0",
         "repoze.who<=1.1",
         "pyrad>=1.1",
-        "LinOtpUserIdResolver>=2.7.dev",
+        "LinOtpUserIdResolver>=2.7",
         "netaddr",
         "qrcode>=2.4",
         "configobj>=4.6.0",
@@ -61,70 +63,108 @@ setup(
         # distributions, that we do not require it here!
         "sqlalchemy-migrate",
     ],
-    scripts=['tools/linotp-convert-token',
-             'tools/linotp-create-pwidresolver-user',
-             'tools/linotp-create-sqlidresolver-user',
-             'tools/linotp-migrate',
-             'tools/linotp-setpins',
-             'tools/linotp-pip-update',
-             'tools/linotp-create-enckey',
-             'tools/linotp-create-auditkeys',
-             'tools/linotp-create-certificate',
-             'tools/linotp-create-database',
-             'tools/linotp-fix-access-rights',
-             'tools/totp-token',
-             'tools/linotp-token-usage',
-             'tools/linotp-create-ad-users',
-             'tools/linotp-auth-radius',
-             'tools/linotp-sql-janitor',
-             'tools/linotp-tokens-used',
-             'tools/linotp-backup',
-             'tools/linotp-decrypt-otpkey',
-             'tools/linotp-convert-gemalto',
-             'tools/linotp-restore',
-             'tools/elm-authenticate-xml',
-             'tools/elm-authenticate'],
-    setup_requires=['PasteScript>=1.6.3',
-                    'nose>=0.11'],
+    scripts=[
+        'tools/linotp-convert-token',
+        'tools/linotp-create-pwidresolver-user',
+        'tools/linotp-create-sqlidresolver-user',
+        'tools/linotp-migrate',
+        'tools/linotp-setpins',
+        'tools/linotp-pip-update',
+        'tools/linotp-create-enckey',
+        'tools/linotp-create-auditkeys',
+        'tools/linotp-create-certificate',
+        'tools/linotp-create-database',
+        'tools/linotp-fix-access-rights',
+        'tools/totp-token',
+        'tools/linotp-token-usage',
+        'tools/linotp-create-ad-users',
+        'tools/linotp-auth-radius',
+        'tools/linotp-sql-janitor',
+        'tools/linotp-tokens-used',
+        'tools/linotp-backup',
+        'tools/linotp-decrypt-otpkey',
+        'tools/linotp-convert-gemalto',
+        'tools/linotp-restore',
+        'tools/elm-authenticate-xml',
+        'tools/elm-authenticate',
+        'tools/linotp-enroll-smstoken',
+        ],
+    setup_requires=[
+        'PasteScript>=1.6.3',
+        ],
     packages=find_packages(exclude=['ez_setup']),
     include_package_data=True,
-    test_suite='nose.collector',
-    data_files=[(get_debian_package() + 'etc/linotp2/', ['config/linotp.ini.example',
-                                                         'config/linotp.ini.paster',
-                                                         'config/linotpapp.wsgi',
-                                                         'config/who.ini',
-                                                         'config/dictionary'
-                                                         ]),
-                (get_debian_package() + 'etc/apache2/sites-available/', ['config/linotp2',
-                                                                         'config/linotp2-radius',
-                                                                         'config/linotp2-certs',
-                                                                         'config/linotp2-ldap',
-                                                                         'config/linotp2-elm'
-                                                                         ]),
-                (get_debian_package() + 'etc/init.d/', ['config/linotp2-paster']),
-                ('share/doc/linotp/', ["tools/README-migrate.txt"]),
-                ('share/man/man1', ["tools/linotp-convert-token.1",
-                                    "tools/linotp-create-pwidresolver-user.1",
-                                    "tools/linotp-create-sqlidresolver-user.1",
-                                    "tools/totp-token.1",
-                                    "tools/linotp-migrate.1",
-                                    "tools/linotp-setpins.1",
-                                    "tools/linotp-pip-update.1",
-                                    "tools/linotp-create-enckey.1",
-                                    "tools/linotp-create-auditkeys.1",
-                                    "tools/linotp-create-certificate.1",
-                                    "tools/linotp-create-database.1",
-                                    "tools/linotp-fix-access-rights.1",
-                                    "tools/linotp-token-usage.1",
-                                    "tools/linotp-sql-janitor.1",
-                                    "tools/linotp-tokens-used.1",
-                                    "tools/linotp-backup.1",
-                                    "tools/linotp-decrypt-otpkey.1",
-                                    "tools/linotp-convert-gemalto.1",
-                                    "tools/linotp-restore.1"
-                                    ]),
-                ('share/linotp', ['tools/LinotpLDAPProxy.pm']),
-            ],
+    data_files=[
+        (
+            get_debian_package() + 'etc/linotp2/',
+            [
+                'config/linotp.ini.example',
+                'config/linotp.ini.paster',
+                'config/linotpapp.wsgi',
+                'config/who.ini',
+                'config/dictionary'
+                ]
+            ),
+        (
+            get_debian_package() + 'etc/linotp2/apache2.2-example/',
+            [
+                'config/apache2.2-example/linotp2',
+                'config/apache2.2-example/linotp2-radius',
+                'config/apache2.2-example/linotp2-certs',
+                'config/apache2.2-example/linotp2-ldap',
+                'config/apache2.2-example/linotp2-elm',
+                ]
+            ),
+        (
+            get_debian_package() + 'etc/linotp2/apache2.4-example/',
+            [
+                'config/apache2.4-example/linotp2.conf',
+                ]
+            ),
+        (
+            get_debian_package() + 'etc/init.d/',
+            [
+                'config/linotp2-paster'
+                ]
+            ),
+        (
+            'share/doc/linotp/',
+            [
+                "tools/README-migrate.txt"
+                ]
+            ),
+        (
+            'share/man/man1',
+            [
+                "tools/linotp-convert-token.1",
+                "tools/linotp-create-pwidresolver-user.1",
+                "tools/linotp-create-sqlidresolver-user.1",
+                "tools/totp-token.1",
+                "tools/linotp-migrate.1",
+                "tools/linotp-setpins.1",
+                "tools/linotp-pip-update.1",
+                "tools/linotp-create-enckey.1",
+                "tools/linotp-create-auditkeys.1",
+                "tools/linotp-create-certificate.1",
+                "tools/linotp-create-database.1",
+                "tools/linotp-fix-access-rights.1",
+                "tools/linotp-token-usage.1",
+                "tools/linotp-sql-janitor.1",
+                "tools/linotp-tokens-used.1",
+                "tools/linotp-backup.1",
+                "tools/linotp-decrypt-otpkey.1",
+                "tools/linotp-convert-gemalto.1",
+                "tools/linotp-restore.1"
+                ]
+            ),
+        (
+            'share/linotp',
+            [
+                'tools/LinotpLDAPProxy.pm'
+                ]
+            ),
+        ],
+>>>>>>> upstream/master
     classifiers=[
         "Framework :: Pylons",
         "License :: OSI Approved :: GNU Affero General Public License v3",
@@ -133,6 +173,7 @@ setup(
         "Topic :: Security",
         "Topic :: System :: Systems Administration :: Authentication/Directory"
     ],
+<<<<<<< HEAD
     message_extractors={'linotp': [
             ('**.py', 'python', None),
             ('templates/**.mako', 'mako', {'input_encoding': 'utf-8'}),
@@ -140,6 +181,69 @@ setup(
             ('public/**', 'ignore', None)]},
     zip_safe=False,
     paster_plugins=['PasteScript', 'Pylons'],
+=======
+    message_extractors={
+        'linotp': [
+            (
+                '**.py',
+                'python',
+                None
+                ),
+            (
+                'templates/**.mako',
+                'mako',
+                {
+                    'input_encoding': 'utf-8'
+                    }
+                ),
+            (
+                'lib/tokens/*.mako',
+                'mako',
+                {
+                    'input_encoding': 'utf-8'
+                    }
+                ),
+            (
+                'public/js/manage.js',
+                'javascript',
+                {
+                    'input_encoding': 'utf-8'
+                    }
+                ),
+            (
+                'public/js/tools.js',
+                'javascript',
+                {
+                    'input_encoding': 'utf-8'
+                    }
+                ),
+            (
+                'public/js/selfservice.js',
+                'javascript',
+                {
+                    'input_encoding': 'utf-8'
+                    }
+                ),
+            (
+                'public/js/linotp_utils.js',
+                'javascript',
+                {
+                    'input_encoding': 'utf-8'
+                    }
+                ),
+            (
+                'public/**',
+                'ignore',
+                None
+                )
+            ]
+        },
+    zip_safe=False,
+    paster_plugins=['PasteScript', 'Pylons'],
+    # The entry point for nose.plugins is required because otherwise nosetests
+    # complains "no such option 'with-pylons'".
+    # https://github.com/Pylons/pylons/issues/13
+>>>>>>> upstream/master
     entry_points="""
     [paste.app_factory]
     main = linotp.config.middleware:make_app

@@ -2,7 +2,7 @@
 <%doc>
  *
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -28,21 +28,24 @@
 </%doc>
 
 %if c.scope == 'config.title' :
- ${_("OCRA2 settings")}
+ ${_("OCRA2 Token")}
 %endif
 
 
 %if c.scope == 'config' :
 
+
+<fieldset>
+	<legend>${_("OCRA2 token settings")}</legend>
 <table>
-	<tr><td><label for=ocra2_max_challenge>${_("maximum concurrent OCRA2 challenges")}</label></td>
+	<tr><td><label for=ocra2_max_challenge>${_("Maximum concurrent OCRA2 challenges")}</label></td>
 		<td><input type="text" id="ocra2_max_challenge" maxlength="4" class=integer
 			title='${_("This is the maximum concurrent challenges per OCRA2 Token.")}'/></td></tr>
 	<tr><td><label for=ocra2_challenge_timeout>${_("OCRA2 challenge timeout")}</label></td>
 		<td><input type="text" id="ocra2_challenge_timeout" maxlength="6"
 			title='${_("After this time a challenge can not be used anymore. Valid entries are like 1D, 2H or 5M where D=day, H=hour, M=minute.")}'></td></tr>
 </table>
-
+</fieldset>
 %endif
 
 
@@ -52,6 +55,20 @@ ${_("OCRA2 - challenge/response Token")}
 
 %if c.scope == 'enroll' :
 <script>
+/*
+ * 'typ'_enroll_setup_defaults()
+ *
+ * this method is called, before the dialog is shown
+ *
+ */
+function ocra2_enroll_setup_defaults(config, options){
+    var rand_pin = options['otp_pin_random'];
+    if (rand_pin > 0) {
+        $("[name='set_pin_rows']").hide();
+    } else {
+        $("[name='set_pin_rows']").show();
+    }
+}
 
 /*
  * 'typ'_get_enroll_params()
@@ -79,9 +96,14 @@ function ocra2_get_enroll_params(){
 
     jQuery.extend(url, add_user_data());
 
+    if ($('#ocra2_pin1').val() != '') {
+        url['pin'] = $('#ocra2_pin1').val();
+    }
+
     return url;
 }
 </script>
+<hr>
 <p><span id='ocra2_key_intro'>
 	${_("Please enter or copy the OCRA2 key.")}</span></p>
 <table>
@@ -95,16 +117,27 @@ function ocra2_get_enroll_params(){
 	    <label for=ocra2_key_cb>${_("Generate OCRA2 key.")}</label></td>
 </tr>
 <tr>
-	<td><label for="ocrasuite_algorithm">${_("Ocra suite")}</label></td>
+	<td><label for="ocrasuite_algorithm">${_("OCRA suite")}</label></td>
 	<td><select name="algorithm" id='ocrasuite_algorithm' >
-	        <option selected value="OCRA-1:HOTP-SHA256-8:C-QN08">SHA256 - otplen 8 digits - numeric challenge 8 digits</option>
-	        <option value="OCRA-1:HOTP-SHA256-8:C-QN08">SHA256 - otplen 8 digits - numeric challenge 8 digits</option>
-	        <option value="OCRA-1:HOTP-SHA256-8:C-QA64">SHA256 - otplen 8 digits - numeric challenge 64 chars</option>
+            <option selected value="OCRA-1:HOTP-SHA256-8:C-QN08">SHA256 - otplen 8 digits - numeric challenge 8 digits</option>
+            <option value="OCRA-1:HOTP-SHA256-8:C-QA64">SHA256 - otplen 8 digits - numeric challenge 64 chars</option>
     </select></td>
 </tr>
 <tr>
     <td><label for="enroll_ocra2_desc" id='enroll_ocra2_desc_label'>${_("Description")}</label></td>
     <td><input type="text" name="enroll_ocra2_desc" id="enroll_ocra2_desc" value="webGUI_generated" class="text" /></td>
+</tr>
+
+<tr name="set_pin_rows" class="space" title='${_("Protect your token with a static PIN")}'><th colspan="2">${_("Token PIN:")}</th></tr>
+<tr name="set_pin_rows">
+    <td class="description"><label for="ocra2_pin1" id="ocra2_pin1_label">${_("enter PIN")}:</label></td>
+    <td><input type="password" autocomplete="off" onkeyup="checkpins('ocra2_pin1','ocra2_pin2');" name="pin1" id="ocra2_pin1"
+            class="text ui-widget-content ui-corner-all" /></td>
+</tr>
+<tr name="set_pin_rows">
+    <td class="description"><label for="ocra2_pin2" id="ocra2_pin2_label">${_("confirm PIN")}:</label></td>
+    <td><input type="password" autocomplete="off" onkeyup="checkpins('ocra2_pin1','ocra2_pin2');" name="pin2" id="ocra2_pin2"
+            class="text ui-widget-content ui-corner-all" /></td
 </tr>
 
 </table>
@@ -156,7 +189,7 @@ function self_ocra2_get_param()
 	var urlparam = {};
 	var typ = 'ocra2';
 
-    if  ( $('#ocra2_key_cb2').attr('checked') ) {
+    if  ( $('#ocra2_key_cb2').is(':checked')) {
     	urlparam['genkey'] = 1;
     } else {
         // OTP Key
@@ -179,7 +212,7 @@ function self_ocra2_submit(){
 	var ret = false;
 	var params =  self_ocra2_get_param();
 
-	if  ( $('#ocra2_key_cb2').attr('checked') === undefined && $('#form_enroll_ocra2').valid() === false) {
+	if  ( $('#ocra2_key_cb2').is(':checked') === undefined && $('#form_enroll_ocra2').valid() === false) {
 		alert('${_("Form data not valid.")}');
 	} else {
 		enroll_token( params );
@@ -292,7 +325,7 @@ function provisionOcra2() {
 		'session' : get_selfservice_session()
 	};
 
-	$.post("/selfservice/useractivateocratoken", params, function(data, textStatus, XMLHttpRequest) {
+	$.post("/userservice/activateocratoken", params, function(data, textStatus, XMLHttpRequest) {
 		hide_waiting();
 
 		if (data.result.status == true) {
@@ -327,7 +360,7 @@ function finishOcra2() {
 	var ocra_finish_ok = $('#ocra2_finish_ok').val();
 	var ocra_finish_fail = $('#ocra2_finish_fail').val();
 
-	$.post("/selfservice/userfinshocra2token", {
+	$.post("/userservice/finshocra2token", {
 		'type' : 'ocra2',
 		'serial' : serial,
 		'transactionid' : trans,

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -50,6 +50,8 @@ class TestGetSerialController(TestController):
 
 
     def setUp(self):
+        TestController.setUp(self)
+        self.set_config_selftest()
         self.initToken()
 
     def tearDown(self):

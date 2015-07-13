@@ -2,7 +2,7 @@
 
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP userid resolvers.
 #
@@ -24,10 +24,11 @@
 #    Contact: www.linotp.org
 #    Support: www.lsexperts.de
 #
-"""This module implements the communication and data mapping to SQL servers.
-   The LinOTP server imports this module to use SQL databases as a userstore.
+"""
+This module implements the communication and data mapping to SQL servers.
+The LinOTP server imports this module to use SQL databases as a userstore.
 
-  Dependencies: UserIdResolver
+Dependencies: UserIdResolver
 """
 
 #from sqlalchemy.event import listen
@@ -39,18 +40,22 @@ from sqlalchemy import Table, MetaData
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import NoSuchColumnError
 
-from useridresolver.UserIdResolver import UserIdResolver
+from useridresolver.UserIdResolver import (UserIdResolver,
+                                           ResolverLoadConfigError
+                                           )
 
 import re
 import base64
 import hashlib
+import sys
+import urllib
+
 
 import linotp.lib.phppass as phppass
 
-import sys
-if sys.version_info[0:2] >= (2, 6):
+try:
     import json
-else:
+except:
     import simplejson as json
 
 import traceback
@@ -61,18 +66,19 @@ DEFAULT_ENCODING = "utf-8"
 
 
 def testconnection(params):
-    '''
+    """
     This is used to test if the given parameter set will do a successful
     SQL connection and return the number of found users
     params are:
-        Driver
-        Server
-        Port
-        Database
-        User
-        Password
-        Table
-    '''
+
+    - Driver
+    - Server
+    - Port
+    - Database
+    - User
+    - Password
+    - Table
+    """
     log.debug('[testconnection] %s' % str(params))
 
     num = -1
@@ -85,7 +91,8 @@ def testconnection(params):
                                    params.get("Password"),
                                    params.get("Server"),
                                    params.get("Port"),
-                                   params.get("Database")
+                                   params.get("Database"),
+                                   conParams=params.get('ConnectionParams', "")
                                    )
 
         log.debug("[testconnection] testing connection with connect str: %r"
@@ -124,25 +131,47 @@ def make_connect(driver, user, pass_, server, port, db, conParams=""):
     :type     db:     string
     :param    conParams: additional connection parameters
     :type     conParams: string
-
     '''
-    connect = driver + "://"
-    if len(user.strip()) > 0:
-        connect = connect + user
-    if len(pass_.strip()) > 0:
-        connect = connect + ":" + pass_
-    if len(server.strip()) > 0:
-        if len(user.strip()) > 0:
-            connect = connect + "@"
-        connect = connect + server
-    if len(port.strip()) > 0:
-        connect = connect + ":" + str(port)
-    # required db
-    if db != "":
-        connect = connect + "/" + db
 
-    if conParams != "":
-        connect = connect + "?" + conParams
+    connect = ""
+    if "?odbc_connect=" in driver:
+
+        # we have the need to support the odbc_connect mode
+        # where the parameters of the drivers will be concated
+        # The template for the odbc_connect string is submitted
+        # in the field "Additional connection parameters:"
+        param_str = conParams
+        settings = {}
+        settings["{PORT}"] = port
+        settings["{DBUSER}"] = user.strip()
+        settings["{SERVER}"] = server.strip()
+        settings["{PASSWORT}"] = pass_
+        settings["{DATABASE}"] = db
+        for key, value in settings.items():
+            param_str = param_str.replace(key, value)
+
+        url_quote = urllib.quote_plus(param_str)
+        connect = "%s%s" % (driver, url_quote)
+    else:
+        connect = driver + "://"
+        if len(user.strip()) > 0:
+            connect = connect + user
+        if len(pass_.strip()) > 0:
+            connect = connect + ":" + pass_
+        if len(server.strip()) > 0:
+            if len(user.strip()) > 0:
+                connect = connect + "@"
+            connect = connect + server
+        if len(port.strip()) > 0:
+            connect = connect + ":" + str(port)
+        # required db
+        if db != "":
+            connect = connect + "/" + db
+
+        if conParams != "":
+            connect = connect + "?" + conParams
+
+
     return connect
 
 
@@ -249,13 +278,19 @@ def _check_hash_type(password, hash_type, hash_value):
         log.debug("[_check_hash_type] found a salted hash.")
         try:
             new_hash_type = hash_type[1:]
-            # binary hash value
-            bin_hash = base64.b64decode(hash_value)[:-4]
-            # binary salt
-            bin_salt = base64.b64decode(hash_value)[-4:]
+            # decode the base64 hash value to binary
+            bin_value = base64.b64decode(hash_value)
+
             H = hashlib.new(new_hash_type)
+            hash_len = H.digest_size
+
+            # split the hashed passowrd from the binary salt
+            bin_hash = bin_value[:hash_len]
+            bin_salt = bin_value[hash_len:]
+
             H.update(password + bin_salt)
             bin_hashed_password = H.digest()
+
             res = (bin_hashed_password == bin_hash)
         except ValueError:
             log.error("[_check_hash_type] Unsupported Hash type: %r"
@@ -322,7 +357,6 @@ class IdResolver (UserIdResolver):
         :return: returns the resolver identifier string
                  or empty string if not exist
         :rtype : string
-
         """
         resolver = "SQLIdResolver.IdResolver"
         if self.conf != "":
@@ -340,6 +374,9 @@ class IdResolver (UserIdResolver):
 
         :return :  true in case of success, false if password does not match
         :rtype :   boolean
+
+        :todo: extend to support htpasswd passwords:
+             http://httpd.apache.org/docs/2.2/misc/password_encryptions.html
         '''
 
         log.info("[checkPass] checking password for user %s" % uid)
@@ -531,6 +568,9 @@ class IdResolver (UserIdResolver):
         userInfo = userInfo.strip('"')
         try:
             self.sqlUserInfo = json.loads(userInfo)
+        except ValueError as exx:
+            raise ResolverLoadConfigError("Invalid userinfo - no json "
+                                          "document: %s %r" % (userInfo, exx))
         except Exception as  e:
             raise Exception("linotp.sqlresolver.Map: " + str(e))
 

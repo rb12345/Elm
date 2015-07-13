@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -50,7 +50,7 @@ from linotp.lib.user    import User
 
 from linotp.lib.config  import getFromConfig
 
-from linotp.lib.token import checkUserPass, checkSerialPass
+from linotp.lib.token import TokenHandler, checkSerialPass
 from linotp.lib.token import get_tokenserial_of_transaction
 
 from linotp.lib.reply import sendResult, sendError
@@ -65,7 +65,6 @@ from linotp.lib.policy import AuthorizeException
 from linotp.lib.policy import set_realm
 from linotp.lib.policy import is_auth_return
 
-from linotp.lib.token import checkYubikeyPass
 from linotp.lib.token import getTokens4UserOrSerial
 
 from linotp.lib.error import ParameterError
@@ -170,8 +169,8 @@ class ValidateController(BaseController):
                 if options is None:
                     options = {}
                 options['initTime'] = initTime
-
-        (ok, opt) = checkUserPass(user, passw, options=options)
+        th = TokenHandler()
+        (ok, opt) = th.checkUserPass(user, passw, options=options)
 
         c.audit['success'] = ok
 
@@ -262,14 +261,15 @@ class ValidateController(BaseController):
                     opt['error'] = c.audit.get('info')
                     log.error("[check] authorization failed for validate/check: %s" % opt['error'])
 
-
             Session.commit()
 
-            qr = getParam(param, 'qr', optional)
-            if qr is not None and opt is not None and opt.has_key('message'):
+            qr = param.get('qr', None)
+            if qr and opt and 'message' in opt:
                 try:
                     dataobj = opt.get('message')
                     param['alt'] = "%s" % opt
+                    if 'transactionid' in opt:
+                        param['transactionid'] = opt['transactionid']
                     return sendQRImageResult(response, dataobj, param)
                 except Exception as exc:
                     log.warning("failed to send QRImage: %r " % exc)
@@ -328,7 +328,8 @@ class ValidateController(BaseController):
 
             ok = False
             try:
-                ok, opt = checkYubikeyPass(passw)
+                th = TokenHandler()
+                ok, opt = th.checkYubikeyPass(passw)
                 c.audit['success'] = ok
 
             except AuthorizeException as exx:
@@ -521,11 +522,13 @@ class ValidateController(BaseController):
             #c.audit['info'] += "%s=%s, " % (k, value)
             Session.commit()
 
-            qr = getParam(param, 'qr', optional)
-            if qr is not None and opt is not None and opt.has_key('message'):
+            qr = param.get('qr', None)
+            if qr and opt and 'message' in opt:
                 try:
                     dataobj = opt.get('message')
                     param['alt'] = "%s" % opt
+                    if 'transactionid' in opt:
+                        param['transactionid'] = opt['transactionid']
                     return sendQRImageResult(response, dataobj, param)
                 except Exception as exc:
                     log.warning("failed to send QRImage: %r " % exc)
@@ -609,16 +612,19 @@ class ValidateController(BaseController):
                         options = {}
                     options['initTime'] = initTime
 
+            options['scope'] = {"check_s": True}
             (ok, opt) = checkSerialPass(serial, passw, options=options)
 
             c.audit['success'] = ok
             Session.commit()
 
-            qr = getParam(param, 'qr', optional)
-            if qr is not None and opt is not None and opt.has_key('message'):
+            qr = param.get('qr', None)
+            if qr and opt and 'message' in opt:
                 try:
                     dataobj = opt.get('message')
                     param['alt'] = "%s" % opt
+                    if 'transactionid' in opt:
+                        param['transactionid'] = opt['transactionid']
                     return sendQRImageResult(response, dataobj, param)
                 except Exception as exc:
                     log.warning("failed to send QRImage: %r " % exc)

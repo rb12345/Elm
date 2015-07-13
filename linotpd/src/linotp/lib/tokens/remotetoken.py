@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -197,7 +197,7 @@ class RemoteTokenClass(TokenClass):
         local_check = False
         if 1 == int(self.getFromTokenInfo("remote.local_checkpin")):
             local_check = True
-        log.debug(" local checking pin? %r" % local_check)
+        log.debug(" local checking PIN? %r" % local_check)
 
         return local_check
 
@@ -229,7 +229,7 @@ class RemoteTokenClass(TokenClass):
             (res, pin, otpval) = split_pin_otp(self, passw, user,
                                                options=options)
 
-            res = TokenClass.checkPin(self, pin)
+            res = check_pin(self, pin, user=user, options=options)
             if res is False:
                 return (res, otp_counter, reply)
 
@@ -261,7 +261,7 @@ class RemoteTokenClass(TokenClass):
 
         return request_is_valid
 
-    def do_request(self, passw, transactionid=None, user=None):
+    def do_request(self, passw, transactionid=None, user=None, autoassign=False):
         """
         run the http request against the remote host
 
@@ -272,8 +272,6 @@ class RemoteTokenClass(TokenClass):
 
         :return: Tuple of (success, otp_count= -1 or 0, reply=remote response)
         """
-
-        reply = {}
         otpval = passw.encode("utf-8")
 
         remoteServer = self.getFromTokenInfo("remote.server") or ""
@@ -312,10 +310,18 @@ class RemoteTokenClass(TokenClass):
                   (len(otpval), remoteServer, remoteSerial, remoteUser))
         params = {}
 
-        if len(remoteSerial) > 0:
+        if autoassign:
+            params['user'] = user.login
+            params['realm'] = remoteRealm
+            user.realm = remoteRealm
+            if len(remotePath) == 0:
+                remotePath = "/validate/check"
+
+        elif len(remoteSerial) > 0:
             params['serial'] = remoteSerial
             if len(remotePath) == 0:
                 remotePath = "/validate/check_s"
+
         elif len(remoteUser) > 0:
             params['user'] = remoteUser
             params['realm'] = remoteRealm
@@ -336,14 +342,20 @@ class RemoteTokenClass(TokenClass):
         if transactionid is not None:
             params['state'] = transactionid
 
-        ## use a POST request to check the token
+        # use a POST request to check the token
+        otp_count = -1
+        res = False
         data = urllib.urlencode(params)
         request_url = "%s%s" % (remoteServer, remotePath)
+
+        reply = {}
+        otp_count = -1
+        res = False
 
         try:
             ## prepare the submit and receive headers
             headers = {"Content-type": "application/x-www-form-urlencoded",
-                       "Accept": "text/plain"}
+                       "Accept": "text/plain", 'Connection': 'close'}
 
             ## submit the request
             try:
@@ -447,6 +459,17 @@ class RemoteTokenClass(TokenClass):
                     self.do_request(passw, transactionid=transid, user=user)
 
         return (otp_counter, matching_challenges)
+
+    def check_otp_exist(self, otp, window=None, user=None, autoassign=False):
+        '''
+        checks if the given OTP value is/are values of this very token.
+        This is used to autoassign and to determine the serial number of
+        a token.
+        '''
+        (res, otp_count, reply) = self.do_request(otp, user=user,
+                                                  autoassign=autoassign)
+        return otp_count
+
 
     def checkPin(self, pin, options=None):
         """

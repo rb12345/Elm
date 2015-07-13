@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -139,6 +139,6 @@ class SMTPEmailProvider(IEmailProvider):
                 smtplib.SMTPDataError) as smtplib_exception:
             LOG.error("[submitMessage] error(s) sending e-mail. Caught exception: %r" %
                       smtplib_exception)
-            success, status_message = False, "error sending e-mail %s" % smtplib_exception
+            success, status_message = False, "error sending e-mail %r" % smtplib_exception
         s.quit()
         return success, status_message

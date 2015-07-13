@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -29,6 +29,7 @@
 """
 
 
+import os
 import logging
 from linotp.tests import TestController, url
 
@@ -39,6 +40,10 @@ class TestSystemController(TestController):
 
 
     ###############################################################################
+    def setUp(self):
+        TestController.setUp(self)
+        self.set_config_selftest()
+
     def test_setDefault(self):
         '''
         Testing setting default values
@@ -112,7 +117,8 @@ class TestSystemController(TestController):
 
 
     def test_001_realms(self):
-
+        self.__createResolvers__()
+        self.__createRealms__()
         response = self.app.get(url(controller='system', action='getRealms'))
         #log.info("response %s\n",response)
 
@@ -299,6 +305,8 @@ class TestSystemController(TestController):
         response = self.app.get(url(controller='admin', action='userlist'), params=parameters)
         #log.info("response %s\n",response)
         assert '"description": "def User,,,,"'in response
+        self.__deleteAllRealms__()
+        self.__deleteAllResolvers__()
 
 
 
@@ -479,24 +487,28 @@ scope = gettoken
         '''
         Testing the deleting of a resolver
         '''
+        fixture_path = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            'fixtures',
+            )
         response = self.app.get(url(controller='system', action='setResolver'),
                                 params={'name':'reso1',
                                         'type': 'passwdresolver',
-                                        'fileName': 'my-pass2'})
+                                        'fileName': os.path.join(fixture_path, 'my-pass2')})
         print response
         assert '"value": true' in response
 
         response = self.app.get(url(controller='system', action='setResolver'),
                                 params={'name':'reso2',
                                         'type': 'passwdresolver',
-                                        'fileName': 'my-pass2'})
+                                        'fileName': os.path.join(fixture_path, 'my-pass2')})
         print response
         assert '"value": true' in response
 
         response = self.app.get(url(controller='system', action='setResolver'),
                                 params={'name':'reso3',
                                         'type': 'passwdresolver',
-                                        'fileName': 'my-pass2'})
+                                        'fileName': os.path.join(fixture_path, 'my-pass2')})
         print response
         assert '"value": true' in response
 

@@ -2,7 +2,7 @@
 <!--
  *
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -25,28 +25,28 @@
  *    Support: www.lsexperts.de
  *
 -->
-	<h1>${_("Resync OTP Token")}</h1>
-	<div id='resyncform'>
-	<form class="cmxform" name='myForm'>
-		<fieldset>
+    <h1>${_("Resync OTP Token")}</h1>
+    <div id='resyncform'>
+    <form class="cmxform" name='myForm'>
+        <fieldset>
 
-		<table>
-		<tr>
-		<td>${_("selected Token")}</td>
-		<td><input type='text' class='selectedToken' class="text ui-widget-content ui-corner-all" disabled value='' /></td>
-		</tr>
-		<tr>
-		<td><label for=otp1>OTP 1</label></td>
-		<td><input type='text' id='otp1' class="text ui-widget-content ui-corner-all" value='' /></td>		
-		</tr>
-		<tr>
-		<td><label for=otp2>OTP 2</label></td>
-		<td><input type='text' id='otp2'  class="text ui-widget-content ui-corner-all" value=''/></td>
-  		</tr>
-		</table>
-		<button class='action-button' id='button_resync' onclick="resync(); return false;">${_("resync OTP")}</button>
-		</fieldset>
-	</form>
-	</div> <!--resync form-->
+        <table>
+        <tr>
+        <td>${_("selected Token")}</td>
+        <td><input type='text' class='selectedToken' class="text ui-widget-content ui-corner-all" disabled value='' /></td>
+        </tr>
+        <tr>
+        <td><label for=otp1>OTP 1</label></td>
+        <td><input type='text' id='otp1' class="text ui-widget-content ui-corner-all" value='' /></td>
+        </tr>
+        <tr>
+        <td><label for=otp2>OTP 2</label></td>
+        <td><input type='text' id='otp2'  class="text ui-widget-content ui-corner-all" value=''/></td>
+        </tr>
+        </table>
+        <button class='action-button' id='button_resync' onclick="resync(); return false;">${_("resync OTP")}</button>
+        </fieldset>
+    </form>
+    </div> <!--resync form-->
 
 

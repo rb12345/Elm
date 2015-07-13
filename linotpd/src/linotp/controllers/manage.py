@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -43,12 +43,12 @@ from mako.exceptions import CompileException
 from paste.deploy.converters import asbool
 
 # Our Token stuff
-from linotp.lib.token   import TokenIterator
+from linotp.lib.tokeniterator   import TokenIterator
 from linotp.lib.token   import getTokenType
 from linotp.lib.token   import newToken
 
 
-from linotp.lib.user    import getUserFromParam, getUserFromRequest, getAdminRealms
+from linotp.lib.user    import getUserFromParam, getUserFromRequest
 from linotp.lib.user    import getUserList, User
 
 from linotp.lib.util    import getParam
@@ -59,6 +59,7 @@ from linotp.lib.reply   import sendError
 
 from linotp.lib.util    import remove_empty_lines
 from linotp.lib.util import get_client
+from linotp.lib.util import unicode_compare
 from linotp.model.meta import Session
 
 from linotp.lib.policy import checkPolicyPre, PolicyException, getAdminPolicies, getPolicyDefinitions
@@ -91,7 +92,6 @@ class ManageController(BaseController):
             audit.initialize()
             c.audit['success'] = False
             c.audit['client'] = get_client()
-            self.set_language()
 
             c.version = get_version()
             c.licenseinfo = get_copyright_info()
@@ -445,7 +445,8 @@ class ManageController(BaseController):
             user = getUserFromParam(param, optional)
             # check admin authorization
             # check if we got a realm or resolver, that is ok!
-            checkPolicyPre('admin', 'userlist', { 'user': "dummy", 'realm' : c.realm })
+            checkPolicyPre('admin', 'userlist', { 'user': user.login,
+                                                 'realm' : c.realm })
 
             if c.filter == "":
                 c.filter = "*"
@@ -492,7 +493,11 @@ class ManageController(BaseController):
                     'mobile' :5, 'phone' : 6, 'userid' : 7 }
             if c.dir == "desc":
                 reverse = True
-            lines = sorted(lines, key=lambda user: user['cell'][sortnames[c.sort]] , reverse=reverse)
+
+            lines = sorted(lines,
+                           key=lambda user: user['cell'][sortnames[c.sort]],
+                           reverse=reverse,
+                           cmp=unicode_compare)
             # end: sorting
 
             # reducing the page

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP smsprovider.
 #
@@ -24,11 +24,13 @@
 #    Support: www.lsexperts.de
 #
 
-from distutils.core import setup
+from setuptools import setup, find_packages
+
+from smsprovider import __version__
 
 setup(
     name='SMSProvider',
-    version='2.7.1.dev0',
+    version=__version__,
     description='LinOTP2 modules for submitting SMS messages',
     author='LSE Leading Security Experts GmbH',
     author_email='linotp@lsexperts.de',

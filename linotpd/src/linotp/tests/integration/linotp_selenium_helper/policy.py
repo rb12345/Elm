@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -39,9 +39,11 @@ class Policy:
         self.action = action
         self.realm = realm
 
-        driver.get(base_url + "/manage/")
+        driver.get(base_url + "/manage")
         driver.find_element_by_xpath("//div[@id='tabs']/ul/li[3]/a").click()
-        driver.find_element_by_id("policy_active").click()
+        policy_active_cb = driver.find_element_by_id("policy_active")
+        if not policy_active_cb.is_selected():
+            policy_active_cb.click()
         driver.find_element_by_id("policy_name").clear()
         driver.find_element_by_id("policy_name").send_keys(self.name)
         scope_select = driver.find_element_by_id('policy_scope_combo')

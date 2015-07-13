@@ -3,7 +3,7 @@
 <!--
  *
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -26,16 +26,28 @@
  *    Support: www.lsexperts.de
  *
 -->
+
+<%!
+from pylons.i18n.translation import get_lang
+%>
+
+<%
+lang = get_lang() or "en"
+allang = "%r" % lang
+if isinstance(lang, list):
+    lang = lang[0]
+%>
+
 <html>
 <head>
 <title>${_("LinOTP 2 User self service")}</title>
-<meta name="author" content="Cornelius Kölbel">
-<meta name="date" content="2010-03-14T20:35:38+0100">
 <meta name="copyright" content="LSE Leading Security Experts GmbH">
 <meta name="keywords" content="LinOTP 2, self service">
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8">
 <meta http-equiv="content-style-type" content="text/css">
+
+<meta http-equiv="X-UA-Compatible" content="IE=8,chrome=1" />
 
 <link type="text/css" rel="stylesheet" href="/css/linotp.css"/>
 <link type="text/css" rel="stylesheet" href="/selfservice/style.css" />
@@ -53,6 +65,15 @@
 <script type="text/javascript" src="/js/qrcode-helper.js"></script>
 <script type="text/javascript" src="/js/linotp_utils.js"></script>
 <script type="text/javascript" src="/js/flexigrid.js"></script>
+
+<!-- load language settings befor selfservice.js -->
+<script type="text/javascript">
+    window.CURRENT_LANGUAGE = "${lang}";
+    window.ALL_CURRENT_LANGUAGE = "${allang}";
+</script>
+
+<script type="text/javascript" src="/js/jed.js"></script>
+
 <script type="text/javascript" src="/js/selfservice.js"></script>
 
 
@@ -77,13 +98,9 @@
 
 <div id="sidebar">
 
-	<div id="logout">
-	<a href="/account/logout">${_("Logout")}</a>
-	</div> <!-- logout -->
+    <div>${_("Tokens for user:")} ${c.user} ${_("in realm")} ${c.realm}</div>
 
-	<div>${_("Tokens for user:")} ${c.user} ${_("in realm")} ${c.realm}</div>
-
-	<div id='tokenDiv'>
+    <div id='tokenDiv'>
 
     </div>
 
@@ -96,63 +113,63 @@
 <div id="main">
 
 <div id="tabs">
-	<ul>
-		% for entry in c.dynamic_actions:
-			<li><a href='/selfservice/load_form?type=${entry}'>
-				<span>${c.dynamic_actions[entry] |n}</span></a></li>
-		% endfor
+    <ul>
+        % for entry in c.dynamic_actions:
+            <li><a href='/selfservice/load_form?type=${entry}'>
+                <span>${c.dynamic_actions[entry] |n}</span></a></li>
+        % endfor
 
-	    % if 'activateQR' in c.actions:
-			<li><a href="/selfservice/activateqrtoken"><span>${_("Activate your QR token")}</span></a></li>
-		%endif
-	    % if 'webprovisionOCRAToken' in c.actions:
-			<li><a href="/selfservice/webprovisionocratoken"><span>${_("Activate your OCRA token")}</span></a></li>
-		%endif
-	    % if 'webprovisionOATH' in c.actions:
-			<li><a href="/selfservice/webprovisionoathtoken"><span>${_("Enroll OATH token")}</span></a></li>
-		%endif
-		% if 'webprovisionGOOGLE' in c.actions or 'webprovisionGOOGLEtime' in c.actions:
-			<li><a href="/selfservice/webprovisiongoogletoken"><span>${_("Enroll Google Authenticator")}</span></a></li>
-		%endif
+        % if 'activateQR' in c.actions:
+            <li><a href="/selfservice/activateqrtoken"><span>${_("Activate your QR token")}</span></a></li>
+        %endif
+        % if 'webprovisionOCRAToken' in c.actions:
+            <li><a href="/selfservice/webprovisionocratoken"><span>${_("Activate your OCRA token")}</span></a></li>
+        %endif
+        % if 'webprovisionOATH' in c.actions:
+            <li><a href="/selfservice/webprovisionoathtoken"><span>${_("Enroll OATH token")}</span></a></li>
+        %endif
+        % if 'webprovisionGOOGLE' in c.actions or 'webprovisionGOOGLEtime' in c.actions:
+            <li><a href="/selfservice/webprovisiongoogletoken"><span>${_("Enroll OATH soft token")}</span></a></li>
+        %endif
 
-		% if 'webprovisionElm' in c.actions:
-			<li><a href="/selfservice/webprovisionelm"><span>${_("Activate Two-Factor Authentication")}</span></a></li>
-		%endif
+        % if 'webprovisionElm' in c.actions:
+            <li><a href="/selfservice/webprovisionelm"><span>${_("Activate Two-Factor Authentication")}</span></a></li>
+        %endif
 
-		% if 'assign' in c.actions:
-			<li><a href="/selfservice/assign"><span>${_("Assign Token")}</span></a></li>
-		%endif
-		%if 'disable' in c.actions:
-		<li><a href="/selfservice/disable"><span>${_("Disable Token")}</span></a></li>
-		%endif
-		%if 'enable' in c.actions:
-		<li><a href="/selfservice/enable"><span>${_("Enable Token")}</span></a></li>
-		%endif
-		%if 'resync' in c.actions:
-		<li><a href="/selfservice/resync"><span>${_("Resync Token")}</span></a></li>
-		%endif
-		%if 'reset' in c.actions:
-		<li><a href="/selfservice/reset"><span>${_("Reset Failcounter")}</span></a></li>
-		%endif
-		%if 'setOTPPIN' in c.actions:
-		<li><a href="/selfservice/setpin"><span>${_("Change Token PIN")}</span></a></li>
-		%endif
-		%if 'setMOTPPIN' in c.actions:
-		<li><a href="/selfservice/setmpin"><span>${_("set mOTP PIN")}</span></a></li>
-		%endif
-		%if 'getotp' in c.actions:
-		<li><a href="/selfservice/getotp"><span>${_("get OTP values")}</span></a></li>
-		%endif
-		%if 'unassign' in c.actions:
-		<li><a href="/selfservice/unassign"><span>${_("unassign Token")}</span></a></li>
-		%endif
-		%if 'delete' in c.actions:
-		<li><a href="/selfservice/delete"><span>${_("Delete Token")}</span></a></li>
-		%endif
-		%if 'history' in c.actions:
-		<li><a href="/selfservice/history"><span>${_("History")}</span></a></li>
-		%endif
-	</ul>
+        % if 'assign' in c.actions:
+            <li><a href="/selfservice/assign"><span>${_("Assign Token")}</span></a></li>
+        %endif
+        %if 'disable' in c.actions:
+        <li><a href="/selfservice/disable"><span>${_("Disable Token")}</span></a></li>
+        %endif
+        %if 'enable' in c.actions:
+        <li><a href="/selfservice/enable"><span>${_("Enable Token")}</span></a></li>
+        %endif
+        %if 'resync' in c.actions:
+        <li><a href="/selfservice/resync"><span>${_("Resync Token")}</span></a></li>
+        %endif
+        %if 'reset' in c.actions:
+        <li><a href="/selfservice/reset"><span>${_("Reset Failcounter")}</span></a></li>
+        %endif
+        %if 'setOTPPIN' in c.actions:
+        <li><a href="/selfservice/setpin"><span>${_("set PIN")}</span></a></li>
+        %endif
+        %if 'setMOTPPIN' in c.actions:
+        <li><a href="/selfservice/setmpin"><span>${_("set mOTP PIN")}</span></a></li>
+        %endif
+        %if 'getotp' in c.actions:
+        <li><a href="/selfservice/getotp"><span>${_("get OTP values")}</span></a></li>
+        %endif
+        %if 'unassign' in c.actions:
+        <li><a href="/selfservice/unassign"><span>${_("unassign Token")}</span></a></li>
+        %endif
+        %if 'delete' in c.actions:
+        <li><a href="/selfservice/delete"><span>${_("delete Token")}</span></a></li>
+        %endif
+        %if 'history' in c.actions:
+        <li><a href="/selfservice/history"><span>${_("History")}</span></a></li>
+        %endif
+    </ul>
 </div>
 
 <div id='errorDiv'> </div>
@@ -161,7 +178,7 @@
 </div>  <!-- end of main-->
 
 <div id="footer">
-${c.version} --- ${c.licenseinfo}
+${c.version} --- &copy; ${c.licenseinfo}
 </div>
 
 
@@ -170,7 +187,7 @@ ${c.version} --- ${c.licenseinfo}
 <input type='hidden' id='token_enroll_ok'   value='${_("Token enrolled successfully:\n %s")}'/>
 
 <div id="alert_box">
-	<span id="alert_box_text"> </span>
+    <span id="alert_box_text"> </span>
 </div>
 
 </body>

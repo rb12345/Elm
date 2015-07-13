@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -25,6 +25,7 @@
 #
 '''The Controller's Base class '''
 import os
+import re
 
 from pylons.i18n.translation import set_lang
 from pylons.i18n import LanguageError
@@ -39,6 +40,7 @@ from linotp.lib.config import initLinotpConfig
 from linotp.lib.resolver import initResolvers
 from linotp.lib.resolver import setupResolvers
 from linotp.lib.resolver import closeResolvers
+from linotp.lib.user import getUserFromRequest
 
 from linotp.lib.config import getGlobalObject
 
@@ -50,6 +52,9 @@ from linotp import model
 import logging
 log = logging.getLogger(__name__)
 
+# HTTP-ACCEPT-LANGUAGE strings are in the form of i.e.
+# de-DE, de; q=0.7, en; q=0.3
+accept_language_regexp = re.compile(r'\s*([^\s;,]+)\s*[;\s*q=[0-9.]*]?\s*,?')
 
 def set_config(key, value, typ, description=None):
     '''
@@ -129,7 +134,7 @@ def set_defaults():
                description=u"Delay until next challenge is created")
 
 
-    ## setup for totp defaults
+    # setup for totp defaults
     # "linotp.totp.timeStep";"60";"None";"None"
     # "linotp.totp.timeWindow";"600";"None";"None"
     # "linotp.totp.timeShift";"240";"None";"None"
@@ -150,7 +155,7 @@ def set_defaults():
         value=u"240", typ=u"int",
         description=u"Autosync timeout for an totp token")
 
-    ## setup for ocra defaults
+    # setup for ocra defaults
     # OcraDefaultSuite
     # QrOcraDefaultSuite
     # OcraMaxChallenges
@@ -202,7 +207,7 @@ def setup_app(conf, conf_global=None, unitTest=False):
         log.info("Deleting previous tables...")
         meta.metadata.drop_all(bind=meta.engine)
 
-    ## Create the tables if they don't already exist
+    # Create the tables if they don't already exist
     log.info("Creating tables...")
     meta.metadata.create_all(bind=meta.engine)
 
@@ -244,6 +249,10 @@ class BaseController(WSGIController):
         :return: None
 
         """
+        self.sep = None
+        self.set_language(request.headers)
+        self.base_auth_user = ''
+
         self.parent = super(WSGIController, self)
         self.parent.__init__(*args, **kw)
 
@@ -266,6 +275,18 @@ class BaseController(WSGIController):
                 config['app_setup_done'] = False
                 log.error("Failed to serve request: %r" % exx)
                 raise exx
+
+        # set the decryption device before loading linotp config,
+        # so it contains the decrypted values as well
+        glo = getGlobalObject()
+        self.sep = glo.security_provider
+
+        try:
+            hsm = self.sep.getSecurityModule()
+            c.hsm = hsm
+        except Exception as exx:
+            log.error('failed to assign hsm device: %r' % exx)
+            raise exx
 
         l_config = initLinotpConfig()
 
@@ -291,15 +312,18 @@ class BaseController(WSGIController):
         # available in environ['pylons.routes_dict']
 
         path = ""
-        glo = getGlobalObject()
-        sep = glo.security_provider
 
         try:
-            hsm = sep.getSecurityModule()
-            c.hsm = hsm
-
             if environ:
                 path = environ.get("PATH_INFO", "") or ""
+
+            try:
+                user_desc = getUserFromRequest(request)
+                self.base_auth_user = user_desc.get('login', '')
+            except UnicodeDecodeError as exx:
+                # we supress Exception here as it will be handled in the
+                # controller which will return corresponding response
+                log.info('Failed to identify user due to %r' % exx)
 
             log.debug("request %r" % path)
             ret = WSGIController.__call__(self, environ, start_response)
@@ -307,12 +331,12 @@ class BaseController(WSGIController):
 
         finally:
             meta.Session.remove()
-            ## free the lock on the scurityPovider if any
-            sep.dropSecurityModule()
+            # free the lock on the scurityPovider if any
+            if self.sep:
+                self.sep.dropSecurityModule()
             closeResolvers()
 
-
-            ## hint for the garbage collector to make the dishes
+            # hint for the garbage collector to make the dishes
             data_objects = ["resolvers_loaded", "resolver_types",
                             "resolver_clazzes", "linotpConfig", "audit", "hsm"]
             for data_obj in data_objects:
@@ -324,28 +348,35 @@ class BaseController(WSGIController):
 
         return ret
 
-    def set_language(self):
+    def set_language(self, headers):
         '''Invoke before everything else. And set the translation language'''
-        languages = request.headers.get('Accept-Language', '').split(';')
+        languages = headers.get('Accept-Language', '')
+
         found_lang = False
 
-        for language in languages:
-            for lang in language.split(','):
-                try:
-                    # Fix borked language detection on some browsers.
-                    if lang == "en" or lang == "en-gb" or lang == "en-GB":
-                        found_lang = True
-                        break
-                    set_lang(lang)
-                    found_lang = True
-                    break
-                except LanguageError as exx:
-                    pass
+        for match in accept_language_regexp.finditer(languages):
+            # make sure we have a correct language code format
+            language = match.group(1)
+            if not language:
+                continue
+            language = language.replace('_', '-').lower()
 
-            if found_lang is True:
+            # en is the default language
+            # Fix borked language detection in some browsers.
+            if language.split('-')[0] in ['en', 'en-gb', 'en-GB']:
+                found_lang = True
                 break
 
-        if found_lang is False:
+            try:
+                # set_lang needs a locale name formed parameter
+                set_lang(language.replace('-','_'))
+                found_lang = True
+                break
+            except LanguageError:
+                log.debug("Cannot set requested language: %s. Trying next language if available.",
+                          language)
+
+        if not found_lang and languages:
             log.warning("Cannot set preferred language: %r" % languages)
 
         return

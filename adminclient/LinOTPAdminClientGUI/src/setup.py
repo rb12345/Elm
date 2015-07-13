@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP admin clients.
 #
@@ -29,27 +29,29 @@
 from setuptools import setup
 import platform
 
+from linotpadminclientgui import __version__
+
 system = platform.system()
 if system == "Windows":
     import py2exe
 
 setup(
     name='LinOTPAdminClientGUI',
-    version='2.7.1.dev0',
+    version=__version__,
     description='LinOTP GUI client',
     author='LSE Leading Security Experts GmbH',
     author_email='linotp@lsexperts.de',
     url='http://www.linotp.org',
-    packages=['linotputilsgui'],
+    packages=['linotpadminclientgui'],
     install_requires=[
         "configobj>=4.6.0"
 	],
-    scripts=['glinotpadm.py',
+    scripts=['bin/glinotpadm.py',
              'tools/linotp-etng-enrollment' ],
     data_files=[('share//linotpadm', ['linotp_logo_200x68_72dpi.png', 'logo_main_lse.png' ]),
 		('share//linotpadm', ['glinotpadm.glade']),
 		('share/locale/de/LC_MESSAGES', ['locale/de/LC_MESSAGES/LinOTP2.mo']),
-		('share//man//man1', ["glinotpadm.py.1",
+		('share//man//man1', ["doc/glinotpadm.py.1",
                               "tools/linotp-etng-enrollment.1"]),
 	],
     license='AGPLv3, (C) LSE Leading Security Experts GmbH',

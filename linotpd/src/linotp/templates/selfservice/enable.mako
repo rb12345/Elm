@@ -2,7 +2,7 @@
 <!--
  *
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -28,15 +28,15 @@
 <h1>${_("Enable OTP Token")}</h1>
 
 <div id='enableform'>
-	<form class="cmxform" name='myForm'>
-		<fieldset>
-		<table>
-		<tr>
-		<td>${_("selected Token")}</td>
-		<td><input type='text' class='selectedToken'  class="text ui-widget-content ui-corner-all" disabled value='' /></td>
-		</tr>
-		</table>
-		<button class='action-button' id='button_enable' onclick="enable(); return false;">${_("enable Token")}</button>
-		</fieldset>
-	</form>
+    <form class="cmxform" name='myForm'>
+        <fieldset>
+        <table>
+        <tr>
+        <td>${_("selected Token")}</td>
+        <td><input type='text' class='selectedToken'  class="text ui-widget-content ui-corner-all" disabled value='' /></td>
+        </tr>
+        </table>
+        <button class='action-button' id='button_enable' onclick="enable(); return false;">${_("enable Token")}</button>
+        </fieldset>
+    </form>
 </div>

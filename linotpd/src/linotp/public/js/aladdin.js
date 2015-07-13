@@ -1,6 +1,6 @@
 /*!
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -46,8 +46,9 @@ function create_aladdin_dialog() {
 				}
         },
         open: function() {
-        	translate_import_safenet();
-        	do_dialog_icons();
+            translate_import_safenet();
+            _fill_realms($('#safenet_realm'),1);
+            do_dialog_icons();
         }
     });
 	return $dialog_load_tokens_aladdin ;

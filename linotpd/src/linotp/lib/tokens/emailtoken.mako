@@ -2,7 +2,7 @@
 <%doc>
  *
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -29,7 +29,7 @@
 
 
 %if c.scope == 'config.title' :
-${_("E-mail OTP token")}
+${_("E-mail OTP Token")}
 %endif
 
 
@@ -70,8 +70,17 @@ function email_get_config_params(){
 }
 
 $(document).ready(function () {
-    $("#form_emailconfig").validate();
+    $("#form_emailconfig").validate({
+        rules: {
+            email_provider_config: {
+                valid_json: true
+            }
+        }
+       });
 });
+
+
+
 </script>
 
 <form class="cmxform" id="form_emailconfig">
@@ -79,15 +88,18 @@ $(document).ready(function () {
     <legend>${_("E-mail provider config")}</legend>
     <table>
         <tr>
-	        <td><label for="c_email_provider">${_("E-mail provider")}</label>: </td>
-	        <td><input type="text" name="email_provider" class="required"  id="c_email_provider" size="37" maxlength="80"></td>
+	        <td><label for="c_email_provider">${_("Provider")}</label>: </td>
+	        <td><input type="text" name="email_provider" class="required"  id="c_email_provider" size="37" maxlength="80"
+	                   placeholder="linotp.lib.emailprovider.SMTPEmailProvider"></td>
         </tr>
         <tr>
-	        <td><label for="c_email_provider_config">${_("E-mail provider config")}</label>: </td>
-	        <td><textarea name="email_provider_config" class="required"  id="c_email_provider_config" cols='35' rows='6' maxlength="400"></textarea></td>
+	        <td><label for="c_email_provider_config">${_("Provider config")}</label>: </td>
+	        <td><textarea name="email_provider_config" class="required"  id="c_email_provider_config" cols='35' rows='6' maxlength="400"
+	                      placeholder='{ "SMTP_SERVER":"mail.example.com", "SMTP_USER":"secret_user", "SMTP_PASSWORD":"secret_pasword" "EMAIL_FROM":"linotp@example.com" "EMAIL_SUBJECT":"Your OTP"}'
+	            ></textarea></td>
         </tr>
         <tr>
-	        <td><label for="c_email_challenge_validity">${_("E-mail challenge validity (sec)")}</label>: </td>
+	        <td><label for="c_email_challenge_validity">${_("Challenge validity (sec)")}</label>: </td>
 	        <td><input type="text" name="email_challenge_validity" class="required"  id="c_email_challenge_validity" size="5" maxlength="5"></td>
         </tr>
         <tr>
@@ -106,12 +118,17 @@ ${_("E-mail token")}
 
 %if c.scope == 'enroll' :
 <script>
-function email_enroll_setup_defaults(config){
+function email_enroll_setup_defaults(config, options){
 	// in case we enroll e-mail otp, we get the e-mail address of the user
 	email_addresses = get_selected_email();
 	$('#email_address').val($.trim(email_addresses[0]));
+    var rand_pin = options['otp_pin_random'];
+    if (rand_pin > 0) {
+        $("[name='set_pin_rows']").hide();
+    } else {
+        $("[name='set_pin_rows']").show();
+    }
 }
-
 /*
  * 'typ'_get_enroll_params()
  *
@@ -125,18 +142,127 @@ function email_get_enroll_params(){
     params['email_address']	= $('#email_address').val();
     params['description'] = $('#email_address').val() + " " + $('#enroll_email_desc').val();
     jQuery.extend(params, add_user_data());
+    if ($('#email_pin1').val() != '') {
+        params['pin'] = $('#email_pin1').val();
+    }
     return params;
 }
 </script>
-
+<hr>
 <table><tr>
 	<td><label for="email_address">${_("E-mail address")}</label></td>
 	<td><input type="text" name="email_address" id="email_address" value="" class="text ui-widget-content ui-corner-all"></td>
-</tr><tr>
+</tr>
+<tr>
     <td><label for="enroll_email_desc" id='enroll_email_desc_label'>${_("Description")}</label></td>
     <td><input type="text" name="enroll_email_desc" id="enroll_email_desc" value="webGUI_generated" class="text" /></td>
+</tr>
+<tr name="set_pin_rows" class="space" title='${_("Protect your token with a static PIN")}'><th colspan="2">${_("Token PIN:")}</th></tr>
+<tr  name='set_pin_rows'>
+    <td class="description"><label for="email_pin1" id="email_pin1_label">${_("enter PIN")}:</label></td>
+    <td><input type="password" autocomplete="off" onkeyup="checkpins('email_pin1','email_pin2');" name="pin1" id="email_pin1"
+            class="text ui-widget-content ui-corner-all" /></td>
+</tr><tr name='set_pin_rows'>
+    <td class="description"><label for="email_pin2" id="email_pin2_label">${_("confirm PIN")}:</label></td>
+    <td><input type="password" autocomplete="off" onkeyup="checkpins('email_pin1','email_pin2');" name="pin2" id="email_pin2"
+            class="text ui-widget-content ui-corner-all" /></td
 </tr>
 </table>
 
 %endif
 
+#####
+%if c.scope == 'selfservice.title.enroll':
+${_("Enroll EMail Token")}
+%endif
+
+
+%if c.scope == 'selfservice.enroll':
+
+<%!
+    from linotp.lib.user import getUserDetail
+%>
+<%
+    try:
+        info = getUserDetail(c.authUser)
+        emailaddress = info.get("email",'')
+    except Exception as exx:
+        emailaddress = ''
+%>
+
+<script>
+
+    $('#form_register_email').validate({
+        rules: {
+            email_address: {
+                required: true,
+                minlength: 3,
+                email: true
+            }
+        }
+    });
+
+
+function self_email_get_param()
+{
+    var urlparam = {};
+    var emailaddress = $('#email_address').val();
+
+
+    urlparam['type'] = 'email';
+    urlparam['email_address'] = emailaddress;
+    urlparam['description'] = emailaddress + '_' + $("#email_self_desc").val();
+
+    return urlparam;
+}
+
+function self_email_clear()
+{
+    return true;
+}
+function self_email_submit(){
+
+    var ret = false;
+
+    if ($('#form_register_email').valid()) {
+        var params =  self_email_get_param();
+        enroll_token(params);
+        ret = true;
+    } else {
+        alert('${_("Input data is not valid!")}');
+    }
+    return ret;
+}
+
+</script>
+
+<h1>${_("Enroll your email token")}</h1>
+<div id='register_email_form'>
+    <form class="cmxform" id='form_register_email'>
+    <fieldset>
+        <table>
+        <tr>
+        <td><label for='email_address'>${_("Your email address")}</label></td>
+        <td><input id='email_address'
+                    name='email_address'
+                    class="required ui-widget-content ui-corner-all"
+                    value='${emailaddress}'
+
+                    %if c.edit_email == 0:
+                            readonly  disabled
+                    %endif
+                    />
+        </td>
+        </tr>
+        <tr>
+            <td><label for="email_self_desc" id='email_self_desc_label'>${_("Description")}</label></td>
+            <td><input type="text" name="email_self_desc" id="email_self_desc"
+                        value="self_registered"; class="text" /></td>
+        </tr>
+        </table>
+        <button class='action-button' id='button_register_email'
+                onclick="self_email_submit();">${_("enroll email token")}</button>
+    </fieldset>
+    </form>
+</div>
+% endif

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -91,11 +91,16 @@ class TestFixesController(TestController):
     def setUp(self):
         ''' setup the Test Controller'''
         TestController.setUp(self)
+        self.set_config_selftest()
+        self.__createResolvers__()
+        self.__createRealms__()
         self.serials = []
 
     def tearDown(self):
         ''' make the dishes'''
         self.remove_tokens()
+        self.__deleteAllRealms__()
+        self.__deleteAllResolvers__()
         TestController.tearDown(self)
         return
 

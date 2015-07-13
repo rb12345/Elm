@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -55,7 +55,10 @@ import linotp
 
 # Create the logging object from the linotp.ini config file
 ini_file = config.get("__file__")
-logging.config.fileConfig(ini_file, disable_existing_loggers=False)
+if ini_file is not None:
+    # When importing the module with Sphinx to generate documentation
+    # 'ini_file' is None. In other cases this should not be the case.
+    logging.config.fileConfig(ini_file, disable_existing_loggers=False)
 log = logging.getLogger(__name__)
 
 metadata = schema.MetaData()
@@ -271,7 +274,7 @@ class Audit(AuditBase):
             column.create(audit_table)
         except Exception as exx:
             # Obviously we already migrated the database.
-            log.info("[__init__] Assuming database migration is complete: %r" % exx)
+            log.info("[__init__] Error during database migration: %r" % exx)
 
 
     def _attr_to_dict(self, audit_line):
@@ -420,8 +423,7 @@ class Audit(AuditBase):
         '''
         create the sqlalchemy condition from the params
         '''
-        condition = None
-
+        conditions = []
         boolCheck = and_
         if not AND:
             boolCheck = or_
@@ -432,47 +434,38 @@ class Audit(AuditBase):
         for k, v in param.items():
             if "" != v:
                 if "serial" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.serial.like(v))
+                    conditions.append(AuditTable.serial.like(v))
                 elif "user" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.user.like(v))
+                    conditions.append(AuditTable.user.like(v))
                 elif "realm" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.realm.like(v))
+                    conditions.append(AuditTable.realm.like(v))
                 elif "action" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.action.like(v))
+                    conditions.append(AuditTable.action.like(v))
                 elif "action_detail" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.action_detail.like(v))
+                    conditions.append(AuditTable.action_detail.like(v))
                 elif "date" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.timestamp.like(v))
+                    conditions.append(AuditTable.timestamp.like(v))
                 elif "number" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.id.like(v))
+                    conditions.append(AuditTable.id.like(v))
                 elif "success" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.success.like(v))
+                    conditions.append(AuditTable.success.like(v))
                 elif "tokentype" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.tokentype.like(v))
+                    conditions.append(AuditTable.tokentype.like(v))
                 elif "administrator" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.administrator.like(v))
+                    conditions.append(AuditTable.administrator.like(v))
                 elif "info" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.info.like(v))
+                    conditions.append(AuditTable.info.like(v))
                 elif "linotp_server" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.linotp_server.like(v))
+                    conditions.append(AuditTable.linotp_server.like(v))
                 elif "client" == k:
-                    condition = boolCheck(condition,
-                                      AuditTable.client.like(v))
+                    conditions.append(AuditTable.client.like(v))
 
-        log.debug("[_buildCondition] return %s" % condition)
-        return condition
+        all_conditions = None
+        if conditions:
+            all_conditions = boolCheck(*conditions)
+
+        log.debug("[_buildCondition] return %s" % all_conditions)
+        return all_conditions
 
     def row2dict(self, audit_line):
         """

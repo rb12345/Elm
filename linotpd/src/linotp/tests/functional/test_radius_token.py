@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -31,9 +31,39 @@ from linotp.tests import TestController, url
 
 log = logging.getLogger(__name__)
 
+DEFAULT_NOSE_CONFIG = {
+    'radius': {
+        'authport': '18012',
+        'acctport': '18013',
+        }
+    }
+try:
+    from testconfig import config as nose_config
+except ImportError as exc:
+    print "You need to install nose-testconfig. Will use default values."
+    nose_config = None
+
+
 class TestRadiusToken(TestController):
 
     p = None
+
+    def setUp(self):
+        TestController.setUp(self)
+        self.set_config_selftest()
+        self.__createResolvers__()
+        self.__createRealms__()
+        if nose_config and 'radius' in nose_config:
+            self.radius_authport = nose_config['radius']['authport']
+            self.radius_acctport = nose_config['radius']['acctport']
+        else:
+            self.radius_authport = DEFAULT_NOSE_CONFIG['radius']['authport']
+            self.radius_acctport = DEFAULT_NOSE_CONFIG['radius']['acctport']
+
+    def tearDown(self):
+        self.__deleteAllRealms__()
+        self.__deleteAllResolvers__()
+        TestController.tearDown(self)
 
     def test_00_create_radius_token(self):
         # The token with the remote PIN
@@ -45,7 +75,7 @@ class TestRadiusToken(TestController):
                       "user"    : "remoteuser",
                       "pin"     : "pin",
                       "description" : "RadiusToken1",
-                      'radius.server' : 'localhost:18012',
+                      'radius.server' : 'localhost:%s' % self.radius_authport,
                       'radius.local_checkpin' : 0,
                       'radius.user' : 'user_with_pin',
                       'radius.secret' : 'testing123',
@@ -60,7 +90,7 @@ class TestRadiusToken(TestController):
                       "user"    : "localuser",
                       "pin"     : "pin",
                       "description" : "RadiusToken2",
-                      'radius.server' : 'localhost:18012',
+                      'radius.server' : 'localhost:%s' % self.radius_authport,
                       'radius.local_checkpin' : 1,
                       'radius.user' : 'user_no_pin',
                       'radius.secret' : 'testing123',
@@ -103,11 +133,34 @@ class TestRadiusToken(TestController):
         import subprocess
         import os.path
 
-        radius_server_file = "linotp/tests/tools/dummy_radius_server.py"
+        radius_server_file = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            '..',
+            'tools',
+            'dummy_radius_server.py',
+            )
+        dictionary_file = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            '..',
+            '..',
+            '..',
+            'config',
+            'dictionary',
+            )
         self.assertTrue(os.path.isfile(radius_server_file) == True,
                         "radius demo server not found: %s" % radius_server_file)
 
-        self.p = subprocess.Popen([radius_server_file])
+        self.p = subprocess.Popen(
+            [
+                radius_server_file,
+                "--dict",
+                dictionary_file,
+                "--authport",
+                self.radius_authport,
+                "--acctport",
+                self.radius_acctport,
+                ]
+            )
         assert self.p is not None
 
         return

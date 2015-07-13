@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -32,8 +32,6 @@ from pylons.i18n.translation import _
 from linotp.lib.tokenclass import TokenClass
 
 from linotp.lib.ImportOTP.vasco import vasco_otp_check
-from linotp.lib.ImportOTP.vasco import compress
-from linotp.lib.ImportOTP.vasco import decompress
 
 import logging
 log = logging.getLogger(__name__)
@@ -111,7 +109,7 @@ class VascoTokenClass(TokenClass):
     def reset(self):
         TokenClass.reset(self)
 
-    def check_otp_exist(self, otp, window=10):
+    def check_otp_exist(self, otp, window=10, user=None, autoassign=False):
         '''
         checks if the given OTP value is/are values of this very token.
         This is used to autoassign and to determine the serial number of
@@ -142,15 +140,23 @@ class VascoTokenClass(TokenClass):
 
         secObject = self.token.getHOtpKey()
         otpkey = secObject.getKey()
-        data = decompress(otpkey)
         # let vasco handle the OTP checking
-        (res, data) = vasco_otp_check(data, anOtpVal)
+        ret = vasco_otp_check(otpkey, anOtpVal)
+        if ret is None:
+            log.info("Failed to authenticate due to missing vasco dll!")
+            return -1
+
+        # if all is ok, we get the result tupple from the return
+        (res, otpkey) = ret
+
         # update the vasco data blob
-        self.update({"otpkey" : compress(data)})
+        self.update({"otpkey": otpkey})
 
         if res != 0:
-            log.warning("[checkOtp] Vasco token failed to authenticate. Vasco Error code: %d" % res)
-            # TODO: Vasco gives much more detailed error codes. But at the moment we do not handle more error codes!
+            log.warning("[checkOtp] Vasco token failed to authenticate. "
+                        "Vasco Error code: %d" % res)
+            # TODO: Vasco gives much more detailed error codes. But at the
+            # moment we do not handle more error codes!
             res = -1
 
         return res

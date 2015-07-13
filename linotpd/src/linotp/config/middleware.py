@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -35,6 +35,17 @@ from pylons.middleware import ErrorHandler, StatusCodeRedirect
 from pylons.wsgiapp import PylonsApp
 from routes.middleware import RoutesMiddleware
 from linotp.config.environment import load_environment
+from contextlib import contextmanager
+
+try:
+    from pylons.configuration import PylonsConfig as PyConf
+except ImportError:
+    class PyConf(dict): pass
+
+import binascii
+import re
+import os
+import tempfile
 
 profile_load = False
 try:
@@ -77,7 +88,7 @@ def make_app(global_conf, full_stack=True, static_files=True, **app_conf):
 
     """
     # Configure the Pylons environment
-    load_environment(global_conf, app_conf)
+    config = load_environment(global_conf, app_conf)
 
     # The Pylons WSGI app
     app = PylonsApp()
@@ -122,7 +133,48 @@ def make_app(global_conf, full_stack=True, static_files=True, **app_conf):
 
     # repoze.who
     if repoze_load:
-        app = make_who_with_config(app, global_conf, app_conf['who.config_file'], app_conf['who.log_file'], app_conf['who.log_level'])
+        if 'who.generate_random_secret' in app_conf and not app_conf['who.generate_random_secret']:
+            app = make_who_with_config(app, global_conf, app_conf['who.config_file'], app_conf['who.log_file'], app_conf['who.log_level'])
+        else:
+            # Read the current configuration file and replace "secret" keys in every line
+            who_config_lines = []
+            secret = binascii.hexlify(os.urandom(16))
+            if len(secret) != 32:
+                raise RuntimeError('Could not generate random repoze.who secret, no os.urandom support?')
+
+            with open(app_conf['who.config_file']) as f:
+                for line in f.readlines():
+                    who_config_lines.append(re.sub(r'^(secret)\s*=\s*.*$', r'\1 = %s' % secret, line))
+            with tempinput(''.join(who_config_lines)) as who_config_file:
+                app = make_who_with_config(app, global_conf, who_config_file, app_conf['who.log_file'], app_conf['who.log_level'])
+
+
+    # this is a compatibility hack for pylons > 1.0!!!
+    conf = PyConf(config)
+
+    conf['global_conf'] = global_conf
+    conf['app_conf'] = app_conf
+    conf['__file__'] = global_conf['__file__']
+    conf['FILE'] = global_conf['__file__']
+    conf['routes.map'] = config['routes.map']
+
+    if not hasattr(conf, 'init_app'):
+        setattr(conf, 'init_app', config.init_app)
+    app.config = conf
 
     return app
 
+
+@contextmanager
+def tempinput(data):
+    """
+    Create a temporary file containing data.
+    Uses contextmanager to make sure that the file is deleted after use.
+    :param data: Contents of temporary file
+    :return: Filename of temporary file
+    """
+    temp = tempfile.NamedTemporaryFile(delete=False)
+    temp.write(data)
+    temp.close()
+    yield temp.name
+    os.unlink(temp.name)

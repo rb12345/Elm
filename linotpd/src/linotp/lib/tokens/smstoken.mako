@@ -2,7 +2,7 @@
 <%doc>
  *
  *   LinOTP - the open source solution for two factor authentication
- *   Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+ *   Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
  *
  *   This file is part of LinOTP server.
  *
@@ -71,20 +71,28 @@ function sms_get_config_params(){
 }
 
 $(document).ready(function () {
-    $("#form_smsconfig").validate();
+    $("#form_smsconfig").validate({
+        rules: {
+            sms_provider_config: {
+                valid_json: true
+            }
+        }
+       });
 });
  </script>
 
 <form class="cmxform" id="form_smsconfig"><fieldset>
-<legend>${_("SMS Provider Config")}</legend>
+<legend>${_("SMS provider config")}</legend>
 <table><tr>
-	<td><label for="c_sms_provider">${_("SMS Provider")}</label>: </td>
-	<td><input type="text" name="sms_provider" class="required"  id="c_sms_provider" size="37" maxlength="80"></td>
+	<td><label for="c_sms_provider">${_("Provider")}</label>: </td>
+	<td><input type="text" name="sms_provider" class="required"  id="c_sms_provider" size="37" maxlength="80"
+	           placeholder="smsprovider.HttpSMSProvider.HttpSMSProvider"></td>
 </tr><tr>
-	<td><label for='c_sms_provider_config'>${_("SMS Provider Config")}</label>: </td>
-	<td><textarea name="sms_provider_config" class="required"  id="c_sms_provider_config" cols='35' rows='6' maxlength="400"> </textarea></td>
+	<td><label for='c_sms_provider_config'>${_("Provider Config")}</label>: </td>
+	<td><textarea name="sms_provider_config" class="required"  id="c_sms_provider_config" cols='35' rows='6' maxlength="400"
+                  placeholder="{ 'URL':'http://smsproviderurl:5001/http2sms', 'PARAMETER': 'your url parameter as json', 'SMS_TEXT_KEY':'text', 'SMS_PHONENUMBER_KEY':'to', 'RETURN_SUCCESS':'ID'}"></textarea></td>
 </tr><tr>
-	<td><label for='c_sms_timeout'>${_("SMS Timeout")}</label>: </td>
+	<td><label for='c_sms_timeout'>${_("Timeout")}</label>: </td>
 	<td><input type="text" name="sms_timeout" class="required"  id="c_sms_timeout" size="5" maxlength="5"></td>
 </tr><tr>
 	<td><label for='c_sms_blocking'>${_("Time between SMS (sec.)")}</label>: </td>
@@ -102,10 +110,16 @@ ${_("SMS OTP")}
 %if c.scope == 'enroll' :
 <script>
 
-function sms_enroll_setup_defaults(config){
+function sms_enroll_setup_defaults(config,options){
 	// in case we enroll sms otp, we get the mobile number of the user
 	mobiles = get_selected_mobile();
 	$('#sms_phone').val($.trim(mobiles[0]));
+    var rand_pin = options['otp_pin_random'];
+    if (rand_pin > 0) {
+        $("[name='set_pin_rows']").hide();
+    } else {
+        $("[name='set_pin_rows']").show();
+    }
 }
 
 /*
@@ -126,17 +140,33 @@ function sms_get_enroll_params(){
 
     jQuery.extend(params, add_user_data());
 
+    if ($('#sms_pin1').val() != '') {
+        params['pin'] = $('#sms_pin1').val();
+    }
+
     return params;
 }
 </script>
-
+<hr>
 <p>${_("Please enter the mobile phone number for the SMS token")}</p>
 <table><tr>
 	<td><label for="sms_phone">${_("phone number")}</label></td>
 	<td><input type="text" name="sms_phone" id="sms_phone" value="" class="text ui-widget-content ui-corner-all"></td>
-</tr><tr>
+</tr>
+<tr>
     <td><label for="enroll_sms_desc" id='enroll_sms_desc_label'>${_("Description")}</label></td>
     <td><input type="text" name="enroll_sms_desc" id="enroll_sms_desc" value="webGUI_generated" class="text" /></td>
+</tr>
+<tr name="set_pin_rows" class="space" title='${_("Protect your token with a static PIN")}'><th colspan="2">${_("Token PIN:")}</th></tr>
+<tr name="set_pin_rows">
+    <td class="description"><label for="sms_pin1" id="sms_pin1_label">${_("enter PIN")}:</label></td>
+    <td><input type="password" autocomplete="off" onkeyup="checkpins('sms_pin1','sms_pin2');" name="pin1" id="sms_pin1"
+            class="text ui-widget-content ui-corner-all" /></td>
+</tr>
+<tr name="set_pin_rows">
+    <td class="description"><label for="sms_pin2" id="sms_pin2_label">${_("confirm PIN")}:</label></td>
+    <td><input type="password" autocomplete="off" onkeyup="checkpins('sms_pin1','sms_pin2');" name="pin2" id="sms_pin2"
+            class="text ui-widget-content ui-corner-all" /></td
 </tr>
 </table>
 
@@ -226,9 +256,15 @@ function self_sms_submit(){
 		<tr>
 		<td><label for='sms_mobilephone'>${_("Your mobile phone number")}</label></td>
 		<td><input id='sms_mobilephone'
-					name='sms_mobilephone'
-					class="required ui-widget-content ui-corner-all"
-					value='${phonenumber}'/>
+                    name='sms_mobilephone'
+                    class="required ui-widget-content ui-corner-all"
+                    value='${phonenumber}'
+
+                    %if c.edit_sms == 0:
+                           readonly  disabled
+                    %endif
+
+                    />
 		</td>
 		</tr>
 		<tr>

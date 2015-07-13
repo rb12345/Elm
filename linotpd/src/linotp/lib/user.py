@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #    LinOTP - the open source solution for two factor authentication
-#    Copyright (C) 2010 - 2014 LSE Leading Security Experts GmbH
+#    Copyright (C) 2010 - 2015 LSE Leading Security Experts GmbH
 #
 #    This file is part of LinOTP server.
 #
@@ -59,6 +59,7 @@ class User(object):
         self.login = ""
         self.realm = ""
         self.conf = ""
+        self.info = None
 
         if login is not None:
             self.login = login
@@ -71,6 +72,7 @@ class User(object):
         self.resolverUid = {}
         self.resolverConf = {}
         self.resolvers_list = []
+        self._exists = None
 
     def getRealm(self):
         return self.realm
@@ -82,25 +84,25 @@ class User(object):
         return self.login
 
     def isEmpty(self):
-        ## ignore if only conf is set! as it makes no sense
+        # ignore if only conf is set! as it makes no sense
         if len(self.login) + len(self.realm) == 0:
             return True
         else:
             return False
-##def __eq__(self,other):
-##    ret = False
-##    if other is None:
-##        if self.isEmpty() == True:
-##            return True
-##        else:
-##            return False
-##    if other.login == self.login and self.realm == other.realm and other.conf == self.conf:
-##        return True
-##    else:
-##        return False
+# def __eq__(self,other):
+#    ret = False
+#    if other is None:
+#        if self.isEmpty() == True:
+#            return True
+#        else:
+#            return False
+#    if other.login == self.login and self.realm == other.realm and other.conf == self.conf:
+#        return True
+#    else:
+#        return False
 
-##def __ne__(self,other):
-##      return not(self.__eq__(other))
+# def __ne__(self,other):
+#      return not(self.__eq__(other))
 
     def __str__(self):
         ret = str(None)
@@ -144,6 +146,31 @@ class User(object):
 
         return uid
 
+    def getUserPerConf(self):
+        """
+        a wildcard usr (realm = *) could have multiple configurations
+        this method will return a list of uniq users, one per configuration
+
+        :return: list of users
+        """
+        resolvers = self.getResolvers()
+        if len(resolvers) == 1:
+            return [self]
+
+        # if we have multiple resolvers in this wildcard user
+        # we create one user per config and add this user to the list
+        # of all users to be checked
+        userlist = []
+        for resolver in resolvers:
+            (resId, resClass, resConf) = self.getResolverConf(resolver)
+            uid = self.getResolverUId(resolver)
+            n_user = User(self.login)
+            n_user.addResolverUId(resClass, uid, resConf, resId, resClass)
+            userlist.append(n_user)
+
+        return userlist
+
+
     def getResolverConf(self, resolver):
         conf = ""
         if self.resolverConf.has_key(resolver):
@@ -151,8 +178,54 @@ class User(object):
 
         return conf
 
+    def exists(self):
+        """
+        check if a user exists in the given realm
+        """
+        if self._exists in [True, False]:
+            return self._exists
+
+        self._exists = False
+
+        realms = getRealms(self.realm)
+        if not realms:
+            return self._exists
+
+        found = []
+        for realm_name, definition in realms.items():
+            resolvers = definition.get('useridresolver', [])
+            for realm_resolver in resolvers:
+                log.debug("checking in %r" % realm_resolver)
+                y = getResolverObject(realm_resolver)
+                if y:
+                    log.debug("checking in module %r" % y)
+                    uid = y.getUserId(self.login)
+                    found.append((self.login, realm_name, uid, realm_resolver))
+                    log.debug("type of uid: %s" % type(uid))
+                    log.debug("type of realm_resolver: %s" % type(realm_resolver))
+                else:
+                    log.error("module %r not found!" % (realm_resolver))
+
+        if found:
+            self._exists = True
+            (self.login, self.realm, self.uid, self.resolver) = found[0]
+        return self._exists
+
+    def checkPass(self, password):
+        if self.exists() == False:
+            return False
+
+        res = False
+        try:
+            y = getResolverObject(self.resolver)
+            res = y.checkPass(self.uid, password)
+        except:
+            pass
+
+        return res
+
 def getUserResolverId(user, report=False):
-    ## here we call the userid resolver!!"
+    # here we call the userid resolver!!"
     log.debug('getUserResolverId for %r' % user)
 
     (uuserid, uidResolver, uidResolverClass) = (u'', u'', u'')
@@ -168,21 +241,26 @@ def getUserResolverId(user, report=False):
 
     return (uuserid, uidResolver, uidResolverClass)
 
+
 def splitUser(username):
+    """
+    split the username into the user and realm
+
+    :param username: the given username
+    :return: tuple of (user and group/realm)
+    """
 
     user = username.strip()
     group = ""
 
-    ## todo split the last
-    l = user.split('@')
-    if len(l) >= 2:
-        (user, group) = user.rsplit('@')
-    else:
-        l = user.split('\\')
-        if len(l) >= 2:
-            (group, user) = user.rsplit('\\')
+
+    if '@' in user:
+        (user, group) = user.rsplit('@', 1)
+    elif '\\' in user:
+        (group, user) = user.split('\\', 1)
 
     return (user, group)
+
 
 def getUserFromParam(param, optionalOrRequired):
     realm = ""
@@ -211,8 +289,8 @@ def getUserFromParam(param, optionalOrRequired):
 
     if param.has_key("resConf"):
         conf = param["resConf"]
-        ## with the short resolvernames, we have to extract the
-        ## configuration name from the resolver spec
+        # with the short resolvernames, we have to extract the
+        # configuration name from the resolver spec
         if "(" in conf and ")" in conf:
             res_conf, resolver_typ = conf.split(" ")
             conf = res_conf
@@ -308,7 +386,7 @@ def setRealm(realm, resolvers):
 
     createDBRealm(realm)
 
-    ## if this is the first one, make it the default
+    # if this is the first one, make it the default
     realms = getRealms()
     if 1 == len(realms):
         for name in realms:
@@ -344,6 +422,7 @@ def getUserRealms(user):
 
     return Realms
 
+
 def getRealmBox():
     '''
     returns the config value of selfservice.realmbox.
@@ -358,6 +437,17 @@ def getRealmBox():
         return "True" == conf[rb_string]
     else:
         return False
+
+
+def getSplitAtSign():
+    '''
+    returns the config value of splitAtSign.
+    if True, the username should be split if there is an at sign.
+    if False, the username will be taken unchanged for loginname.
+    '''
+    splitAtSign = getFromConfig("splitAtSign", "true") or 'true'
+    return "true" == splitAtSign.lower()
+
 
 def getConf(Realms, Conf):
     """
@@ -433,7 +523,7 @@ def getAllUserRealms(user):
 
     return results;
 
-def getResolversOfUser(user):
+def getResolversOfUser(user, use_default_realm=True):
     '''
     This returns the list of the Resolvers of a user in a given realm.
     Usually this should only return one resolver
@@ -453,10 +543,14 @@ def getResolversOfUser(user):
     if len(Resolvers) > 0:
         return Resolvers
 
-    if realm is None or realm == "":
-        realm = getDefaultRealm()
+    if not login:
+        return Resolvers
 
-    #if realm is None or realm=="" or login is None or login == "":
+    if realm is None or realm == "":
+        if use_default_realm:
+            realm = getDefaultRealm()
+
+    # if realm is None or realm=="" or login is None or login == "":
     #    log.error("[getResolversOfUser] You need to specify the name ( %s) and the realm (%s) of a user with conf %s" % (login, realm, user.conf))
 
     realms = getRealms();
@@ -491,11 +585,11 @@ def getResolversOfUser(user):
                 if uid not in ["", None]:
                     log.debug("[getResolversOfUser] user %r found in resolver %r" % (login, realm_resolver))
                     log.debug("[getResolversOfUser] userid resolved to %r " % uid)
+                    # Unicode Madness:
+                    # This will break as soon as the unicode "uid" is put into a tuple
+                    # v = (login, realm_resolver, uid)
+                    # log.info("[getResolversOfUser] %s %s %s" % v)
 
-                    ## Unicode Madness:
-                    ## This will break as soon as the unicode "uid" is put into a tuple
-                    ## v = (login, realm_resolver, uid)
-                    ## log.info("[getResolversOfUser] %s %s %s" % v)
                     resId = y.getResolverId();
                     resCId = realm_resolver
                     Resolvers.append(realm_resolver)
@@ -548,7 +642,7 @@ def getUserId(user):
             if conf.lower() != user.conf.lower():
                 continue
 
-        ## try to load the UserIdResolver Class
+        # try to load the UserIdResolver Class
         try:
             module = package + "." + module
             log.debug("[getUserId] Getting resolver class: [%r] [%r]"
@@ -597,7 +691,7 @@ def getSearchFields(User):
             if conf.lower() != User.conf.lower():
                 continue
 
-        ## try to load the UserIdResolver Class
+        # try to load the UserIdResolver Class
         try:
             y = getResolverObject(reso)
             sf = y.getSearchFields()
@@ -609,15 +703,15 @@ def getSearchFields(User):
 
     return searchFields
 
-def getUserList(param, User):
+def getUserList(param, search_user):
 
     users = []
 
     searchDict = {}
     log.debug("[getUserList] entering function getUserList")
 
-    ## we have to recreate a new searchdict without the realm key
-    ## as delete does not work
+    # we have to recreate a new searchdict without the realm key
+    # as delete does not work
     for key in param:
         lval = param[key]
         if key == "realm":
@@ -628,28 +722,47 @@ def getUserList(param, User):
         searchDict[key] = lval
         log.debug("[getUserList] Parameter key:%r=%r" % (key, lval))
 
-    resolverrrs = getResolvers(User)
+    resolverrrs = getResolvers(search_user)
 
     for reso in resolverrrs:
-        (package, module, class_, conf) = splitResolver(reso)
+        (package, module, _class, conf) = splitResolver(reso)
         module = package + "." + module
 
-        if len(User.conf) > 0:
-            if conf.lower() != User.conf.lower():
+        if len(search_user.conf) > 0:
+            if conf.lower() != search_user.conf.lower():
                 continue
 
-        ## try to load the UserIdResolver Class
+        # try to load the UserIdResolver Class
         try:
+
             log.debug("[getUserList] Check for resolver class: %r" % reso)
             y = getResolverObject(reso)
-            log.debug("[getUserList] with this search dictionary: %r " % searchDict)
-            ulist = y.getUserList(searchDict)
-            log.debug("[getUserList] setting the resolver <%r> for each user" % reso)
-            for u in ulist:
-                u["useridresolver"] = reso
+            log.debug("[getUserList] with this search dictionary: %r "
+                      % searchDict)
 
-            log.debug("[getUserList] Found this userlist: %r" % ulist)
-            users.extend (ulist)
+            if hasattr(y, 'getUserListIterator'):
+                try:
+                    ulist_gen = y.getUserListIterator(searchDict)
+                    while True:
+                        ulist = ulist_gen.next()
+                        log.debug("[getUserList] setting the resolver <%r> "
+                                  "for each user" % reso)
+                        for u in ulist:
+                            u["useridresolver"] = reso
+                        log.debug("[getUserList] Found this userlist: %r"
+                                  % ulist)
+                        users.extend(ulist)
+
+                except StopIteration as exx:
+                    # we are done: all users are fetched or
+                    # page size limit reached
+                    pass
+            else:
+                ulist = y.getUserList(searchDict)
+                for u in ulist:
+                    u["useridresolver"] = reso
+                log.debug("[getUserList] Found this userlist: %r" % ulist)
+                users.extend(ulist)
 
         except KeyError as exx:
             log.error("[getUserList][ module %r:%r ]" % (module, exx))
@@ -663,10 +776,65 @@ def getUserList(param, User):
 
     return users
 
+
+def getUserListIterators(param, search_user):
+    """
+    return a list of iterators for all userid resolvers
+
+    :param param: request params (dict), which might be realm or resolver conf
+    :param search_user: restrict the resolvers to those of the search_user
+    """
+    user_iters = []
+    searchDict = {}
+
+    log.debug("Entering function getUserListIterator")
+
+    searchDict.update(param)
+    if 'realm' in searchDict:
+        del searchDict['realm']
+    if 'resConf' in searchDict:
+        del searchDict['resConf']
+    log.debug("searchDict %r" % searchDict)
+
+    resolverrrs = getResolvers(search_user)
+    for reso in resolverrrs:
+        (package, module, _class, conf) = splitResolver(reso)
+        module = package + "." + module
+
+        if len(search_user.conf) > 0:
+            if conf.lower() != search_user.conf.lower():
+                continue
+
+        # try to load the UserIdResolver Class
+        try:
+            log.debug("Check for resolver class: %r" % reso)
+            y = getResolverObject(reso)
+            log.debug("With this search dictionary: %r " % searchDict)
+
+            if hasattr(y, 'getUserListIterator'):
+                uit = y.getUserListIterator(searchDict, limit_size=False)
+            else:
+                uit = iter(y.getUserList(searchDict))
+
+            user_iters.append((uit, reso))
+
+        except KeyError as exx:
+            log.error("[ module %r:%r ]" % (module, exx))
+            log.error("%s" % traceback.format_exc())
+            raise exx
+
+        except Exception as exx:
+            log.error("[ module %r:%r ]" % (module, exx))
+            log.error("%s" % traceback.format_exc())
+            continue
+
+    return user_iters
+
+
 def getUserInfo(userid, resolver, resolverC):
     log.debug("[getUserInfo] uid:%r resolver:%r class:%r" %
               (userid, resolver, resolverC))
-                ## [PasswdIdResolver] [IdResolver]
+                # [PasswdIdResolver] [IdResolver]
     userInfo = {}
     module = ""
 
@@ -674,7 +842,7 @@ def getUserInfo(userid, resolver, resolverC):
         return userInfo
 
     try:
-        (package, module, class_, conf) = splitResolver(resolverC)
+        (package, module, _class, _conf) = splitResolver(resolverC)
         module = package + "." + module
 
         y = getResolverObject(resolverC)
@@ -686,6 +854,21 @@ def getUserInfo(userid, resolver, resolverC):
         log.error("[getUserInfo][ module %r notfound! :%r ]" % (module, e))
 
     return userInfo
+
+
+def getUserDetail(user):
+    '''
+    Returns userinfo of an user
+
+    :param user: the user
+    :returns: the userinfo dict
+    '''
+    (uid, resId, resClass) = getUserId(user)
+    log.debug("got uid %r, ResId %r, Class %r"
+              % (uid, resId, resClass))
+    userinfo = getUserInfo(uid, resId, resClass)
+    return userinfo
+
 
 def getUserPhone(user, phone_type='phone'):
     '''
@@ -712,80 +895,122 @@ def getUserPhone(user, phone_type='phone'):
                     "type %r." % (uid, resId, resClass, phone_type))
         return ""
 
-def check_user_password(username, realm, password):
+
+def get_authenticated_user(username, realm, password=None,
+                           realm_box=False, authenticate=True,
+                           options=None):
     '''
-    This is a helper function to check the username and password against
-    a userstore.
+    check the username and password against a userstore.
 
-    return
+    remark: the method is called in the context of repoze.who
+            during authentication and during auto_enrollToken/auto_assignToken
 
-      success    --- This is the username of the authenticated user. If unsuccessful,
-                      returns None
+    :param username: the user login name
+    :param realm: the realm, where the user belongs to
+    :param password: the to be checked userstore password
+    :param realm_box: take the information, if realmbox is displayed
+    :parm authenticate: for the selftest, we skip the authentication
+
+    :return: None or authenticated user object
     '''
-    success = None
-    try:
-        log.info("[check_user_password] User %r from realm %r tries to "
-                 "authenticate to selfservice" % (username, realm))
-        if type(username) != unicode:
-            username = username.decode(ENCODING)
-        u = User(username, realm, "")
-        res = getResolversOfUser(u)
-        # Now we know, the resolvers of this user and we can verify the password
-        if (len(res) == 1):
-            (uid, resolver, resolverC) = getUserId(u)
-            log.info("[check_user_password] the user resolves to %r" % uid)
-            log.info("[check_user_password] The username is found within the "
-                     "resolver %r" % resolver)
-            # Authenticate user
-            try:
-                (package, module, class_, conf) = splitResolver(resolverC)
-                module = package + "." + module
-                y = getResolverObject(resolverC)
-            except Exception as e:
-                log.error("[check_user_password] [ module %r notfound! :%r ]"
-                          % (module, e))
-            try:
-                if  y.checkPass(uid, password):
-                    log.debug("[check_user_password] Successfully "
-                              "authenticated user %r." % username)
-                    # try:
-                    #identity = self.add_metadata( environ, identity )
-                    success = username + '@' + realm
-                else:
-                    log.info("[check_user_password] user %r failed "
-                             "to authenticate." % username)
-            except Exception as e:
-                log.error("[check_user_password] Error checking password "
-                          "within module %r:%r" % (module, e))
-                log.error("[check_user_password] %s" % traceback.format_exc())
 
-        elif (len(res) == 0):
-            log.error("[check_user_password] The username %r exists in NO "
-                      "resolver within the realm %r." % (username, realm))
+    log.info("User %r from realm %r tries to authenticate to selfservice"
+             % (username, realm))
+
+    if type(username) != unicode:
+        username = username.decode(ENCODING)
+
+    # ease the handling of options
+    if not options:
+        options = {}
+
+    users = []
+    uid = None
+    resolver = None
+    resolverC = None
+
+    # if we have an realmbox, we take the user as it is
+    # - the realm is always given
+    # - appended realms result in error
+    if realm_box:
+        user = User(username, realm, "")
+        users.append(user)
+
+    # else if no realm box is given
+    #   and realm is not empty:
+    #    - create the user from the values (as we are in auto_assign, etc)
+    #   and the realm is empty! (s. login.mako
+    #    - the user either appends his realm
+    #    - or will get the realm appended
+    #
+    else:
+        if realm:
+            user = User(username, realm, "")
+            users.append(user)
         else:
-            log.error("[check_user_password] The username %r exists in more "
-                      "than one resolver within the realm %r" % (username, realm))
-            log.error(res)
-    except UserError as e:
-        log.error("[check_user_password] Error while trying to verify "
-                  "the username: %r" % e.description)
+            def_realm = options.get('defaultRealm', getDefaultRealm())
+            if def_realm:
+                user = User(username, def_realm, "")
+                users.append(user)
+            if '@' in username:
+                u_name, u_realm = username.rsplit('@', 1)
+                user = User(u_name, u_realm, "")
+                users.append(user)
 
-    return success
+    identified_users = []
+    for user in users:
+        username = user.login
+        realm = user.realm
+        res = getResolversOfUser(user, use_default_realm=False)
+        if (len(res) != 1):
+            if (len(res) == 0):
+                log.info("The username %r exists in NO resolver within the "
+                          "realm %r." % (username, realm))
+            else:
+                log.info("The username %r exists in more than one resolver "
+                          "within the realm %r" % (username, realm))
+            continue
 
-def getAdminRealms(username):
-    results = []
-    if username is None:
-		return results
+        # we got one resolver, so lets check if user exists
+        (uid, resolver, resolverC) = getUserId(user)
+        identified_users.append((user, uid, resolver, resolverC))
+        log.info("the user resolves to %r" % uid)
+        log.info("The username is found within the resolver %r" % resolver)
 
-    from linotp.lib.policy import checkPolicyPre
+    ide_user = len(identified_users)
+    if ide_user != 1:
+        if ide_user > 1:
+            log.info("The username %s could not be identified uniquely" %
+                     username)
+        if ide_user == 0:
+            log.info("The username %s could not be found." % username)
+        return None
 
+    (user, uid, resolver, resolverC) = identified_users[0]
+    if not authenticate:
+        return user
+
+    # Authenticate user
+    auth_user = None
     try:
-        res = checkPolicyPre('admin', 'show', {}, user = User(username, '', ""))
-        results = res['realms']
-    finally:
-        pass
+        (package, module, class_, conf) = splitResolver(resolverC)
+        module = package + "." + module
+        y = getResolverObject(resolverC)
 
-    return results
+        if  y.checkPass(uid, password):
+            log.debug("Successfully authenticated user %r." % username)
+            auth_user = user
+        else:
+            log.info("user %r failed to authenticate." % username)
+
+    except UserError as exx:
+        log.info("failed to verify the username: %s@%s" % (user.login,
+                                                           user.realm))
+
+    if not auth_user:
+        log.error("Error while trying to verify the username: %s" % username)
+
+    return auth_user
 
 #eof###########################################################################
 
