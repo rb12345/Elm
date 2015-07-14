@@ -49,7 +49,7 @@ from linotp.lib.token   import newToken
 
 
 from linotp.lib.user    import getUserFromParam, getUserFromRequest
-from linotp.lib.user    import getUserList, User
+from linotp.lib.user    import getUserList, User, getAdminRealms
 
 from linotp.lib.util    import getParam
 from linotp.lib.util    import check_session

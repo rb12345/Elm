@@ -1012,5 +1012,20 @@ def get_authenticated_user(username, realm, password=None,
 
     return auth_user
 
+def getAdminRealms(username):
+    results = []
+    if username is None:
+        return results
+
+    from linotp.lib.policy import checkPolicyPre
+    
+    try:
+        res = checkPolicyPre('admin', 'show', {}, user = User(username, '', ""))
+        results = res['realms']
+    finally:
+        pass
+
+    return results
+
 #eof###########################################################################
 

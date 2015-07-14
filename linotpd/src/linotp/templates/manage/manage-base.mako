@@ -93,10 +93,6 @@ if isinstance(lang, list):
 				<span class=portalname>${_("Management Portal")}</span>
 				</div>
 		</li>
-		<li><a href='#'>${_("LinOTP Config")}</a>
-            <ul>
-                <li><a href='#' id='menu_edit_resolvers'>${_("useridresolvers")}</a></li>
-                <li><a href='#' id='menu_edit_realms'>${_("realms")}</a></li>
         <li><a href='#'>${_("LinOTP Config")}</a>
             <ul>
                 <li><a href='#' id='menu_edit_resolvers'>${_("User ID Resolvers")}</a></li>
@@ -135,7 +131,6 @@ if isinstance(lang, list):
             </ul>
         </li>
     </ul>
-    <div id="logo"><img src="/images/linotp_logo_103x35.png" alt="LinOTP"/></div>
 </div> <!-- header -->
 <div align="right" style="font-size: 70%">
     <p>${_("Logged in as")}: ${c.admin} | <a href="${c.logout_url}">${_("Logout")}</a>
