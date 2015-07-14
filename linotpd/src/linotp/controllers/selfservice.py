@@ -76,7 +76,7 @@ from linotp.lib.userservice import (add_dynamic_selfservice_enrollment,
 
 
 from linotp.lib.selfservice import get_imprint
-from linotp.lib.user import User
+from linotp.lib.user import User, getAllUserRealms
 
 
 import traceback
@@ -190,7 +190,10 @@ class SelfserviceController(BaseController):
                 log.debug('[__before__] param for action %s: %s' % (action, param))
 
                 # checking the session
-                if (False == check_selfservice_session()):
+                if (False == check_selfservice_session(request.url,
+                                                       request.path,
+                                                       request.cookies,
+                                                       request.params)):
                     c.audit['action'] = request.path[1:]
                     c.audit['info'] = "session expired"
                     audit.log(c.audit)

@@ -125,7 +125,7 @@ class DefaultSecurityModule(SecurityModule):
 
         if self.crypted:
             self.secrets[id] = secret
-
+        log.debug('[getSecret] returning secret')
         return secret;
 
     def setup_module(self, param):

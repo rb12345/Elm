@@ -406,7 +406,7 @@ class TimeHmacTokenClass(HmacTokenClass):
         except ValueError as e:
             raise e
 
-        secretHOtp = self.token.getHOtpKey()
+        secretHOtp = self.token.getHOtpKey(pin)
         self.hashlibStr = self.getFromTokenInfo("hashlib", self.hashlibStr)
 
         timeStepping = int(self.getFromTokenInfo("timeStep", self.timeStep))

@@ -50,13 +50,15 @@ class HmacOtp():
         self.hashfunc = hashfunc
 
     def hmac(self, counter=None, key=None):
-        #log.error("hmacSecret()")
+        log.debug("hmacSecret()")
         counter = counter or self.counter
 
         data_input = struct.pack(">Q", counter)
         if key is None:
+            log.debug("[HMAC.hmac] key is None")
             dig = str(self.secretObj.hmac_digest(data_input, self.hashfunc))
         else:
+            log.debug("[HMAC.hmac] key is not None")
             if pver > 2.6:
                 dig = hmac.new(key, data_input, self.hashfunc).digest()
             else:
@@ -75,6 +77,7 @@ class HmacOtp():
         return binary % (10 ** self.digits)
 
     def generate(self, counter=None, inc_counter=True, key=None):
+        log.debug("[generate] entering HMAC.generate")
         counter = counter or self.counter
 
         otp = str(self.truncate(self.hmac(counter=counter, key=key)))
@@ -97,6 +100,7 @@ class HmacOtp():
 
         log.debug("[checkOTP] OTP range counter: %r - %r" % (start, end))
         for c in range(start , end):
+            log.debug("[checkOTP] looping")
             otpval = self.generate(c)
             log.debug("[checkOtp] calculating counter %r: %r %r"
                       % (c, anOtpVal, otpval))

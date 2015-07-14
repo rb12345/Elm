@@ -211,11 +211,11 @@ class UserserviceController(BaseController):
                 res = check_userservice_session(request, config,
                                                 self.authUser, self.client)
 
-            # Check the session.
-            res = check_userservice_session(request, config, self.authUser, self.client)
-
             else:
                 abort(401, _("No valid authentication session %r") % auth_type)
+
+            # Check the session.
+            res = check_userservice_session(request, config, self.authUser, self.client)
 
             if not res:
                 abort(401, _("No valid session"))
@@ -348,7 +348,7 @@ class UserserviceController(BaseController):
  
         if self.otpLogin:
             res = self._webauth_OTP_check(request)
-        else
+        else:
             res = self._webauth_check(request)
         
         if res:

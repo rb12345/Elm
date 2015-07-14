@@ -836,12 +836,13 @@ class ValidateController(BaseController):
             code = param["code"]
 
             user = User(username, "", "")
-
+            th = TokenHandler()
+           
             if ('token' in param):
                 serial = param["token"]
-                (ok, opt) = checkSerialPass(serial, code, options = None, user=user)
+                (ok, opt) = th.checkSerialPass(serial, code, options = None, user=user)
             else:
-                (ok, opt) = checkUserPass(user, code)
+                (ok, opt) = th.checkUserPass(user, code)
 
             ret = {
                 "success" : ok,
