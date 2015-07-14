@@ -191,8 +191,8 @@ class TestChallengeResponseController(TestController):
         This sets up all the resolvers and realms
         '''
         TestController.setUp(self)
-        self.__createResolvers__()
-        self.__createRealms__()
+        self.create_common_resolvers()
+        self.create_common_realms()
 
         if hasattr(self, "policies") is False:
             setattr(self, "policies", [])
@@ -203,8 +203,8 @@ class TestChallengeResponseController(TestController):
         self.patch_smtp = None
         self.patch_sms = None
 
-        self.deleteAllTokens()
-        self.deleteAllPolicies()
+        self.delete_all_token()
+        self.delete_all_policies()
 
         if nose_config and 'radius' in nose_config:
             self.radius_authport = nose_config['radius']['authport']
@@ -225,11 +225,11 @@ class TestChallengeResponseController(TestController):
             self.patch_smtp.stop()
         if self.patch_sms is not None:
             self.patch_sms.stop()
-        self.__deleteAllRealms__()
-        self.__deleteAllResolvers__()
+        self.delete_all_realms()
+        self.delete_all_resolvers()
         TestController.tearDown(self)
 
-    def deleteAllPolicies(self):
+    def delete_all_policies(self):
         '''
         '''
         response = self.make_system_request(action='getPolicy')
@@ -239,24 +239,7 @@ class TestChallengeResponseController(TestController):
         policies = body.get('result', {}).get('value', {}).keys()
 
         for policy in policies:
-            self.delPolicy(policy)
-
-        return
-
-    def deleteAllTokens(self):
-        serials = []
-
-        response = self.make_admin_request(action='show')
-        self.assertTrue('"status": true' in response, response)
-
-        body = json.loads(response.body)
-        tokens = body.get('result', {}).get('value', {}).get('data', {})
-        for token in tokens:
-            serial = token.get("LinOtp.TokenSerialnumber")
-            serials.append(serial)
-
-        for serial in serials:
-            self.removeTokenBySerial(serial)
+            self.delete_policy(policy)
 
         return
 
@@ -292,15 +275,6 @@ class TestChallengeResponseController(TestController):
         self.assertTrue('"value": true' in response, response)
         self.serials.append(serial)
         return serial
-
-    def removeTokenBySerial(self, serial):
-        params = {
-            "serial": serial,
-            'session': self.session,
-            }
-
-        response = self.make_admin_request(action='remove', params=params)
-        return response
 
     def setPinPolicy(self, name='otpPin', realm='ldap_realm',
                      action='otppin=1, ', scope='authentication',
@@ -344,25 +318,18 @@ class TestChallengeResponseController(TestController):
         self.policies.append(name)
         return response
 
-    def delPolicy(self, name='otpPin', remoteurl=None):
-
+    def delete_remote_policy(self, name, url):
+        """
+        Delete policy on remote LinOTP found at url
+        """
         params = {
             'name': name,
             'selftest_admin': 'superadmin',
             'session': self.session,
             }
-        r_url = url(controller='system', action='delPolicy')
 
-        if remoteurl is not None:
-            r_url = "%s/%s" % (remoteurl, "system/delPolicy")
-            response = do_http(r_url, params=params)
-        else:
-            response = self.app.get(r_url, params=params)
-
-
-        return response
-
-
+        r_url = "%s/%s" % (url, "system/delPolicy")
+        response = do_http(r_url, params=params)
 
     def setup_remote_token(self,
                            typ="pw",
@@ -553,7 +520,7 @@ class TestChallengeResponseController(TestController):
         response = self.app.get(url(controller='validate', action='check'),
                                                             params=params)
         self.assertTrue('"value": true' in response, response)
-        self.removeTokenBySerial(serial)
+        self.delete_token(serial)
 
 
         # with otppin==1 the pin should be the same
@@ -566,9 +533,9 @@ class TestChallengeResponseController(TestController):
         response = self.app.get(url(controller='validate', action='check'),
                                 params=params)
         self.assertTrue('"value": true' in response, response)
-        self.removeTokenBySerial(serial)
+        self.delete_token(serial)
 
-        self.delPolicy()
+        self.delete_policy('otpPin')
 
         # with otppin==2 the pin is not required at all
         self.setPinPolicy(realm='myDefRealm', action='otppin=2, ')
@@ -601,8 +568,8 @@ class TestChallengeResponseController(TestController):
         self.assertTrue('"value": false' in response, response)
         self.assertTrue('transactionid"' not in response, response)
 
-        self.removeTokenBySerial(serial)
-        self.delPolicy(name="ch_resp")
+        self.delete_token(serial)
+        self.delete_policy(name="ch_resp")
 
         return
 
@@ -621,7 +588,7 @@ class TestChallengeResponseController(TestController):
         response = self.app.get(url(controller='validate', action='check'),
                                                             params=params)
         self.assertTrue('"value": true' in response, response)
-        self.removeTokenBySerial(serial)
+        self.delete_token(serial)
 
 
         # with otppin==1 the pin should be the same
@@ -633,8 +600,8 @@ class TestChallengeResponseController(TestController):
         response = self.app.get(url(controller='validate', action='check'),
                                 params=params)
         self.assertTrue('"value": true' in response, response)
-        self.removeTokenBySerial(serial)
-        self.delPolicy()
+        self.delete_token(serial)
+        self.delete_policy('otpPin')
 
         # with otppin==2 the pin is not required at all
         self.setPinPolicy(realm='myDefRealm', action='otppin=2, ')
@@ -645,8 +612,8 @@ class TestChallengeResponseController(TestController):
         response = self.app.get(url(controller='validate', action='check'),
                                 params=params)
         self.assertTrue('"value": true' in response, response)
-        self.removeTokenBySerial(serial)
-        self.delPolicy()
+        self.delete_token(serial)
+        self.delete_policy('otpPin')
 
         return
 
@@ -668,7 +635,7 @@ class TestChallengeResponseController(TestController):
         self.assertTrue('"value": true' in response, response)
 
         for serial in serials:
-            self.removeTokenBySerial(serial)
+            self.delete_token(serial)
         return
 
 
@@ -691,9 +658,9 @@ class TestChallengeResponseController(TestController):
         response = self.app.get(url(controller='validate', action='check'),
                                 params=params)
         self.assertTrue('"value": true' in response, response)
-        self.removeTokenBySerial(serial)
+        self.delete_token(serial)
 
-        self.delPolicy()
+        self.delete_policy('otpPin')
 
         # with otppin==2 the pin is not required at all
         self.setPinPolicy(realm='myDefRealm', action='otppin=2, ')
@@ -704,9 +671,9 @@ class TestChallengeResponseController(TestController):
         response = self.app.get(url(controller='validate', action='check'),
                                 params=params)
         self.assertTrue('"value": true' in response, response)
-        self.removeTokenBySerial(serial)
+        self.delete_token(serial)
 
-        self.delPolicy()
+        self.delete_policy('otpPin')
 
         return
 
@@ -812,9 +779,9 @@ class TestChallengeResponseController(TestController):
 
 
 
-        self.removeTokenBySerial(serial)
+        self.delete_token(serial)
 
-        self.delPolicy(name="ch_resp")
+        self.delete_policy(name="ch_resp")
         return
 
     def test_10_multiple_tokens(self):
@@ -919,10 +886,10 @@ class TestChallengeResponseController(TestController):
         self.assertTrue(state1 not in response, response)
 
 
-        self.removeTokenBySerial("H1")
-        self.removeTokenBySerial("H2")
+        self.delete_token("H1")
+        self.delete_token("H2")
 
-        self.delPolicy(name="ch_resp")
+        self.delete_policy(name="ch_resp")
         return
 
 
@@ -1005,8 +972,8 @@ class TestChallengeResponseController(TestController):
                                 params=params)
         self.assertTrue('"value": true' in response, response)
 
-        self.removeTokenBySerial(serial)
-        self.delPolicy()
+        self.delete_token(serial)
+        self.delete_policy('otpPin')
 
         return
 
@@ -1111,8 +1078,8 @@ class TestChallengeResponseController(TestController):
         for cmp_value in cmp_values:
             self.assertIn(cmp_value, otp_message, response)
 
-        self.removeTokenBySerial(serial)
-        self.delPolicy(name='trigger_sms')
+        self.delete_token(serial)
+        self.delete_policy(name='trigger_sms')
 
         return
 
@@ -1169,10 +1136,10 @@ class TestChallengeResponseController(TestController):
         self.assertTrue('"value": true' in response, response)
 
         for serial in serials:
-            self.removeTokenBySerial(serial)
+            self.delete_token(serial)
 
-        self.delPolicy(name="ch_resp")
-        self.delPolicy(name="ch_resp", remoteurl=remoteurl)
+        self.delete_policy(name="ch_resp")
+        self.delete_remote_policy("ch_resp", remoteurl)
 
         return
 
@@ -1237,10 +1204,10 @@ class TestChallengeResponseController(TestController):
         self.assertTrue('"value": true' in response, response)
 
         for serial in serials:
-            self.removeTokenBySerial(serial)
+            self.delete_token(serial)
 
-        self.delPolicy(name="ch_resp")
-        self.delPolicy(name="ch_resp", remoteurl=remoteurl)
+        self.delete_policy(name="ch_resp")
+        self.delete_remote_policy("ch_resp", remoteurl)
 
         return
 
@@ -1280,7 +1247,7 @@ class TestChallengeResponseController(TestController):
         self._stop_radius_server()
 
         for serial in serials:
-            self.removeTokenBySerial(serial)
+            self.delete_token(serial)
 
         return
 
@@ -1320,7 +1287,7 @@ class TestChallengeResponseController(TestController):
         self._stop_radius_server()
 
         for serial in serials:
-            self.removeTokenBySerial(serial)
+            self.delete_token(serial)
 
         return
 
@@ -1440,9 +1407,9 @@ class TestChallengeResponseController(TestController):
 
         counter = self.do_auth("", counter + 1)
 
-        self.removeTokenBySerial(serial)
-        self.delPolicy(name="ch_resp")
-        self.delPolicy(name="otpPin")
+        self.delete_token(serial)
+        self.delete_policy(name="ch_resp")
+        self.delete_policy(name="otpPin")
 
         return
 
@@ -1527,9 +1494,9 @@ class TestChallengeResponseController(TestController):
                                             mock_obj=mock_obj,
                                             otp_func=sms_otp_func
                                             )
-        self.removeTokenBySerial(serial)
-        self.delPolicy(name="ch_resp")
-        self.delPolicy(name="otpPin")
+        self.delete_token(serial)
+        self.delete_policy(name="ch_resp")
+        self.delete_policy(name="otpPin")
 
         return
 
@@ -1642,9 +1609,9 @@ class TestChallengeResponseController(TestController):
 
         counter = self.do_auth("", counter + 1, typ=typ)
 
-        self.removeTokenBySerial(serial)
-        self.delPolicy(name="ch_resp")
-        self.delPolicy(name="otpPin")
+        self.delete_token(serial)
+        self.delete_policy(name="ch_resp")
+        self.delete_policy(name="otpPin")
 
         return
 
@@ -1752,8 +1719,6 @@ class TestChallengeResponseController(TestController):
 
         self.assertTrue('"value": true' in response, response)
 
-        self.delPolicy()
-
         counter2 = self.do_auth("shortpin", counter2 + 1 , otpkey=otpkey2,
                                 user="passthru_user1@myDefRealm")
 
@@ -1771,7 +1736,7 @@ class TestChallengeResponseController(TestController):
         counter2 = self.do_auth("", counter2 + 1, otpkey=otpkey2,
                                user="passthru_user1@myDefRealm")
 
-        self.delPolicy()
+        self.delete_policy('otpPin')
 
         counter1 = self.do_auth("shortpin", counter1 + 1 , otpkey=otpkey1,
                                 user="passthru_user1@myMixRealm")
@@ -1790,7 +1755,7 @@ class TestChallengeResponseController(TestController):
         counter1 = self.do_auth("", counter1 + 1, otpkey=otpkey1,
                                user="passthru_user1@myMixRealm")
 
-        self.delPolicy()
+        self.delete_policy('otpPin')
 
         counter2 = self.do_auth("shortpin", counter2 + 1 , otpkey=otpkey2,
                                 user="passthru_user1")
@@ -2218,10 +2183,10 @@ class TestChallengeResponseController(TestController):
         self.assertTrue(transactionid not in response, response)
 
         # final cleanup
-        self.removeTokenBySerial("H1")
-        self.removeTokenBySerial("H2")
+        self.delete_token("H1")
+        self.delete_token("H2")
 
-        self.delPolicy(name="ch_resp")
+        self.delete_policy(name="ch_resp")
         return
 
 

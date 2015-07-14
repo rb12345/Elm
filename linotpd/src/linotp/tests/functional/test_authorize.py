@@ -60,16 +60,16 @@ class TestAuthorizeController(TestController):
         '''
         TestController.setUp(self)
         self.set_config_selftest()
-        self.__createResolvers__()
-        self.__createRealms__()
+        self.create_common_resolvers()
+        self.create_common_realms()
 
         self.curTime = datetime.datetime(2012, 5, 16, 9, 0, 52, 227413)
         self.TOTPcurTime = datetime.datetime.fromtimestamp(1337292860.585256)
         self.initToken()
 
     def tearDown(self):
-        self.__deleteAllRealms__()
-        self.__deleteAllResolvers__()
+        self.delete_all_realms()
+        self.delete_all_resolvers()
         TestController.tearDown(self)
 
 
@@ -94,30 +94,12 @@ class TestAuthorizeController(TestController):
         assert '"value": true' in response
 
 
-
-    def removeTokenBySerial(self, serial):
-
-        parameters = {
-                      "serial": serial,
-                      }
-
-        response = self.app.get(url(controller='admin', action='remove'), params=parameters)
-        return response
-
-
     def setTokenRealm(self, serial, realms):
         parameters = { "serial" : serial,
                        "realms" : realms}
 
         response = self.app.get(url(controller="admin", action="tokenrealm"), params=parameters)
         return response
-
-    def delPolicy(self, name):
-
-        response = self.app.get(url(controller="system", action="delPolicy"),
-                               params={"name": name})
-        print "delPolicy:" , response
-        assert '"status": true' in response
 
     def setPolicy(self, parameters):
         response = self.app.get(url(controller='system', action='setPolicy'), params=parameters)
@@ -309,7 +291,7 @@ class TestAuthorizeController(TestController):
         '''
 
         #deleting authorization policy
-        self.delPolicy("authorization1")
+        self.delete_policy("authorization1")
 
         # setting pin policy
         parameters = { 'name' : 'pinpolicy1',
@@ -374,8 +356,8 @@ class TestAuthorizeController(TestController):
         Auth Test 10: client not in policy. So every tokentype should be able to authenticate
         '''
         # clear pin policy
-        self.delPolicy("pinpolicy1")
-        self.delPolicy("pinpolicy2")
+        self.delete_policy("pinpolicy1")
+        self.delete_policy("pinpolicy2")
         #
         #
         #
@@ -464,7 +446,7 @@ class TestAuthorizeController(TestController):
         print "validate/check: ", response
         assert '"value": true' in response
 
-        self.delPolicy("tokentypepolicy1")
+        self.delete_policy("tokentypepolicy1")
 
 ##############################################################################################
 #
@@ -582,8 +564,6 @@ class TestAuthorizeController(TestController):
         '''
         Auth Test 31: setrealm for a user in the not default realm.
         '''
-        self.delPolicy("tokentypepolicy1")
-
         self.setPolicy({"name" : "setrealm",
                          "scope":"authorization",
                          "realm":"*",

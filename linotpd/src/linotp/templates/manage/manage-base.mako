@@ -95,7 +95,7 @@ if isinstance(lang, list):
 		</li>
         <li><a href='#'>${_("LinOTP Config")}</a>
             <ul>
-                <li><a href='#' id='menu_edit_resolvers'>${_("User ID Resolvers")}</a></li>
+                <li><a href='#' id='menu_edit_resolvers'>${_("UserIdResolvers")}</a></li>
                 <li><a href='#' id='menu_edit_realms'>${_("Realms")}</a></li>
                 <li><a href='#' id='menu_system_config'>${_("System Config")}</a></li>
                 <li><a href='#' id='menu_token_config'>${_("Token Config")}</a></li>
@@ -412,7 +412,7 @@ ${c.version} --- &copy; ${c.licenseinfo}
     <p>${_("Authors:")}
         <br>Cornelius Kölbel, Kay Winkler, Omar Kohl, Friedrich Weber,
         <br>Christian Pommranz, Reinhard Stampp, Rainer Endres,
-        <br>Stefan Pietsch, Eric Sesterhenn
+        <br>Stefan Pietsch, Eric Sesterhenn, Marian Pascalau
     </p>
 
 </div>
@@ -977,7 +977,7 @@ ${c.version} --- &copy; ${c.licenseinfo}
 </script>
 <!-- ######################### resolvers ############################## -->
 <div id='dialog_resolvers'>
-    <p>${_("Create a new or select one available User ID Resolver")}:</p>
+    <p>${_("Create a new or select one available UserIdResolver")}:</p>
     <div id='resolvers_list'> </div>
 </div>
 <script>
@@ -1089,7 +1089,7 @@ ${c.version} --- &copy; ${c.licenseinfo}
             ${_("- Select Temporary Token Type -")}
         </option>
         <option value="password_token">
-            ${_("Password Token")}
+            ${_("Simple Password Token")}
         </option>
         <option value="email_token">
             ${_("Email Token")}
