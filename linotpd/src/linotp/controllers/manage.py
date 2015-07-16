@@ -382,8 +382,6 @@ class ManageController(BaseController):
                             tok['LinOtp.Isactive'],
 
                             tok['User.username'],
-                            tok['LinOtp.RealmNames'],
-                            tok['LinOtp.IdResolver'],
                             tok['LinOtp.Userid'],
 
                             tok['LinOtp.FailCount'],
@@ -481,16 +479,15 @@ class ManageController(BaseController):
                             (u['surname']) if u.has_key('surname') else (""),
                             (u['email']) if u.has_key('email') else (""),
                             (u['userid']) if u.has_key('userid') else (""),
-                            (resolver_display),
                              ]
                     }
                     )
 
+            log.debug("[userview_flexi] Elements in c.userArray: %s" % len(c.userArray))
             # sorting
             reverse = False
-            sortnames = { 'username' : 0, 'useridresolver' : 1,
-                    'surname' : 2, 'givenname' : 3, 'email' : 4,
-                    'mobile' :5, 'phone' : 6, 'userid' : 7 }
+            sortnames = { 'username' : 0, 'givenname' : 1,
+                    'surname' : 2, 'email' : 3, 'userid' : 4 }
             if c.dir == "desc":
                 reverse = True
 

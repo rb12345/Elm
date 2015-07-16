@@ -5268,9 +5268,7 @@ function view_token() {
                         {display: 'active', name : 'Isactive', width : 35, sortable : true, align: 'center'},
 
                         {display: 'username', name : 'Username', width : 100, sortable : false, align: 'center'},
-                        {display: 'realm', name : 'realm', width : 100, sortable : false, align: 'center'},
-                        {display: 'resolver', name : 'IdResolver', width : 200, sortable : true, align: 'center'},
-							{display: 'userid', name : 'Userid', width : 100, sortable : true, align: 'center'},
+			{display: 'userid', name : 'Userid', width : 100, sortable : true, align: 'center'},
 
                         {display: 'fail count', name : 'FailCount', width : 60, sortable : true, align: 'center'},
                         {display: 'max fails', name : 'maxfailcount', width : 60, sortable : false, align: 'center'},
@@ -5280,7 +5278,7 @@ function view_token() {
             ],
             height: 400,
             searchitems : [
-                {display: 'in loginname', name: 'loginname', isdefault: true },
+                {display: 'in username', name: 'username', isdefault: true },
                 {display: 'in all other columns', name : 'all'},
                 {display: 'realm', name: 'realm' }
                 ],
@@ -5316,7 +5314,6 @@ function view_user() {
 			{display: 'surname', name : 'surname', width : 150, sortable : true, align:"left"},
 			{display: 'email', name : 'email', width : 300, sortable : false, align:"left"},
                         {display: 'userid', name : 'userid', width : 100, sortable : true, align:"left"},
-			{display: 'useridresolver', name : 'useridresolver', width : 200, sortable : true, align:"left"}
             ],
             height: 400,
             searchitems : [
