@@ -409,7 +409,7 @@ function get_selected_tokens(){
     return selectedTokenItems;
 }
 
-function get_selected_users(){
+function get_selected_user(){
     /*
      * This function returns the list of selected users.
      * Each list element is an object with
@@ -557,7 +557,7 @@ function show_selected_status(){
 }
 
 function get_selected(){
-    var selectedUserItems = get_selected_users();
+    var selectedUserItems = get_selected_user();
     var selectedTokenItems = get_selected_tokens();
     document.getElementById('selected_tokens').innerHTML = selectedTokenItems.join(", ");
     // we can only select a single user
@@ -1040,7 +1040,7 @@ function token_assign(){
 
     tokentab = 0;
     tokens = get_selected_tokens();
-    user = get_selected_users();
+    user = get_selected_user();
     count = tokens.length;
     for (i = 0; i < count; i++) {
         serial = tokens[i];
@@ -1303,7 +1303,7 @@ function enroll_callback(xhdr, textStatus, p_serial) {
         if (true == g.display_genkey) {
 
             // display the QR-Code of the URL. tab
-            var users = get_selected_users();
+            var users = get_selected_user();
             var emails = get_selected_email();
             $('#token_enroll_serial').html(serial);
             if (users.length >= 1) {
@@ -1455,7 +1455,7 @@ function token_enroll(){
 }
 
 function get_enroll_infotext(){
-    var users = get_selected_users();
+    var users = get_selected_user();
     $("#enroll_info_text_user").hide();
     $("#enroll_info_text_nouser").hide();
     $("#enroll_info_text_multiuser").hide();
