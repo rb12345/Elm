@@ -37,13 +37,15 @@ a.activeToken {
 	margin-bottom: 1em;
 	padding: 1em;
 	border: 1px solid #dedede;
+        height: 80px;
 }
 
 #logo{
 	background-image:  url(/images/crest.png);
 	background-size: cover;
 	float: right;
-	width: 220px;
+	width: 251px;
+        height: 78px;
 	margin: 0px;
 }
 
@@ -60,7 +62,12 @@ a.activeToken {
 	color: #fff;
  	float: left;
 	text-align: left;
+        font-size: 125%;
  }
+
+.portalname {
+        color: #fff;
+}
 
 .ui-tabs.ui-widget {
 	border: none;
