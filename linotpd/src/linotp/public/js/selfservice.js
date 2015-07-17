@@ -209,6 +209,7 @@ function resync() {
     return false;
 }
 
+
 function assign() {
     show_waiting();
     var serial = $('#assign_serial').val();
@@ -876,7 +877,7 @@ function elmProvisionFinal() {
     var serial = $('#token_serial').val();
     var params = {otp: otp, serial: serial, session: get_selfservice_session()};
 
-    var data = run_sync_request("/userservice/webprovision/elmfinal", params);
+    var data = run_sync_request("/userservice/userelmfinal", params);
 
     hide_waiting();
     if (data.result.status == false) {

@@ -2726,6 +2726,8 @@ def checkPolicyPost(controller, method, param=None, user=None):
                   "was passed." % controller)
         raise PolicyException(_("Failed to run getPolicyPost. "
                               "Unknown controller: %s") % controller)
+
+    log.debug("[checkPolicyPost] leaving function")
     return ret
 
 

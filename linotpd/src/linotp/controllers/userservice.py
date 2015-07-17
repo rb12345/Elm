@@ -89,14 +89,16 @@ from linotp.lib.reply import (sendResult,
 
 from linotp.lib.util import (generate_otpkey,
                              get_client,
-                             remove_empty_lines
+                             remove_empty_lines,
+                             getParam
                              )
 
 from linotp.lib.realm import getDefaultRealm
 
 from linotp.lib.user import (getUserInfo,
                               User,
-                              getUserId)
+                              getUserId,
+                             getAllUserRealms)
 
 from linotp.lib.token import (resetToken,
                               setPin,
@@ -147,7 +149,7 @@ audit = config.get('audit')
 ENCODING = "utf-8"
 
 
-def get_auth_user(request):
+def get_auth_user():
     """
     retrieve the authenticated user from WebAuth
 
@@ -157,6 +159,7 @@ def get_auth_user(request):
     :param request: the request object
     :return: tuple of (authentication type and authenticated user)
     """
+    log.debug("[get_auth_user] entering function")
     auth_type = ''
 
     if request.environ.has_key('REMOTE_USER'):
@@ -165,6 +168,12 @@ def get_auth_user(request):
         log.debug("[get_auth_user] getting identity from WebAuth: %r" % user_id)
 
     else:
+        log.debug("[get_auth_user] no REMOTE_USER found")
+        user_id = request.params.get('user', None)
+        log.debug("[get_auth_user] getting identity from params: %r" % request.params)
+        auth_type = "userservice"
+
+    if not user_id:
         return ('unauthenticated', None)
 
     if type(user_id) == unicode:
@@ -194,7 +203,7 @@ class UserserviceController(BaseController):
         self.client = get_client()
 
         if action not in ['auth', 'pre_context']:
-            auth_type, identity = get_auth_user(request)
+            auth_type, identity = get_auth_user()
             if not identity:
                 abort(401, _("You are not authenticated"))
             
@@ -211,11 +220,14 @@ class UserserviceController(BaseController):
                 res = check_userservice_session(request, config,
                                                 self.authUser, self.client)
 
+            elif auth_type == "webauth":
+                res = check_selfservice_session(request.url, request.path,
+                                                request.cookies, request.params)
+
             else:
                 abort(401, _("No valid authentication session %r") % auth_type)
 
             # Check the session.
-            res = check_userservice_session(request, config, self.authUser, self.client)
 
             if not res:
                 abort(401, _("No valid session"))
@@ -1306,6 +1318,8 @@ class UserserviceController(BaseController):
 
             ret = {}
             ret1 = False
+            ret2 = False
+            ret3 = False
             param.update(request.params)
 
             # check selfservice authorization
@@ -1380,11 +1394,11 @@ class UserserviceController(BaseController):
                     t_type = "totp"
 
                 if prefix is None:
-                    prefix = "LSGO"
+                    prefix = "GOOG"
                 if serial is None:
                     serial = th.genSerial(t_type, prefix)
 
-                log.debug("Initializing the token serial: "
+                log.debug("[userwebprovision] Initializing the token serial: "
                           "%s, desc: %s for user %s @ %s." %
                         (serial, desc, self.authUser.login,
                          self.authUser.realm))
@@ -1420,10 +1434,75 @@ class UserserviceController(BaseController):
                             'counter': 0,
                             'digits': 6,
                         }
+
+            elif typ.lower() == "elm_totp":
+                # Elm tokens are Google Authenticator TOTP tokens, 
+                # but they are deactivated until the user confirms
+                # his token is working.
+                desc = "Google Authenticator web prov"
+
+                # ideal: 32 byte.
+                otpkey = generate_otpkey(32)
+                t_type = "totp"
+
+                if prefix is None:
+                    prefix = "GOOG"
+                if serial is None:
+                    serial = th.genSerial(t_type, prefix)
+
+                log.debug("[userwebprovision] Initializing the token serial: %s, desc: %s for user %s @ %s." %
+                        (serial, desc, self.authUser.login, self.authUser.realm))
+
+                (ret1, tokenObj) = th.initToken({ 'type': t_type,
+                                'serial': serial,
+                                'otplen': 6,
+                                'description' : desc,
+                                'otpkey' : otpkey,
+                                'timeStep' : 30,
+                                'timeWindow' : 180,
+                                'hashlib' : "sha1"
+                                }, self.authUser)
+
+                # We also set the PIN straight away for Elm tokens.
+                userPin = getParam(param, "userpin", optional=False)
+
+                check_res = checkOTPPINPolicy(userPin, self.authUser)
+
+                if not check_res['success']:
+                    log.warning("[usersetpin] Setting of OTP PIN for Token %s by user %s failed: %s" % (serial, c.user, check_res['error']))
+                    return sendError(response, u"Setting OTP PIN failed: %s" % check_res['error'])
+
+                if 1 == getOTPPINEncrypt(serial=serial, user=User(c.user, "", c.realm)):
+                    param['encryptpin'] = "True"
+
+                ret2 = setPin(userPin, None, serial)
+
+                ret3 = th.enableToken(False, None, serial)
+                if ret1:
+                        pparam = {'user.login' : self.authUser.login,
+                                  'user.realm' : self.authUser.realm,
+                                  'otpkey' : otpkey,
+                                  'serial' : serial,
+                                  'type' : t_type,
+                                  'description': desc,
+                                 }
+
+                        url = create_google_authenticator(pparam, user=self.authUser)
+                        label = "%s@%s" % (self.authUser.login, self.authUser.realm)
+                        ret = {
+                            'url' :     url,
+                            'img' :     create_img(url, width=300, alt=serial),
+                            'key' :     otpkey,
+                            'label' :   label,
+                            'serial' :  serial,
+                            'counter' : 0,
+                            'digits':   6,
+                        }
+
             else:
                 return sendError(response, _(
                 "valid types are 'oathtoken' and 'googleauthenticator' and "
-                "'googleauthenticator_time'. You provided %s") % typ)
+                "'googleauthenticator_time' and 'elm_totp'. You provided %s") % typ)
 
             logTokenNum()
             c.audit['serial'] = serial
@@ -1431,13 +1510,16 @@ class UserserviceController(BaseController):
             c.audit['token_type'] = t_type
             c.audit['success'] = ret1
             param['serial'] = serial
+  
+            log.debug("[webprovision] params are: %r" % param)
 
             checkPolicyPost('selfservice', 'enroll', param, user=self.authUser)
 
             Session.commit()
             return sendResult(response, {'init': ret1,
-                                         'setpin': False,
-                                         'oathtoken': ret})
+                                         'setpin': ret2,
+                                         'oathtoken': ret,
+                                         'enable' : ret3})
 
         except PolicyException as pe:
             log.error("[userwebprovision] policy failed: %r" % pe)
@@ -1924,6 +2006,57 @@ class UserserviceController(BaseController):
         finally:
             Session.close()
             log.debug('[userfinshocra2token] done')
+
+    def userelmfinal(self):
+        # Called to confim Elm token setup.
+        # Verifies the code given and activates the token if it's correct
+
+        param = request.params
+        serial = getParam(param, "serial", optional=False)
+
+        try:
+            # check selfservice authorization
+            checkPolicyPre('selfservice', 'usersetpin', param, self.authUser)
+            
+            otp = getParam(param, "otp", optional=False)
+
+            # Check the passcode (and indicate that inactive tokens should be considered valid in this case)
+            (ok, opt) = checkSerialPass(serial, otp, options = {"allow_inactive" : True}, user=self.authUser)
+
+            ret = {"success" : ok}
+
+            if (ok):
+                th = TokenHandler()
+                ret["enable"] = th.enableToken(True, None, serial)
+                log.info("[userelmfinal] Activated token %s for user %s." % (serial, c.user))
+
+            else:
+                if opt == None:
+                    opt = {}
+                ret['error'] = c.audit.get('info')
+                log.error("[userelmfinal] Activation of token %s for user %s failed: %s" % (serial, c.user, ret['error']))
+
+                ret['code'] = -309
+
+            Session.commit()
+            return sendResult(response, ret, 1)
+
+        except PolicyException as pe:
+            log.error("[userelmfinal] policy failed: %r" % pe)
+            log.error("[userelmfinal] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, unicode(pe), 1)
+
+        except Exception as e:
+            log.error("[userelmfinal] enabling token %s of user %s failed! %r" % (serial, c.user, e))
+            log.error("[userelmfinal] %s" % traceback.format_exc())
+            Session.rollback()
+            return sendError(response, e, 1)
+
+        finally:
+            Session.close()
+            log.debug('[userelmfinal] done')
+
 
     def token_call(self):
         '''

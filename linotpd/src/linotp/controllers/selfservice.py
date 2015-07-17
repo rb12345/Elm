@@ -71,7 +71,8 @@ from linotp.model.meta import Session
 
 
 from linotp.lib.userservice import (add_dynamic_selfservice_enrollment,
-                                    add_dynamic_selfservice_policies
+                                    add_dynamic_selfservice_policies,
+                                    create_auth_cookie
                                     )
 
 
@@ -183,8 +184,14 @@ class SelfserviceController(BaseController):
 
                 # Check token expiry.
             	age = int(request.environ.get('WEBAUTH_TOKEN_EXPIRATION')) - time.time()
+
+                # Set selfservice cookie
             	response.set_cookie('linotp_selfservice', 'REMOTE_USER', max_age = int(age))
 
+                # Set userservice auth cookie
+                self.client = get_client()
+                authcookie = create_auth_cookie(config, identity, self.client)
+                response.set_cookie('userauthcookie', authcookie, max_age=360*24)
 
                 log.debug("[__before__] set the self.authUser to: %s, %s " % (self.authUser.login, self.authUser.realm))
                 log.debug('[__before__] param for action %s: %s' % (action, param))
@@ -255,7 +262,7 @@ class SelfserviceController(BaseController):
             return sendError(response, e, context='before')
 
         finally:
-            log.debug('[__after__] done')
+            log.debug('[__before__] done')
 
     def __after__(self, action,):
         '''

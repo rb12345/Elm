@@ -1850,8 +1850,8 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
 
     for token in tokenList:
 
-        if not token.isActive():
-            continue
+        #if not token.isActive():
+        #    continue
 
         audit = {}
         audit['serial'] = token.getSerial()
