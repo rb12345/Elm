@@ -86,6 +86,7 @@ if isinstance(lang, list):
 
 <div id="wrap">
 <div id="header" class="ui-widget-header ui-corner-all">
+    <div id="logo"></div>
     <ul id='menu' class='sf-menu sf-vertical'>
 		<li>
 				<div class="float_left">

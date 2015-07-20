@@ -7,17 +7,12 @@
 	font-size: 1.0em;
  }
   
- #header #logo {
-	margin: 0;
-	
-}
- 
- #logo div{
-	background-image:  url(/images/crest.png);
+ #logo{
+	background-image:  url(/images/crest2.png);
 	background-size: cover;
 	float: right;
-	width: 220px;
-	height: 68px;
+	width: 251px;
+	height: 78px;
 	margin: 0px;
 }
  
@@ -34,15 +29,16 @@
 	padding: 1em;
 	border: 1px solid #dedede;
 	border-radius: 0;
-	height:70px;
+	height:80px;
 	width: auto;
 	width: initial;
-	font-size: large;
+	font-size: 125%;
 	float: none;
 }
 
 #header .sf-menu {
 	width: 100%;
+        position: absolute;
 }
 
  #main {

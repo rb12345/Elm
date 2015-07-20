@@ -247,16 +247,6 @@ z-index: 1;
 	height: 45px;
  }
 
- #header #logo {
-	float: right;
-	margin-right: 5px;
-	margin-top: 5px;
- }
-
- #header #logo img {
-	display: block;
- }
-
  #header .sf-menu {
 	margin-bottom: 0;
  }
