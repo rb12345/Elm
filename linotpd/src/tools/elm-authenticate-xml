@@ -24,7 +24,11 @@ import crypt
 
 from getopt import getopt, GetoptError
 
-LINOTP_URL = "https://mfa-test.bsp.ox.ac.uk"
+import logging
+
+log = logging.getLogger(__name__)
+
+LINOTP_URL = "https://mfa.it.ox.ac.uk"
 DISABLE_SSL_VALIDATION = True
 
 
@@ -98,7 +102,8 @@ def webkdc_validate(user, code):
     value = response.get("value")
     if (value and response.get("status") and value.get("success")):
         # The call succeeded and they authenticated successfully
-        factor = "<factors><factor>o</factor><factor>o3</factor><expiration>%s</expiration></factors>" % value.get("expiration")
+        log.debug("[webkdc_validate] type: %s" % type(value))
+        factor = "<factors><factor>o</factor><factor>o3</factor><expiration>%d</expiration></factors>" % value.get("expiration")[0]
         return reply % (user, "yes", factor)
     else:
         # An error occured, so respond with the error info.

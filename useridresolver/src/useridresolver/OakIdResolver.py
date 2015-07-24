@@ -52,7 +52,7 @@ import logging
 import os
 
 # Path to the Oak LDAP credential file.
-os.environ["KRB5CCNAME"] = "/etc/krb5/oak-ldap.ccache"
+os.environ["KRB5CCNAME"] = "/etc/krb5/oak-ldap.mfa.it.ox.ac.uk.ccache"
 
 log = logging.getLogger(__name__)
 
@@ -121,10 +121,12 @@ class IdResolver (UserIdResolver):
             l.sasl_interactive_bind_s("",auth)
 
             # We use eduPersonOrgUnitDN's oakUnitCode attribute to identify user realms.
-            realmfilter = "(eduPersonOrgUnitDN=oakUnitCode=%s,ou=units,dc=oak,dc=ox,dc=ac,dc=uk)" % params['OAKREALM']
+            #realmfilter = "(eduPersonOrgUnitDN=oakUnitCode=%s,ou=units,dc=oak,dc=ox,dc=ac,dc=uk)" % params['OAKREALM']
+            realmfilter = ""
 
             # We use the oakOxfordSSOUsername as the user name.
-            searchfilter = "(&(oakOxfordSSOUsername=*)%s)" % realmfilter
+            #searchfilter = "(&(oakOxfordSSOUsername=*)%s)" % realmfilter
+            searchfilter = "(oakOxfordSSOUsername=*)"
 
             results = 0;
             sizelimit = int(DEFAULT_SIZELIMIT)
@@ -163,7 +165,7 @@ class IdResolver (UserIdResolver):
         self.realm = ""
         self.loginnameattribute = "oakOxfordSSOUsername"
 
-        self.ldapuri = "ldap://ldap.oak.ox.ac.uk:389"
+        self.ldapuri = "ldaps://ldap.oak.ox.ac.uk"
         self.base = "ou=people,dc=oak,dc=ox,dc=ac,dc=uk"
         self.filter = ""
         self.searchfilter = ""
@@ -229,10 +231,11 @@ class IdResolver (UserIdResolver):
 
             l_obj.network_timeout = self.timeout
 
-            l_obj.start_tls_s()
+            #l_obj.start_tls_s()
             l_obj.sasl_interactive_bind_s("",auth)
 
             self.l_obj = l_obj
+            log.debug("[bind] Successfully bound to %r", uri)
             return l_obj
         except ldap.LDAPError as  e:
             log.error("[bind] LDAP error: %r" % e)
@@ -289,6 +292,8 @@ class IdResolver (UserIdResolver):
         attrlist = []
         attrlist.append("oakPrimaryPersonID")
 
+        log.debug("[getUserId] filter string is %s" % fil)
+
         resultList = None
         try:
             l_id = l_obj.search_ext(self.base,
@@ -305,8 +310,6 @@ class IdResolver (UserIdResolver):
             log.debug("[getUserId] : empty result ")
             return userid
             
-        log.debug("[getUserId] : resultList :%r: " % (resultList))
-
         # [0][0] is the distinguished name
 
         res = None
@@ -609,10 +612,11 @@ class IdResolver (UserIdResolver):
         log.debug("[loadConfig: the sizelimit is: %s, %i"
                                                 % (sizelimit, self.sizelimit))
 
-        self.realmfilter = "(eduPersonOrgUnitDN=oakUnitCode=%s,ou=units,dc=oak,dc=ox,dc=ac,dc=uk)" % self.realm
+        #self.realmfilter = "(eduPersonOrgUnitDN=oakUnitCode=%s,ou=units,dc=oak,dc=ox,dc=ac,dc=uk)" % self.realm
+        self.realmfiler = ""
 
-        self.filter = "(&(%s=%%s)%s)" % (self.loginnameattribute, self.realmfilter)
-        self.searchfilter = "(%s=*)%s" % (self.loginnameattribute, self.realmfilter)
+        self.filter = "(%s=%%s)" % (self.loginnameattribute)
+        self.searchfilter = "(%s=*)" % (self.loginnameattribute)
 
         return self
 

@@ -51,6 +51,8 @@ from linotp.lib.token   import newToken
 from linotp.lib.user    import getUserFromParam, getUserFromRequest
 from linotp.lib.user    import getUserList, User, getAdminRealms
 
+from linotp.lib.realm   import getDefaultRealm
+
 from linotp.lib.util    import getParam
 from linotp.lib.util    import check_session
 from linotp.lib.util    import get_version
@@ -152,7 +154,7 @@ class ManageController(BaseController):
                 if (realms):
                     c.realm = realms[0]
                 else:
-                    realm = getDefaultRealm()
+                    c.realm = getDefaultRealm()
 
                 c.admin = "%s@%s" % (c.login, c.realm)
 

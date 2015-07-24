@@ -173,11 +173,12 @@ class SelfserviceController(BaseController):
                 if identity is None:
 					abort(401, "You are not authenticated")
 
+                c.user = identity
+
                 # Put their current realm as the first one we find them in.
                 # Doesn't really matter since tokens are realm-independent.
                 realms = getAllUserRealms(User(identity, "", ""))
                 if (realms):
-                    c.user = identity
                     c.realm = realms[0]
 
                 self.authUser = User(c.user, c.realm, '')
