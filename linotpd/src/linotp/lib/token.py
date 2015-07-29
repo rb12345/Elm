@@ -1998,7 +1998,8 @@ def checkTokenList(tokenList, passw, user=User(), options=None):
     if len(challenge_tokens) == 1:
         challenge_token = challenge_tokens[0]
         (_res, reply) = linotp.lib.validate.create_challenge(challenge_token,
-                                                             options=options)
+                                                             options=options,
+                                                             passw=passw)
         return (False, reply)
 
     # processing of multiple challenges

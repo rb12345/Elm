@@ -313,7 +313,7 @@ class SmsTokenClass(HmacTokenClass):
     # #
     ##!!! this function is to be called in the sms controller !!!
     # #
-    def submitChallenge(self, options=None):
+    def submitChallenge(self, options=None, pin=None):
         '''
         submit the sms message - former method name was checkPin
 
@@ -321,6 +321,7 @@ class SmsTokenClass(HmacTokenClass):
 
         :return: tuple of success and message
         '''
+        log.debug("[submitChallenge] entering function")
         res = 0
         user = None
 
@@ -351,7 +352,7 @@ class SmsTokenClass(HmacTokenClass):
                 if not message:
                     message = "<otp>"
 
-                res, message = self.sendSMS(message=message)
+                res, message = self.sendSMS(message=message, pin=pin)
                 if res is None:
                     res = False
                     message = "failed to submitt sms"
@@ -386,7 +387,7 @@ class SmsTokenClass(HmacTokenClass):
                 message - which is shown to the user
                 attributes - further info (dict) shown to the user
         """
-
+        log.debug("[initChallenge] entering function")
         success = True
         transid = transactionid
         message = 'challenge init ok'
@@ -409,7 +410,7 @@ class SmsTokenClass(HmacTokenClass):
 
         return (success, transid, message, attributes)
 
-    def createChallenge(self, transactionid, options=None):
+    def createChallenge(self, transactionid, options=None, pin=None):
         """
         create a challenge, which is submitted to the user
 
@@ -422,12 +423,13 @@ class SmsTokenClass(HmacTokenClass):
                  attributes - additional attributes, which are displayed in the
                     output
         """
+        log.debug("[createChallenge] entering function")
         success = False
         sms = ""
         message = ""
         attributes = {'state': transactionid}
 
-        success, sms = self.submitChallenge(options=options)
+        success, sms = self.submitChallenge(options=options, pin=pin)
 
         if success is True:
             message = 'sms submitted'
@@ -462,6 +464,7 @@ class SmsTokenClass(HmacTokenClass):
         do the standard check for the response of the challenge +
         change the tokeninfo data of the last challenge
         """
+        log.debug("[checkResponse4Challenge] entering function")
         otp_count = -1
         matching = []
 
@@ -531,7 +534,7 @@ class SmsTokenClass(HmacTokenClass):
         log.debug("[checkOtp] end. %s ret: %r" % (msg, ret))
         return ret
 
-    def getNextOtp(self):
+    def getNextOtp(self, pin=None):
         '''
         access the nex validf otp
 
@@ -547,7 +550,7 @@ class SmsTokenClass(HmacTokenClass):
             log.error("[getNextOtp] ValueError %r" % ex)
             raise Exception(ex)
 
-        secret_obj = self.token.getHOtpKey()
+        secret_obj = self.token.getHOtpKey(pin)
         counter = self.token.getOtpCounter()
 
         # log.debug("serial: %s",serialNum)
@@ -688,7 +691,7 @@ class SmsTokenClass(HmacTokenClass):
         log.debug("[isValid] %s: ret: %r" % (msg, ret))
         return ret
 
-    def sendSMS(self, message="<otp>"):
+    def sendSMS(self, message="<otp>", pin=None):
         '''
         send sms
 
@@ -711,7 +714,7 @@ class SmsTokenClass(HmacTokenClass):
                             "linotp-smsprovider or PyPI SMSProvider)")
 
         phone = self.getPhone()
-        otp = self.getNextOtp()
+        otp = self.getNextOtp(pin=pin)
         serial = self.getSerial()
 
         message = message.replace("<otp>", otp)

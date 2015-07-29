@@ -114,7 +114,7 @@ def is_same_transaction(challenge, transaction_id):
     return False
 
 
-def create_challenge(token, options=None, challenge_id=None, id_postfix=''):
+def create_challenge(token, options=None, challenge_id=None, id_postfix='', passw=None):
     """
     dedicated method to create a challenge to support the implementation
     of challenge policies in future
@@ -188,7 +188,7 @@ def create_challenge(token, options=None, challenge_id=None, id_postfix=''):
             challenge_obj.save()
 
             (res, message, data, attributes) = \
-                        token.createChallenge(transactionid, options=options)
+                        token.createChallenge(transactionid, options=options, pin=passw)
 
             if res == True:
                 # persist the final challenge data + message

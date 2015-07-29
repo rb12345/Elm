@@ -135,11 +135,12 @@ class ValidateController(BaseController):
         :rtype: Tuple(boolean, opt)
 
         '''
+        log.debug("[_check] entering function")
         opt = None
 
         options = {}
 
-        ## put everythin in the options but the user, pass, init
+        ## put everything in the options but the user, pass, init
         options.update(param)
         for para in ["pass", "user", "init"]:
             if options.has_key(para):
@@ -170,6 +171,7 @@ class ValidateController(BaseController):
                     options = {}
                 options['initTime'] = initTime
         th = TokenHandler()
+        log.debug("[_check] calling th.checkUserPass")
         (ok, opt) = th.checkUserPass(user, passw, options=options)
 
         c.audit['success'] = ok
@@ -191,6 +193,7 @@ class ValidateController(BaseController):
             else:
                 opt['error'] = c.audit.get('action_detail')
 
+        log.debug("[_check] exiting function")
         return (ok, opt)
 
 
@@ -737,6 +740,7 @@ class ValidateController(BaseController):
         returns:
             JSON response
         '''
+        log.debug("[smspin] entering function")
         ret = False
         param = request.params
         state = ''
@@ -748,7 +752,9 @@ class ValidateController(BaseController):
             c.audit['realm'] = user.realm or getDefaultRealm()
             c.audit['success'] = 0
 
+            log.debug("[smspin] calling _check")
             (ret, opt) = self._check(param)
+            log.debug("[smspin] returning to function")
 
             ## here we build some backward compatibility
             if type(opt) is dict:
