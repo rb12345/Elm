@@ -1,34 +1,34 @@
 <!DOCTYPE html>
 <html>
-	<head>
-  		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-		<link rel="icon" href="/elm/images/favicon.ico" type="image/x-icon" />
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <link rel="icon" href="/elm/images/favicon.ico" type="image/x-icon" />
 
-		<link rel="shortcut icon" href="/elm/images/favicon.ico" type="image/x-icon" />
-		<meta name="author" content="University of Oxford" />
-		<link rel="stylesheet" type="text/css" href="/elm/css/webauth.css?1.21" media="all"/>
+        <link rel="shortcut icon" href="/elm/images/favicon.ico" type="image/x-icon" />
+        <meta name="author" content="University of Oxford" />
+        <link rel="stylesheet" type="text/css" href="/elm/css/webauth.css?1.21" media="all"/>
 
-		<link rel="stylesheet" type="text/css" href="/elm/css/webauth-handheld.css?1.21" media="screen and (max-width: 639px)"/>
-		<link rel="stylesheet" type="text/css" href="/elm/css/webauth-large.css?1.21" media="screen and (min-width: 640px)" />
+        <link rel="stylesheet" type="text/css" href="/elm/css/webauth-handheld.css?1.21" media="screen and (max-width: 639px)"/>
+        <link rel="stylesheet" type="text/css" href="/elm/css/webauth-large.css?1.21" media="screen and (min-width: 640px)" />
 
-		<!--[if (lt IE 9)&(!IEMobile)]>
-		<link rel="stylesheet" type="text/css" href="/css/webauth-large.css?1.21" media="screen"/>
-		<![endif]-->
-		
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+        <!--[if (lt IE 9)&(!IEMobile)]>
+        <link rel="stylesheet" type="text/css" href="/css/webauth-large.css?1.21" media="screen"/>
+        <![endif]-->
 
-		<title>University of Oxford - Single Sign-On</title>
-		<script type="text/javascript">
-		 <!--
-		 function init() {
-		   if (self != top) top.location = self.location;
-		 }
-		 // -->
-		</script>
-		
-	</head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 
-  [% IF notdefined %]
+        <title>University of Oxford - Single Sign-On</title>
+        <script type="text/javascript">
+         <!--
+         function init() {
+           if (self != top) top.location = self.location;
+         }
+         // -->
+        </script>
+    </head>
+
+    [% IF notdefined %]
+
 <!--
 This is the template for the WebAuth multifactor page.  This page is called
 from login.fcgi script on the weblogin server after a successful
@@ -36,6 +36,9 @@ authentication that has come back signaling that multifactor authentication
 is also required.  Variables used:
 
 factor_type             : type of multifactor being used (o1, o2, etc)
+default_device          : the default device ID
+default_factor          : the default second factor
+devices                 : array of devices (name, id, and factors as keys)
 username                : the authenticated identity of the user
 login_cancel            : a cancel URL was specified
 cancel_url              : the specified cancel URL
@@ -43,64 +46,92 @@ multifactor_sentauth    : the form was submitted to run the sendauth function
 error                   : some error occurred
 err_multifactor_missing : the form was submitted previously without an OTP
 err_multifactor_invalid : could not validate a submitted OTP
+remember_login          : set if single sign-on cookies should be generated
+user_message            : raw HTML returned by the user information service
 -->
-  [% END %]
 
-  <body onload="document.multifactor_login.otp.focus();">
-	<div class="content" id="loginPage">
-		<h1 id=pageTitle>University of Oxford - Single Sign On</h1>
-		[% IF error || user_message %]
-		  <div class="error" align="center">
-			<p>
-				[% IF user_message %]
-					[% user_message %]
-				[% ELSE %]
-					[% IF err_multifactor_missing %]
-						<!-- Error: no OTP submitted. -->
-						Error: Enter a one-time password.
-					[% END %]
+    [% END %]
 
-					[% IF err_multifactor_invalid %]
-						<!-- Error: login failed. -->
-						Error: You entered an incorrect one-time password.
-					[% END %]
-				[% END %]
-			</p>
-		  </div>
-		[% END %]
+    <body onload="document.login.otp.focus();">
+    <div class="content" id="loginPage">
+    <h1 id=pageTitle>University of Oxford - Single Sign On</h1>
+    [% IF error || user_message %]
+        <div class="error" align="center">
+        [% IF user_message %][% user_message %][% END %]
+        <p>
+        [% IF err_multifactor_missing %]
+            <!-- Error: no OTP submitted. -->
+            Error: Enter a one-time password.
+        [% END %]
 
-		<div id="loginForm">
+        [% IF err_multifactor_invalid && !user_message %]
+            <!-- Error: login failed. -->
+            Error: You entered an incorrect one-time password.
+        [% END %]
 
-			<form name="multifactor_login"	action="[% script_name FILTER html %]" method="post" autocomplete="OFF" enctype="application/x-www-form-urlencoded">
+        </p>
+        </div>
+    [% END %]
+    </div>
+
+    <div id="loginForm">
+        [% IF factor_type == "o2" && !multifactor_sentauth %]
+            <form name="multifactor_send" action="[% script_name FILTER html %]" method="post" enctype="application/x-www-form-urlencoded">
+                <img class="form-logo" src="/elm/images/crest.png" alt=""></img>
+                <div class="form-intro">
+                    <p>Your multifactor configuration requires us to send you a password
+                    via SMS. Please click below to send the message.</p>
+                </div>
+                <input type="hidden" name="rm" value="multifactor_sendauth">
+                <input type="submit" name="Submit" value="Send OTP">
+                <input type="hidden" name="RT" value="[% RT FILTER html %]">
+                <input type="hidden" name="ST" value="[% ST FILTER html %]">
+                <input type="hidden" name="LS" value="[% LS FILTER html %]">
+                <input type="hidden" name="username" value="[% username FILTER html %]">
+                <input type="hidden" name="factor_type" value="[% factor_type FILTER html %]">
+                <input type="hidden" name="remember_login" value="[% remember_login FILTER html %]">
+            </form>
+        [% ELSE %]
+            <form name="multifactor_login"  action="[% script_name FILTER html %]" method="post" autocomplete="OFF" enctype="application/x-www-form-urlencoded">
                 <img class="form-logo" src="/elm/images/crest.png" alt=""></img>
 
-				<div class="form-intro"><p>Please enter your PIN, followed by your one-time password.</p></div>
-				<input type="hidden" name="rm" value="multifactor">
-				<input type="hidden" name="RT" value="[% RT FILTER html %]">
-				<input type="hidden" name="ST" value="[% ST FILTER html %]">
-				<input type="hidden" name="username" value="[% username FILTER html %]">
-				<input type="hidden" name="factor_type" value="[% factor_type FILTER html %]">
+                <div class="form-intro">
+                    [% IF multifactor_sentauth %]
+                    <p>Please enter the code you received in your device.</p>
+                    [% ELSE %]
+                    <p>Please enter your PIN, followed by your one-time password.</p>
+                    [% END %]
+                </div>
+                <input type="hidden" name="rm" value="multifactor">
+                <input type="hidden" name="RT" value="[% RT FILTER html %]">
+                <input type="hidden" name="ST" value="[% ST FILTER html %]">
+                <input type="hidden" name="username" value="[% username FILTER html %]">
+                <input type="hidden" name="factor_type" value="[% factor_type FILTER html %]">
+                <input type="hidden" name="remember_login" value="[% remember_login FILTER html %]">
+                [% IF factor_type == "o2" && multifactor_sentauth %]
+                    <input type="hidden" name="multifactor_sentauth" value="1">
+                [% END %]
 
-				<!--[if lte IE 9]>
-					<label class="ie-label" for="otp">Access Code</label>
-				<![endif]-->
-				<input id="otp" type="password" name="otp" value="" placeholder="Access Code" size="10" maxlength="10" tabindex="1"/>
-				
-				<div class="formsubmit">
-					<input type="submit" name="Submit" class="go-go-go" value="Login" tabindex="2" />
-					<p><a class="form-help forgot-password" title="Helpful advice on what to do about forgotten or expired passwords and other how to get help if you're having trouble." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Having trouble logging in?</a></p>				
-				</div>
-			</form>
-		</div>
+                <!--[if lte IE 9]>
+                <label class="ie-label" for="otp">Access Code</label>
+                <![endif]-->
+                <input id="otp" type="password" name="otp" value="" placeholder="Access Code" size="10" maxlength="10" tabindex="1"/>
 
-		<p class="postscript">
-			<a href="http://www.ict.ox.ac.uk/oxford/rules/">University of Oxford  Computer Usage Rules and Etiquette</a>
-		</p>
-		
-	</div>
-	<div id="footer">
-		<div id="site-info">
-		</div>
-	</div> 
-  </body>
+                <div class="formsubmit">
+                <input type="submit" name="Submit" class="go-go-go" value="Login" tabindex="2" />
+                <p><a class="form-help forgot-password" title="Helpful advice on what to do about forgotten or expired passwords and other how to get help if you're having trouble." href="http://www.oucs.ox.ac.uk/webauth/oxfordusername.xml">Having trouble logging in?</a></p>       
+                </div>
+            </form>
+        [% END %]
+    </div>
+
+    <p class="postscript">
+        <a href="http://www.ict.ox.ac.uk/oxford/rules/">University of Oxford  Computer Usage Rules and Etiquette</a>
+    </p>
+    
+    </div>
+    <div id="footer">
+        <div id="site-info"></div>
+    </div> 
+    </body>
 </html>
