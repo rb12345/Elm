@@ -74,6 +74,7 @@ from linotp.model import Token
 
 import traceback
 import time
+import json
 
 audit = config.get('audit')
 
@@ -812,9 +813,9 @@ class ValidateController(BaseController):
                     model.Token.LinOtpIdResClass == idResolverClass).filter(
                      model.Token.LinOtpIsactive == True)
 
-                tokenList = []
+                tokenList = {}
                 for token in sqlQuery:
-                    tokenList.append(token.LinOtpTokenSerialnumber)
+                    tokenList[token.LinOtpTokenSerialnumber] = json.loads(token.LinOtpTokenInfo)
 
             Session.commit()
 

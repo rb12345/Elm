@@ -86,10 +86,11 @@ def webkdc_userinfo(user):
             extra += "<required-factors><factor>m</factor></required-factors>"
             factors += "<factor>m</factor>"
             # Send back the correct available factors
-            for tok in tokens:
+            for tok in tokens.keys():
                 typ = tok[:4]
                 if typ == "LSSM": # sms
                     factors += "<factor>o2</factor>"
+                    extra += "<user-message>%s</user-message>" % tokens[tok]["phone"][-3:]
                 elif typ == "GOOG": # authenticator app
                     factors += "<factor>o3</factor>"
                 elif typ == "UBCM": # yubikey
