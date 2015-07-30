@@ -119,6 +119,7 @@ setup(
             get_debian_package() + 'etc/linotp2/apache2.4-example/',
             [
                 'config/apache2.4-example/linotp2.conf',
+                'config/apache2.4-example/linotp2-elm.conf',
                 ]
             ),
         (

@@ -28,7 +28,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-LINOTP_URL = "https://mfa.it.ox.ac.uk"
+LINOTP_URL = "https://localhost"
 DISABLE_SSL_VALIDATION = True
 
 

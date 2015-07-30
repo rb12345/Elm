@@ -172,3 +172,4 @@
     ErrorDocument 500 "<h1>Internal Server Error</h1> Possible reasons can be missing modules or bad access rights on LinOTP configuration files or log files. Please check the apache logfile <pre>/var/log/apache2/error.log</pre> for more details."
 
 </VirtualHost>
+
