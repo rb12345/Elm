@@ -1213,7 +1213,7 @@ class AdminController(BaseController):
                 oldPin = getParam(param, "oldpin", optional)
                 if oldPin:
                     # Check the old PIN is correct.
-                    tokenList = getTokens4UserOrSerial(None, serial, forUpdate=True)
+                    tokenList = getTokens4UserOrSerial(None, serial)
                     # Should only be one token with this serial.
                     token = tokenList[0]
 

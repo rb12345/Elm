@@ -290,7 +290,7 @@ class HmacTokenClass(TokenClass):
         return (True, message, data, None)
 
 
-    def checkOtp(self, anOtpVal, counter, window, options=None):
+    def checkOtp(self, anOtpVal, counter, window, options=None, pin=None):
         '''
         checkOtp - validate the token otp against a given otpvalue
 
@@ -325,7 +325,7 @@ class HmacTokenClass(TokenClass):
             log.error('[checkOtp] failed to initialize hashlibStr: %r' % (ex))
             raise Exception(ex)
 
-        secretHOtp = self.token.getHOtpKey()
+        secretHOtp = self.token.getHOtpKey(pin)
         #serialNum   = self.token.LinOtpTokenSerialnumber
         #log.debug("serial: %s",serialNum)
 

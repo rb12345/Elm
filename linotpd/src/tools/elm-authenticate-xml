@@ -61,9 +61,9 @@ def call_linotp(path, params):
     
 	# Connect with httplib2 (note that not all versions are compiled with disable_ssl_validation)
     try:
-        http = httplib2.Http(disable_ssl_certificate_validation = DISABLE_SSL_VALIDATION, timeout = 5)
+        http = httplib2.Http(disable_ssl_certificate_validation = DISABLE_SSL_VALIDATION, timeout = 10)
     except TypeError as exx:
-        http = httplib2.Http(timeout = 5)
+        http = httplib2.Http(timeout = 10)
     
 	# POST and get our response
     (_resp, content) = http.request(url, method="POST", body=data, headers=headers)
@@ -83,11 +83,22 @@ def webkdc_userinfo(user):
         tokens = response.get("value") 
         if tokens:
             # If they have a token, require multifactor authentication.
-            factors += "<factor>m</factor><factor>o</factor><factor>o1</factor><factor>o2</factor><factor>o3</factor>"
+            extra += "<required-factors><factor>m</factor></required-factors>"
+            factors += "<factor>m</factor>"
+            # Send back the correct available factors
+            for tok in tokens:
+                typ = tok[:4]
+                if typ == "LSSM": # sms
+                    factors += "<factor>o2</factor>"
+                elif typ == "GOOG": # authenticator app
+                    factors += "<factor>o3</factor>"
+                elif typ == "UBCM": # yubikey
+                    factors += "<factor>o4</factor>"
+            #factors += "<factor>m</factor><factor>o</factor><factor>o1</factor><factor>o2</factor><factor>o3</factor>"
             # We require MFA here rather than in WebAuthRequireInitialFactor because 
             # this seems to be the only way to get MFA-if-token/password-if-not working.
 
-            extra = "<multifactor-required>yes</multifactor-required>"
+            #extra = "<multifactor-required>yes</multifactor-required>"
         # If they don't have a token, they get nothing.
             
         return reply % (user, factors, extra)
@@ -95,21 +106,31 @@ def webkdc_userinfo(user):
         print >> sys.stderr, response.get("error")
         sys.exit(1)
         
-def webkdc_validate(user, code):
+def webkdc_validate(user, code, token):
     response = call_linotp("/validate/webkdc_validate", {"user" : user, "code" : code})
     reply = '<authdata user="%s"><success>%s</success>%s</authdata>'
     # Did the call succeed?
     value = response.get("value")
     if (value and response.get("status") and value.get("success")):
         # The call succeeded and they authenticated successfully
-        log.debug("[webkdc_validate] type: %s" % type(value))
-        factor = "<factors><factor>o</factor><factor>o3</factor><expiration>%d</expiration></factors>" % value.get("expiration")[0]
-        return reply % (user, "yes", factor)
+        factors = "<factor>o</factor><factor>%s</factor>" % token
+        data = "<factors>%s<expiration>%d</expiration></factors>" % (factors, value.get("expiration")[0])
+        #factor = "<factors><factor>o</factor><factor>o2</factor><factor>o3</factor><expiration>%d</expiration></factors>" % value.get("expiration")[0]
+        return reply % (user, "yes", data)
     else:
         # An error occured, so respond with the error info.
         error = "<user-message>%s</user-message>" % value.get("error")
         return reply % (user, "no", error)
         
+def sms_send(user):
+    _pin = "9999"
+    response = call_linotp("/validate/smspin", {"user" : user, "pass" : _pin})
+    if response.get("status"):
+        return 0
+    else:
+        print "Error: %s" % value.get("error").get("message")
+        return 1
+
 def main():
     """
     main worker:
@@ -142,8 +163,19 @@ def main():
             print "Not enough arguments."
             usage()
             sys.exit(1)
-        
-        print webkdc_validate(sys.argv[2], sys.argv[4]) # third is username, fifth is the code
+        if sys.argv[5] == "o2": # sms
+            code = "9999" + str(sys.argv[4])
+        else:
+            code = sys.argv[4]
+        print webkdc_validate(sys.argv[2], code, sys.argv[4]) # third is username, fourth is token type
+
+    elif (command == "sms"):
+        if len(sys.argv) < 3:
+            print "Not enough arguments."
+            usage()
+            sys.exit(1)
+        sys.exit(sms_send(sys.argv[2]))
+
     else:
         print "Unrecognized command."
         usage()

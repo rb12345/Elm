@@ -488,14 +488,14 @@ class SmsTokenClass(HmacTokenClass):
 
         for challenge in challenges:
             otp_count = self.checkOtp(otp_val, counter, window,
-                                                            options=options)
+                                      options=options, pin=pin)
             if otp_count > 0:
                 matching.append(challenge)
                 break
 
         return (otp_count, matching)
 
-    def checkOtp(self, anOtpVal, counter, window, options=None):
+    def checkOtp(self, anOtpVal, counter, window, options=None, pin=None):
         '''
         checkOtp - check the otpval of a token against a given counter
         in the + window range
@@ -511,7 +511,7 @@ class SmsTokenClass(HmacTokenClass):
                   " %r, counter: %r, window: %r, options: %r "
                   % (anOtpVal, counter, window, options))
 
-        ret = HmacTokenClass.checkOtp(self, anOtpVal, counter, window)
+        ret = HmacTokenClass.checkOtp(self, anOtpVal, counter, window, pin=pin)
         if ret != -1:
             if self.isValid() == False:
                 ret = -1
