@@ -91,7 +91,7 @@ def webkdc_userinfo(user):
                 if typ == "LSSM": # sms
                     factors += "<factor>o2</factor>"
                     extra += "<user-message>%s</user-message>" % tokens[tok]["phone"][-3:]
-                elif typ == "GOOG": # authenticator app
+                elif typ in ["GOOG", "TOTP"]: # authenticator app
                     factors += "<factor>o3</factor>"
                 elif typ == "UBCM": # yubikey
                     factors += "<factor>o4</factor>"
