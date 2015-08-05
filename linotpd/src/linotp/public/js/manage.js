@@ -1073,7 +1073,7 @@ function token_resync(){
     var count = tokens.length;
     for (i = 0; i < count; i++) {
         var serial = tokens[i];
-        clientUrlFetch("/admin/resync", {"serial" : serial, "otp1" : $('#otp1').val(), "otp2":  $('#otp2').val()}, token_resync_callback);
+        clientUrlFetch("/admin/resync", {"serial" : serial, "otp1" : $('#otp1').val(), "otp2":  $('#otp2').val(), "pin" : $('#pin').val()}, token_resync_callback);
     }
 }
 

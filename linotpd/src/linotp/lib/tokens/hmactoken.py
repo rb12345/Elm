@@ -473,7 +473,7 @@ class HmacTokenClass(TokenClass):
         return res
 
 
-    def resync(self, otp1, otp2, options=None):
+    def resync(self, otp1, otp2, options=None, pin=None):
         '''
         resync the token based on two otp values
         - external method to do the resync of the token
@@ -503,7 +503,7 @@ class HmacTokenClass(TokenClass):
 
         self.hashlibStr = self.getFromTokenInfo("hashlib", 'sha1')
 
-        secretHOtp = self.token.getHOtpKey()
+        secretHOtp = self.token.getHOtpKey(pin)
         counter = self.token.getOtpCounter()
         syncWindow = self.token.getSyncWindow()
         #log.debug("serial: %s",serialNum)

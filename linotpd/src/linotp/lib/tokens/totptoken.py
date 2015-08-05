@@ -575,7 +575,7 @@ class TimeHmacTokenClass(HmacTokenClass):
         return res
 
 
-    def resync(self, otp1, otp2, options=None):
+    def resync(self, otp1, otp2, options=None, pin=None):
         '''
         resync the token based on two otp values
         - external method to do the resync of the token
@@ -603,7 +603,7 @@ class TimeHmacTokenClass(HmacTokenClass):
             return ret
 
 
-        secretHOtp = self.token.getHOtpKey()
+        secretHOtp = self.token.getHOtpKey(pin)
 
         self.hashlibStr = self.getFromTokenInfo("hashlib", 'sha1')
         timeStepping = int(self.getFromTokenInfo("timeStep", 30))

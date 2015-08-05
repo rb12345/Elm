@@ -1088,7 +1088,7 @@ class TokenHandler(object):
 
         return len(tokenList)
 
-    def resyncToken(self, otp1, otp2, user, serial, options=None):
+    def resyncToken(self, otp1, otp2, user, serial, options=None, pin=None):
         """
         resync a token by its consecutive otps
 
@@ -1108,7 +1108,7 @@ class TokenHandler(object):
 
         for token in tokenList:
             token.addToSession(Session)
-            res = token.resync(otp1, otp2, options)
+            res = token.resync(otp1, otp2, options, pin=pin)
             if res == True:
                 ret = True
         return ret

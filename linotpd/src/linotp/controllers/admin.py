@@ -1469,6 +1469,7 @@ class AdminController(BaseController):
 
             otp1 = getParam(param, "otp1", required)
             otp2 = getParam(param, "otp2", required)
+            pin = getParam(param, "pin", required)
 
             ''' to support the challenge based resync, we have to pass the challenges
                 down to the token implementation
@@ -1485,7 +1486,7 @@ class AdminController(BaseController):
             th = TokenHandler()
             log.info("[resync] resyncing token with serial %r, user %r@%r"
                      % (serial, user.login, user.realm))
-            res = th.resyncToken(otp1, otp2, user, serial, options)
+            res = th.resyncToken(otp1, otp2, user, serial, options, pin=pin)
 
             c.audit['success'] = res
             c.audit['user'] = user.login

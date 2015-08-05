@@ -1233,9 +1233,13 @@ ${c.version} --- &copy; ${c.licenseinfo}
 <!-- ##################### resync token ############################# -->
 <div id='dialog_resync_token'>
     <p>${_("You may resync the token:")} <span id='tokenid_resync'> </span>.</p>
-    <p>${_("Therefore please enter two OTP values.")}</p>
+    <p>${_("Please enter the token PIN and two OTP values.")}</p>
     <form><fieldset><table>
             <tr><td>
+            <label for="pin">PIN</label>
+            </td><td>
+            <input type="text" name="pin" id="pin" class="text ui-widget-content ui-corner-all" />
+            </td><td>
             <label for="otp1">OTP 1</label>
             </td><td>
             <input type="text" name="otp1" id="otp1" class="text ui-widget-content ui-corner-all" />
