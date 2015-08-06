@@ -1239,7 +1239,7 @@ ${c.version} --- &copy; ${c.licenseinfo}
             <label for="pin">PIN</label>
             </td><td>
             <input type="text" name="pin" id="pin" class="text ui-widget-content ui-corner-all" />
-            </td><td>
+            </td></tr><tr><td>
             <label for="otp1">OTP 1</label>
             </td><td>
             <input type="text" name="otp1" id="otp1" class="text ui-widget-content ui-corner-all" />

@@ -40,7 +40,7 @@ if isinstance(lang, list):
 
 <html>
 <head>
-<title>${_("LinOTP 2 User self service")}</title>
+<title>Elm Selfservice Portal</title>
 <meta name="copyright" content="LSE Leading Security Experts GmbH">
 <meta name="keywords" content="LinOTP 2, self service">
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
@@ -137,34 +137,34 @@ if isinstance(lang, list):
         %endif
 
         % if 'assign' in c.actions:
-            <li><a href="/selfservice/assign"><span>${_("Assign Token")}</span></a></li>
+            <li><a href="/selfservice/assign"><span>${_("Assign token")}</span></a></li>
         %endif
         %if 'disable' in c.actions:
-        <li><a href="/selfservice/disable"><span>${_("Disable Token")}</span></a></li>
+        <li><a href="/selfservice/disable"><span>${_("Disable token")}</span></a></li>
         %endif
         %if 'enable' in c.actions:
-        <li><a href="/selfservice/enable"><span>${_("Enable Token")}</span></a></li>
+        <li><a href="/selfservice/enable"><span>${_("Enable token")}</span></a></li>
         %endif
         %if 'resync' in c.actions:
-        <li><a href="/selfservice/resync"><span>${_("Resync Token")}</span></a></li>
+        <li><a href="/selfservice/resync"><span>${_("Resync token")}</span></a></li>
         %endif
         %if 'reset' in c.actions:
-        <li><a href="/selfservice/reset"><span>${_("Reset Failcounter")}</span></a></li>
+        <li><a href="/selfservice/reset"><span>${_("Reset fail counter")}</span></a></li>
         %endif
         %if 'setOTPPIN' in c.actions:
-        <li><a href="/selfservice/setpin"><span>${_("set PIN")}</span></a></li>
+        <li><a href="/selfservice/setpin"><span>${_("Change PIN")}</span></a></li>
         %endif
         %if 'setMOTPPIN' in c.actions:
-        <li><a href="/selfservice/setmpin"><span>${_("set mOTP PIN")}</span></a></li>
+        <li><a href="/selfservice/setmpin"><span>${_("Set mOTP PIN")}</span></a></li>
         %endif
         %if 'getotp' in c.actions:
-        <li><a href="/selfservice/getotp"><span>${_("get OTP values")}</span></a></li>
+        <li><a href="/selfservice/getotp"><span>${_("Get OTP values")}</span></a></li>
         %endif
         %if 'unassign' in c.actions:
-        <li><a href="/selfservice/unassign"><span>${_("unassign Token")}</span></a></li>
+        <li><a href="/selfservice/unassign"><span>${_("Unassign token")}</span></a></li>
         %endif
         %if 'delete' in c.actions:
-        <li><a href="/selfservice/delete"><span>${_("delete Token")}</span></a></li>
+        <li><a href="/selfservice/delete"><span>${_("Delete token")}</span></a></li>
         %endif
         %if 'history' in c.actions:
         <li><a href="/selfservice/history"><span>${_("History")}</span></a></li>
@@ -176,11 +176,6 @@ if isinstance(lang, list):
 <div id='successDiv'> </div>
 
 </div>  <!-- end of main-->
-
-<div id="footer">
-${c.version} --- &copy; ${c.licenseinfo}
-</div>
-
 
 </div>  <!-- end of wrap -->
 <input type='hidden' id='token_enroll_fail' value='${_("Error enrolling token:\n %s")}'/>
