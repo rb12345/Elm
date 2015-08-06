@@ -104,6 +104,9 @@ def create_google_authenticator(param, user=None):
     if 'timeStep' in param:
         url_param['period'] = param.get('timeStep')
 
+    if 'issuer' in param:
+        url_param['issuer'] = param.get('issuer')
+
     ga = "otpauth://%s/%s" % (typ, serial)
     qg_param = urllib.urlencode(url_param)
 
@@ -119,6 +122,8 @@ def create_google_authenticator(param, user=None):
         label = get_tokenlabel(login, realm, serial)
         if len(param.get('description', '')) > 0 and '<d>' in label:
             label = label.replace('<d>', param.get('description'))
+        if len(param.get('issuer', '')) > 0:
+            label = param.get('issuer') + ':' + label
 
     else:
         label = serial or ''

@@ -1486,6 +1486,7 @@ class UserserviceController(BaseController):
                                   'serial' : serial,
                                   'type' : t_type,
                                   'description': desc,
+                                  'issuer' : "University of Oxford",
                                  }
 
                         url = create_google_authenticator(pparam, user=self.authUser)
