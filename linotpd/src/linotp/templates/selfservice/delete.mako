@@ -25,7 +25,7 @@
  *    Support: www.lsexperts.de
  *
 -->
-<h1>${_("Delete Token")}</h1>
+<h2>${_("Delete Token")}</h2>
 
 <div id='deleteform'>
     <form class="cmxform" name='myForm'>
@@ -44,6 +44,7 @@
                     <td><span class="form-help">Click a token on the left to select it.</span></td>
                 </tr>
             </table>
+            <br/>
             <button class='action-button' id='button_delete' onclick="token_delete(); return false;">${_("Delete Token")}</button>
         </fieldset>
     </form>
@@ -51,7 +52,8 @@
 
 <script>
         // Initial display.
-           $('#del_success').hide();
+        $('#del_success').hide();
         $('#del_error').hide();
+        $('#button_delete').button();
 </script>
 

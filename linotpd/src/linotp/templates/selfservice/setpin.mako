@@ -25,7 +25,7 @@
  *    Support: www.lsexperts.de
  *
 -->
-<h1>${_("Change Token PIN")}</h1>
+<h2>${_("Change Token PIN")}</h2>
 
 <div id='passwordform'>
     <form class="cmxform" name='myForm'>
@@ -65,7 +65,8 @@
                     <td><input autocomplete="off" type='password' onkeyup="checkpins('pin1', 'pin2');" id="pin2" class="text ui-widget-content ui-corner-all" value='' placeholder="Confirm new PIN"/></td>
                 </tr>
             </table>
-            <button class='action-button' id='button_setpin' onclick="setpin(); return false;">${_("set PIN")}</button>
+            <br/>
+            <button class='action-button' id='button_setpin' onclick="setpin(); return false;">Change PIN</button>
 
         </fieldset>
     </form>
@@ -73,7 +74,8 @@
 
 <script>
         // Initial display.
-           $('#setpin_success').hide();
+        $('#setpin_success').hide();
         $('#setpin_error').hide();
+        $('#button_setpin').button();
 </script>
 

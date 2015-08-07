@@ -24,6 +24,14 @@ a.activeToken {
 	font-style: italic;
 }
 
+.ui-button-text {
+	padding: 0.5em 1em 0.5em 1.5em;
+}
+
+.ui-widget {
+	font-size: 1em;
+}
+
 #main {
 	background: #eeeeee;
 	border: 1px solid #aeaeae;
@@ -56,6 +64,16 @@ a.activeToken {
 
 #wrap {
 	width: 70%;
+}
+
+#showadvanced {
+	background-color: transparent;
+	background-image: none;
+        border: medium none;
+	padding: 0px;
+        color: black;
+        font-size: 0.8em;
+        left: -0.7em;
 }
 
  #logout {

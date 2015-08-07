@@ -51,7 +51,6 @@ if isinstance(lang, list):
 
 <link type="text/css" rel="stylesheet" href="/css/linotp.css"/>
 <link type="text/css" rel="stylesheet" href="/selfservice/style.css" />
-<link type="text/css" rel="stylesheet" href="/selfservice/custom-style.css" />
 <link type="text/css" rel="stylesheet" href="/css/flexigrid/flexigrid.css">
 
 <link type="text/css" href="/css/jquery-ui/jquery-ui.min.css" rel="stylesheet" />
@@ -65,6 +64,8 @@ if isinstance(lang, list):
 <script type="text/javascript" src="/js/qrcode-helper.js"></script>
 <script type="text/javascript" src="/js/linotp_utils.js"></script>
 <script type="text/javascript" src="/js/flexigrid.js"></script>
+
+<link type="text/css" rel="stylesheet" href="/selfservice/custom-style.css" />
 
 <!-- load language settings befor selfservice.js -->
 <script type="text/javascript">
