@@ -842,7 +842,17 @@ function elmProvision() {
 		$('#error_pin').text("PIN codes must match.");
         hide_waiting();
     } else {
-        var params = {userpin : pin1, type : 'elm_totp', session : get_selfservice_session()};
+
+        var params = {userpin : pin1,
+                      type : $('input[name=token_type]:checked').val(),
+                      seedtype : $('input[name=seed_type]:checked').val(),
+                      seedval : $('#seedvalue').val(),
+                      otplen : $('#otplen').val(),
+                      hashlib : $('#algorithm').val(),
+                      desc : $('#desc').val(),
+                      timestep : $('#timestep').val(),
+                      session : get_selfservice_session()};
+                      
         var data = run_sync_request("/userservice/webprovision", params);
         hide_waiting();
         if (data.result.status == false) {
@@ -855,6 +865,7 @@ function elmProvision() {
             var img = data.result.value.oathtoken.img;
             $('#google_link').attr("href", url);
             $('#google_qr_code').html(img);
+            $('#tokenkey').text(data.result.value.oathtoken.key);
             $('#provisionElmInstall').hide();
             $('#provisionElmResultDiv').show();
 
@@ -866,7 +877,7 @@ function elmProvision() {
 
             // Disable the previous submit button. Otherwise, hitting enter tries to register another token for some reason.
             $('#elmprovision').attr('disabled', 'disabled');
-	}
+	    }
     }
 }
 

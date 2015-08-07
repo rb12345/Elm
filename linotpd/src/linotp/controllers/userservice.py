@@ -1436,18 +1436,30 @@ class UserserviceController(BaseController):
                             'digits': 6,
                         }
 
-            elif typ.lower() == "elm_totp":
-                # Elm tokens are Google Authenticator TOTP tokens, 
-                # but they are deactivated until the user confirms
+            elif typ.lower() in ["elm_totp", "elm_hmac"]:
+                # Elm tokens are TOTP or HOTP tokens, but
+                # they are deactivated until the user confirms
                 # his token is working.
-                desc = "Google Authenticator web prov"
+                desc = "Selfservice web prov"
 
                 # ideal: 32 byte.
-                otpkey = generate_otpkey(32)
-                t_type = "totp"
+                if param.get("seedtype") == "random":
+                    otpkey = generate_otpkey(32)
+                else:
+                    seed = param.get("seedvalue")
+                    if (len(seed) == 20) or (len(seed) == 32):
+                        otpkey = seed
+                    else:
+                        log.warning("[webprovision] Invalid seed length.")
+                        sendError(response, u"The seed needs to be either 20 or 32 bytes long.")
+
+                t_type = typ.lower()[4:]
 
                 if prefix is None:
-                    prefix = "GOOG"
+                    if t_type == "hmac":
+                        prefix = "HOTP"
+                    else:
+                        prefix = "TOTP"
                 if serial is None:
                     serial = th.genSerial(t_type, prefix)
 
@@ -1456,12 +1468,12 @@ class UserserviceController(BaseController):
 
                 (ret1, tokenObj) = th.initToken({ 'type': t_type,
                                 'serial': serial,
-                                'otplen': 6,
-                                'description' : desc,
+                                'otplen': int(param.get("otplen")),
+                                'description' : param.get("desc"),
                                 'otpkey' : otpkey,
-                                'timeStep' : 30,
+                                'timeStep' : int(param.get("timestep")),
                                 'timeWindow' : 180,
-                                'hashlib' : "sha1"
+                                'hashlib' : param.get("hashlib")
                                 }, self.authUser)
 
                 # We also set the PIN straight away for Elm tokens.
@@ -1473,7 +1485,7 @@ class UserserviceController(BaseController):
                     log.warning("[usersetpin] Setting of OTP PIN for Token %s by user %s failed: %s" % (serial, c.user, check_res['error']))
                     return sendError(response, u"Setting OTP PIN failed: %s" % check_res['error'])
 
-                if 1 == getOTPPINEncrypt(serial=serial, user=User(c.user, "", c.realm)):
+                if getOTPPINEncrypt(serial=serial, user=User(c.user, "", c.realm)):
                     param['encryptpin'] = "True"
 
                 ret2 = setPin(userPin, None, serial)
@@ -1487,6 +1499,7 @@ class UserserviceController(BaseController):
                                   'type' : t_type,
                                   'description': desc,
                                   'issuer' : "University of Oxford",
+                                  'otplen' : int(param.get("otplen"))
                                  }
 
                         url = create_google_authenticator(pparam, user=self.authUser)
@@ -1498,13 +1511,13 @@ class UserserviceController(BaseController):
                             'label' :   label,
                             'serial' :  serial,
                             'counter' : 0,
-                            'digits':   6,
+                            'digits':   int(param.get("otplen")),
                         }
 
             else:
                 return sendError(response, _(
                 "valid types are 'oathtoken' and 'googleauthenticator' and "
-                "'googleauthenticator_time' and 'elm_totp'. You provided %s") % typ)
+                "'googleauthenticator_time' and 'elm_totp' and 'elm_hotp'. You provided %s") % typ)
 
             logTokenNum()
             c.audit['serial'] = serial
