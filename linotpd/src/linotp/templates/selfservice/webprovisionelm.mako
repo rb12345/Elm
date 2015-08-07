@@ -60,8 +60,8 @@
                     <div id="advancedoptions"><table>
                         <tr>
                             <td><label for="token_type">Token type</label></td>
-                            <td><input type="radio" name="token_type" value="elm_totp" checked>Time-based HMAC (TOTP)</td>
-                            <td><input type="radio" name="token_type" value="elm_hmac">Event-based HMAC (HOTP)</td>
+                            <td><input type="radio" name="token_type" value="elm_totp" id="totp" checked>Time-based HMAC (TOTP)</td>
+                            <td><input type="radio" name="token_type" value="elm_hmac" id="hotp">Event-based HMAC (HOTP)</td>
                         </tr>
                         <tr>
                             <td><label for="seed_type">Token seed</label></td>
@@ -89,6 +89,13 @@
                         <tr>
                             <td><label for="desc">Description</label></td>
                             <td><input type="text" id="desc" value="Web provision" class="text" /></td>
+                        </tr>
+                        <tr id="totp_row">
+                            <td><label for="timestep">Time step</label></td>
+                                <td><select id="timestep">
+                                    <option value='30'>30 seconds</option>
+                                    <option value='60'>60 seconds</option>
+                                </select></td>
                         </tr>
                     </table></div>
                     <br/>
@@ -162,14 +169,13 @@
 
     // Show advanced options
     function toggleadv() {
-       var div = document.getElementById("advancedoptions");
-        if (div.style.display == "none") {
-            div.style.display = "block";
+        if ($('#advancedoptions').css('display') == "none") {
+            $('#advancedoptions').show();
             $('#showadvanced').button({ icons: { primary: "ui-icon-triangle-1-s" },
                                      });
         }
         else {
-            div.style.display = "none";
+            $('#advancedoptions').hide();
             $('#showadvanced').button({ icons: { primary: "ui-icon-triangle-1-e" },
                                      });
         }
@@ -179,5 +185,10 @@
     $('#manualseed').click(function(){ $('#seedvalue').prop("disabled", false); });
     $('#genseed').click(function(){ $('#seedvalue').prop("disabled", true); });
 
+    // Show extra TOTP settings
+    $('#totp').click(function(){ $('#totp_row').show(); });
+    $('#hotp').click(function(){ $('#totp_row').hide(); });
+
 </script>
+
 
