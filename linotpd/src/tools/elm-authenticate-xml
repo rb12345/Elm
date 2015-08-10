@@ -168,7 +168,7 @@ def main():
             code = "9999" + str(sys.argv[4])
         else:
             code = sys.argv[4]
-        print webkdc_validate(sys.argv[2], code, sys.argv[4]) # third is username, fourth is token type
+        print webkdc_validate(sys.argv[2], code, sys.argv[5]) # third is username, fourth is token type
 
     elif (command == "sms"):
         if len(sys.argv) < 3:
