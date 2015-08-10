@@ -849,7 +849,6 @@ function elmProvision() {
                       seedval : $('#seedvalue').val(),
                       otplen : $('#otplen').val(),
                       hashlib : $('#algorithm').val(),
-                      desc : $('#desc').val(),
                       timestep : $('#timestep').val(),
                       session : get_selfservice_session()};
                       
@@ -866,6 +865,7 @@ function elmProvision() {
             $('#google_link').attr("href", url);
             $('#google_qr_code').html(img);
             $('#tokenkey').text(data.result.value.oathtoken.key);
+            $('#tokensecret').text(data.result.value.oathtoken.secret);
             $('#provisionElmInstall').hide();
             $('#provisionElmResultDiv').show();
 

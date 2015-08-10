@@ -1469,7 +1469,7 @@ class UserserviceController(BaseController):
                 (ret1, tokenObj) = th.initToken({ 'type': t_type,
                                 'serial': serial,
                                 'otplen': int(param.get("otplen")),
-                                'description' : param.get("desc"),
+                                'description' : desc,
                                 'otpkey' : otpkey,
                                 'timeStep' : int(param.get("timestep")),
                                 'timeWindow' : 180,
@@ -1503,6 +1503,7 @@ class UserserviceController(BaseController):
                                  }
 
                         url = create_google_authenticator(pparam, user=self.authUser)
+                        secret = url.split('&')[1].split('=')[1]
                         label = "%s@%s" % (self.authUser.login, self.authUser.realm)
                         ret = {
                             'url' :     url,
@@ -1512,6 +1513,7 @@ class UserserviceController(BaseController):
                             'serial' :  serial,
                             'counter' : 0,
                             'digits':   int(param.get("otplen")),
+                            'secret':   secret,
                         }
 
             else:
