@@ -1747,23 +1747,6 @@ function get_serial_by_otp_callback(xhdr, textStatus) {
         alert_info_text("text_failed", obj.result.error.message, ERROR);
     }
 }
-// get Serial by OTP
-function getSerialByOtp(otp, type, assigned, realm) {
-    var param = {};
-    param["otp"] = otp;
-    if (""!=type) {
-        param["type"]=type;
-    }
-    if (""!=assigned) {
-        param["assigned"] = assigned;
-    }
-    if (""!=realm) {
-        param["realm"] = realm;
-    }
-    clientUrlFetch('/admin/getSerialByOtp', param, get_serial_by_otp_callback);
-
-}
-
 
 function checkpins(){
     var pin1 = $('#pin1').val();
@@ -3755,18 +3738,6 @@ $(document).ready(function(){
     /**************************************************
      *  Tools
      */
-    $dialog_tools_getserial = create_tools_getserial_dialog();
-    $('#menu_tools_getserial').click(function(){
-        _fill_realms($('#tools_getserial_realm'),1);
-        $dialog_tools_getserial.dialog('open');
-    });
-
-    $dialog_tools_copytokenpin = create_tools_copytokenpin_dialog();
-    $('#menu_tools_copytokenpin').click(function(){
-        //_fill_realms($('#tools_getserial_realm'),1)
-        $dialog_tools_copytokenpin.dialog('open');
-    });
-
     $dialog_tools_checkpolicy = create_tools_checkpolicy_dialog();
     $('#menu_tools_checkpolicy').click(function(){
         $dialog_tools_checkpolicy.dialog('open');

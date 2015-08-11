@@ -105,8 +105,6 @@ if isinstance(lang, list):
         </li>
         <li><a href='#'>${_("Tools")}</a>
             <ul>
-                <li><a href='#' id='menu_tools_getserial'>${_("Get Serial by OTP")}</a></li>
-                <li><a href='#' id='menu_tools_copytokenpin'>${_("Copy Token PIN")}</a></li>
                 <li><a href='#' id='menu_tools_checkpolicy'>${_("Check Policy")}</a></li>
                 <li><a href='#' id='menu_tools_exporttoken'>${_("Export Token Info")}</a></li>
                 <li><a href='#' id='menu_tools_exportaudit'>${_("Export Audit Trail")}</a></li>
@@ -559,30 +557,6 @@ ${c.version} --- &copy; ${c.licenseinfo}
 </script>
 
 
-<!-- ####################################### get serial ############# -->
-<div id='dialog_get_serial'>
-    <p>${_("Here you can search for the serial of a token."+
-        "You need to enter the current OTP value, and choose where you want to search for this token.")}</p>
-        <p>${_("Beware: This can be time consuming!")}</p>
-        <p><label for="tools_getserial_type">${_("Type")}</label> <input id='tools_getserial_type'></p>
-        <p><label for="tools_getserial_assigned">${_("Assigned token")}</label>
-            <select id='tools_getserial_assigned'><option> </option>
-                <option value="1">${_("assigned")}</option>
-                <option value="0">${_("not assigned")}</option>
-            </select></p>
-        <p><label for="tools_getserial_realm">${_("Realm")}</label> <select id='tools_getserial_realm'> </select></p>
-        <p><label for="tools_getserial_otp">${_("OTP value")}</label> <input id='tools_getserial_otp'></p>
-</div>
-
-<script>
-    function translate_get_serial() {
-        $("#dialog_get_serial" ).dialog( "option", "title", '${_("Get Serial by OTP value")}' );
-        $('#button_tools_getserial_ok .ui-button-text').html('${_("Get Serial")}');
-        $('#button_tools_getserial_close .ui-button-text').html('${_("Close")}');
-    }
-</script>
-
-
 <!------------------------ check policy ------------------------->
 <div id="dialog_check_policy">
     <p>${_("Here you can check your policies.")}</p>
@@ -659,22 +633,6 @@ ${c.version} --- &copy; ${c.licenseinfo}
     }
 </script>
 
-
-<!-- ###################### copy token ####################### -->
-<div id='dialog_copy_token'>
-    <p>${_("Here you can copy the OTP PIN from one token to the other.")}</p>
-    <p>${_("Please enter the serial number of the token with the existing PIN and the serial number of the token, that should get the same PIN.")}</p>
-    <p><label for=copy_from_token>${_("From token")}</label> <input id='copy_from_token'></p>
-    <p><label for=copy_to_token>${_("To token")}</label> <input id='copy_to_token'></p>
-</div>
-
-<script>
-    function translate_copy_token() {
-        $("#dialog_copy_token" ).dialog( "option", "title", '${_("Copy Token PIN")}' );
-        $('#button_tools_copytokenpin_ok .ui-button-text').html('${_("Copy PIN")}');
-        $('#button_tools_copytokenpin_close .ui-button-text').html('${_("Close")}');
-    }
-</script>
 
 <!-- ############# import Safenet ######################### -->
 <div id='dialog_import_safenet'>
