@@ -126,7 +126,7 @@ class VascoTokenClass(TokenClass):
 
         return res
 
-    def checkOtp(self, anOtpVal, counter, window, options=None):
+    def checkOtp(self, anOtpVal, counter, window, options=None, pin=None):
         '''
         Checks if the OTP value is valid.
 
@@ -138,7 +138,7 @@ class VascoTokenClass(TokenClass):
         '''
         res = -1
 
-        secObject = self.token.getHOtpKey()
+        secObject = self.token.getHOtpKey(pin)
         otpkey = secObject.getKey()
         # let vasco handle the OTP checking
         ret = vasco_otp_check(otpkey, anOtpVal)

@@ -223,7 +223,7 @@ class YubikeyTokenClass(TokenClass):
 
         return
 
-    def checkOtp(self, otpVal, counter=None, window=None, options=None):
+    def checkOtp(self, otpVal, counter=None, window=None, options=None, pin=None):
         """
         checkOtp - validate the token otp against a given otpvalue
 
@@ -260,7 +260,7 @@ class YubikeyTokenClass(TokenClass):
             return res
 
         serial = self.token.getSerial()
-        secret = self.token.getHOtpKey()
+        secret = self.token.getHOtpKey(pin)
 
         anOtpVal = otpVal.lower()
 

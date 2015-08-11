@@ -154,7 +154,7 @@ class YubicoTokenClass(TokenClass):
         """
         raise Exception("YUBICO token resync is not managed by LinOTP.")
 
-    def checkOtp(self, anOtpVal, counter, window, options=None):
+    def checkOtp(self, anOtpVal, counter, window, options=None, pin=None):
         '''
         Here we contact the Yubico Cloud server to validate the OtpVal.
         '''
