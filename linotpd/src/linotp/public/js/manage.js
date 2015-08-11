@@ -5181,7 +5181,7 @@ function view_policy() {
 
 
      $('#policy_export').click(function(){
-		window.location.href = 'https://' + location.href + '/system/getPolicy/policy.cfg?session=' + getsession();
+		window.location.href = 'https://' + location.host + '/system/getPolicy/policy.cfg?session=' + getsession();
 	 });
 
     $('#policy_import').click(function(){
