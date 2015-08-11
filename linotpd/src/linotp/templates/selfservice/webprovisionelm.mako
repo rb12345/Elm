@@ -90,10 +90,6 @@
                                 </select>
                             </td>
                         </tr>
-                        <tr>
-                            <td><label for="desc">Description</label></td>
-                            <td><input type="text" id="desc" value="Web provision" class="text" /></td>
-                        </tr>
                         <tr id="totp_row">
                             <td><label for="timestep">Time step</label></td>
                                 <td><select id="timestep">
