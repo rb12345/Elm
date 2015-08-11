@@ -160,6 +160,15 @@
     $('#provisionElmComplete').hide();
     $('#advancedoptions').hide();
     $('#keyvalues').hide();
+    $('#elm_pin2').keypress(function(e){
+        if(e.keyCode==13)
+        $('#elmprovision').click();
+    });
+    
+    $('#otp').keypress(function(e){
+        if(e.keyCode==13)
+        $('#elmfinal').click();
+    });
 
     // Set up the accordion drop-down for the QR codes.
     $(function() {
