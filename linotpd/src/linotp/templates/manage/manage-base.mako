@@ -189,11 +189,6 @@ if isinstance(lang, list):
 </div>  <!-- end of main-->
 
 </div>
-<div id="footer">
-${c.version} --- &copy; ${c.licenseinfo}
-</div>
-
-<span id="include_footer"> </span>
 </div>  <!-- end of wrap -->
 
 <div id="all_dialogs" style="display:none; height:0px;">
