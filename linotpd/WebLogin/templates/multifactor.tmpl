@@ -52,11 +52,11 @@ user_message            : raw HTML returned by the user information service
 
     [% END %]
 
-    <body onload="document.login.otp.focus();">
+    <body onload="document.multifactor_login.otp.focus();">
     <div class="content" id="loginPage">
     <h1 id=pageTitle>University of Oxford - Single Sign On</h1>
     [% IF error %]
-        <div class="error" align="center">
+        <div id="errorBox" class="error" align="center">
         [% IF user_message %][% user_message %][% END %]
         <p>
         [% IF err_multifactor_missing %]
@@ -64,7 +64,7 @@ user_message            : raw HTML returned by the user information service
             Error: Enter a one-time password.
         [% END %]
 
-        [% IF err_multifactor_invalid && !user_message %]
+        [% IF err_multifactor_invalid %]
             <!-- Error: login failed. -->
             Error: You entered an incorrect one-time password.
         [% END %]
@@ -117,6 +117,8 @@ user_message            : raw HTML returned by the user information service
                 <input type="hidden" name="username" value="[% username FILTER html %]">
                 <input type="hidden" name="factor_type" value="[% factor_type FILTER html %]">
                 <input type="hidden" name="remember_login" value="[% remember_login FILTER html %]">
+                <input type="hidden" name="error" value="[% error FILTER html %]">
+                <input type="hidden" name="mf-invalid" value="[% err_multifactor_invalid FILTER html %]">
                 [% IF factor_type == "o2" && multifactor_sentauth %]
                     <input type="hidden" name="multifactor_sentauth" value="1">
                 [% END %]
@@ -124,7 +126,7 @@ user_message            : raw HTML returned by the user information service
                 <!--[if lte IE 9]>
                 <label class="ie-label" for="otp">Access Code</label>
                 <![endif]-->
-                <input id="otp" type="password" name="otp" value="" placeholder="Access Code" size="10" maxlength="10" tabindex="1"/>
+                <input id="otp" type="password" name="otp" value="" placeholder="Access Code" size="10" maxlength="50" tabindex="1"/>
 
                 <div class="formsubmit">
                 <input type="submit" name="Submit" class="go-go-go" value="Login" tabindex="2" />
