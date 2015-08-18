@@ -120,7 +120,10 @@ def webkdc_validate(user, code, token):
         return reply % (user, "yes", data)
     else:
         # An error occured, so respond with the error info.
-        error = "<user-message>%s</user-message>" % value.get("error")
+        # Return <user-message> only if there was an exception
+        error = ""
+        if value.get("error"):
+            error = "<user-message>%s</user-message>" % value.get("error")
         return reply % (user, "no", error)
         
 def sms_send(user):
