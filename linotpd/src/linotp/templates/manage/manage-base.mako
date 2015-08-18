@@ -14,12 +14,8 @@ if isinstance(lang, list):
 <html>
 
 <head>
-<title>${_("LinOTP 2 Management")}</title>
+<title>Elm Management Portal</title>
 
-<meta name="author" content="Cornelius Kölbel">
-<meta name="date" content="2010-08-21T00:25:13+0200">
-<meta name="copyright" content="LSE Leading Security Experts GmbH">
-<meta name="keywords" content="LinOTP 2 manage">
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8">
 <meta http-equiv="content-style-type" content="text/css">
