@@ -62,6 +62,7 @@ setup(
         # We also need M2Crypto. But this package is so problematic on many
         # distributions, that we do not require it here!
         "sqlalchemy-migrate",
+        "PasteScript",
     ],
     scripts=[
         'tools/linotp-convert-token',
