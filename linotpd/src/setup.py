@@ -28,13 +28,7 @@ def get_debian_package():
     returns the slash, if we do a debian installation
     Set the environment variable LINOTP_DEBIAN_PACKAGE_PREFIX
     """
-    check_file = os.path.join(package_directory, "LINOTP_DEBIAN_PACKAGE")
-    print
-    print check_file
-    print
-    if os.path.isfile(check_file):
-        return "/"
-    return ""
+    return "/"
 
 
 setup(
@@ -91,7 +85,6 @@ setup(
         'tools/linotp-enroll-smstoken',
         ],
     setup_requires=[
-        'PasteScript>=1.6.3',
         ],
     packages=find_packages(exclude=['ez_setup']),
     include_package_data=True,
