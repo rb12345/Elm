@@ -1,3 +1,10 @@
+linotp-useridresolver (2.8.2~dev0-1~ox.0~test.0) UNRELEASED; urgency=low
+
+  * Non-maintainer upload.
+  * Redo packaging to make it more Debian-friendly.
+
+ -- Robert Bradley <robert.bradley@it.ox.ac.uk>  Wed, 19 Aug 2015 14:39:50 +0100
+
 linotp-useridresolver (2.8.2~0dev0-1) jessie; urgency=low
 
   * Set new version 2.8.2~0dev0-1~bpo70+1
