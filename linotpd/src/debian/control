@@ -2,7 +2,8 @@ Source: linotp
 Section: net
 Priority: optional
 Maintainer: LSE Leading Security Experts GmbH <linotp@lsexperts.de>
-Build-Depends: debhelper (>=7.4.0), dh-python,
+Uploaders: Robert Bradley <robert.bradley@it.ox.ac.uk>
+Build-Depends: debhelper (>=8.0), dh-python,
  python (>=2.6),  po-debconf, python-setuptools, python-pastescript,
  python-paste, python-pastedeploy,
  linotp-useridresolver (>=2.7~),
