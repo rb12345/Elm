@@ -51,9 +51,6 @@ import logging
 
 import os
 
-# Path to the Oak LDAP credential file.
-os.environ["KRB5CCNAME"] = "/etc/krb5/oak-ldap.mfa.it.ox.ac.uk.ccache"
-
 log = logging.getLogger(__name__)
 
 ENCODING = 'utf-8'
