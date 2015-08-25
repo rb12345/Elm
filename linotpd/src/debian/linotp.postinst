@@ -27,7 +27,7 @@ case "$1" in
         if ! getent passwd linotp > /dev/null ; then
             echo 'Adding system-user for linotp' 1>&2
             adduser --system --group --quiet \
-                --no-create-home linotp
+                --no-create-home --home /etc/linotp2 linotp
         fi
         chown linotp /var/log/linotp2
         chown linotp /var/cache/linotp2
