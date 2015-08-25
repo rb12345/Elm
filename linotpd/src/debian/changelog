@@ -1,12 +1,13 @@
-linotp (2.8.2~dev0~ox.0~test.2) UNRELEASED; urgency=low
+linotp (2.8.2~dev0~ox.0~test.3) UNRELEASED; urgency=low
 
   * Non-maintainer upload.
   * Redo packaging to make it more Debian-friendly.
   * Native package format.
   * linotp: Remove upstream config scripts.
   * linotp: Fix typo in postinst script.
+  * linotp: Fix issue where authentication failed with HTTP 500 errors.
 
- -- Robert Bradley <robert.bradley@it.ox.ac.uk>  Tue, 25 Aug 2015 12:57:44 +0100
+ -- Robert Bradley <robert.bradley@it.ox.ac.uk>  Tue, 25 Aug 2015 17:04:27 +0100
 
 linotp (2.8.2~0dev0-1) jessie; urgency=low
 
