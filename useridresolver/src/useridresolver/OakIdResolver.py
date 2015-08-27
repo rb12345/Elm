@@ -114,7 +114,8 @@ class IdResolver (UserIdResolver):
 
             l.network_timeout = 10.0
 
-            l.start_tls_s()
+            if l.get_option(ldap.OPT_URI).startswith('ldap:'):
+                l.start_tls_s()
             l.sasl_interactive_bind_s("",auth)
 
             # We use eduPersonOrgUnitDN's oakUnitCode attribute to identify user realms.
@@ -228,7 +229,9 @@ class IdResolver (UserIdResolver):
 
             l_obj.network_timeout = self.timeout
 
-            #l_obj.start_tls_s()
+            if l_obj.get_option(ldap.OPT_URI).startswith('ldap:'):
+                l_obj.start_tls_s()
+
             l_obj.sasl_interactive_bind_s("",auth)
 
             self.l_obj = l_obj
@@ -803,7 +806,8 @@ class IdResolver (UserIdResolver):
         l_obj = ldap.initialize("ldap://ldap.oak.ox.ac.uk:389", trace_level=0)
 
         l_obj.network_timeout = self.timeout
-        l_obj.start_tls_s()
+        if l_obj.get_option(ldap.OPT_URI).startswith('ldap:'):
+            l_obj.start_tls_s()
         l_obj.sasl_interactive_bind_s("",auth)
 
         resultList = []
