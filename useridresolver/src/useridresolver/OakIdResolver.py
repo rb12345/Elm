@@ -691,58 +691,7 @@ class IdResolver (UserIdResolver):
                         case the Uid is not the DN
         '''
 
-        ## Patch:
-        ##   simple bind allows anonymous auth which raises no exception
-        ##   so we return immediatly if no password is given
-        ##
-
-        log.debug("[checkPass]")
-
-        if password == None or len(password) == 0:
-            return False
-
-        if type(password) == unicode:
-            password = password.encode(ENCODING)
-
-        if type(uid) == unicode:
-            uid = uid.encode(ENCODING)
-
-        DN = self._getUserDN(uid)
-
-        if type(DN) == unicode:
-            DN = DN.encode(ENCODING)
-
-        log.debug("[checkPass] DN: %r" % DN)
-
-        uri = self.ldapuri
-
-        log.debug("[checkPass] we will try to authenticate to this LDAP "
-                  "server: %r" % uri)
-
-        l = None
-        try:
-            log.info("[checkPass] check password for user %r "
-                     "on LDAP server %r" % (DN, uri))
-            auth = ldap.sasl.gssapi("")
-            l = ldap.initialize(uri, trace_level=0)
-
-            l.network_timeout = self.timeout
-            l.start_tls_s()
-            l.sasl_interactive_bind_s("",auth)
-
-            log.info("[checkPass] ldap bind for %r successful" % DN)
-            return True
-
-        except ldap.INVALID_CREDENTIALS as exc:
-            log.warning("[checkPass] invalid credentials: %r" % exc)
-
-        except ldap.LDAPError as  exc:
-            log.warning("[checkPass] checking password failed: %r" % exc)
-
-        finally:
-            if l is not None:
-                l.unbind_s()
-
+        # We don't do LDAP "authentication", so always return false
         return False
 
     def guid2str(self, guid):
