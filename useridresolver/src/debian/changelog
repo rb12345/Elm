@@ -1,10 +1,11 @@
-linotp-useridresolver (2.8.2~dev0~ox.0~test.2) UNRELEASED; urgency=low
+linotp-useridresolver (2.8.2~dev0~ox.0~test.3) UNRELEASED; urgency=low
 
   * Redo packaging to make it more Debian-friendly.
   * Adjust dependencies so that python2.6 is not required.
   * OakIDResolver: Avoid hard-coding Kerberos credential cache location.
+  * OakIDResolver: Call start_tls_s() automatically for non-LDAPS URIs.
 
- -- Robert Bradley <robert.bradley@it.ox.ac.uk>  Tue, 25 Aug 2015 15:36:36 +0100
+ -- Robert Bradley <robert.bradley@it.ox.ac.uk>  Thu, 27 Aug 2015 10:42:46 +0100
 
 linotp-useridresolver (2.8.2~0dev0-1) jessie; urgency=low
 
